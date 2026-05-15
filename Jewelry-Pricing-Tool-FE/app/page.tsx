@@ -14,7 +14,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { GOLD_RATIOS, formatCurrency, formatNumber } from '@/lib/pricing'
-import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp } from 'lucide-react'
+import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, Hammer } from 'lucide-react'
+import { QuoteRequestModal } from '@/components/quote-request-modal'
+import { QuoteListPricer } from '@/components/quote-list-pricer'
+import { ProductionBoard } from '@/components/production-board'
 
 const tabContentVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -50,6 +53,8 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('dashboard')
 
   const canViewSettings = currentRole === 'order' || currentRole === 'admin'
+  const canViewProduction = currentRole === 'workshop' || currentRole === 'admin'
+  const currentUserName = currentRole === 'sale' ? 'Nguyễn Văn Sale' : currentRole === 'order' ? 'NV Báo Giá' : 'Admin'
 
   return (
     <div className="min-h-screen bg-background">
@@ -91,7 +96,9 @@ export default function Home() {
             <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-none lg:flex">
               {[
                 { value: 'dashboard', icon: LayoutDashboard, label: 'Bảng điều khiển' },
+                { value: 'quotes', icon: ClipboardList, label: 'Báo giá' },
                 { value: 'calculator', icon: Calculator, label: 'Tính giá' },
+                ...(canViewProduction ? [{ value: 'production', icon: Hammer, label: 'Sản xuất' }] : []),
                 ...(canViewSettings ? [{ value: 'settings', icon: Settings, label: 'Cài đặt' }] : []),
               ].map((tab) => (
                 <TabsTrigger
@@ -126,10 +133,58 @@ export default function Home() {
                 <WorkflowStatus currentStep={currentStep} />
 
                 {/* Recent Quotes */}
+                {/* Recent Quotes */}
                 <RecentQuotes currentRole={currentRole} />
+
+                {/* Sale: nút tạo yêu cầu báo giá nhanh từ dashboard */}
+                {currentRole === 'sale' && (
+                  <div className="flex justify-end">
+                    <QuoteRequestModal
+                      requesterName={currentUserName}
+                      onSuccess={() => {}}
+                    />
+                  </div>
+                )}
               </motion.div>
             </TabsContent>
           </AnimatePresence>
+
+          {/* Quotes Tab — GĐ1: Luồng báo giá */}
+          <TabsContent value="quotes" className="space-y-6">
+            <motion.div
+              key="quotes"
+              variants={tabContentVariants}
+              initial="hidden"
+              animate="visible"
+              exit="exit"
+              className="space-y-4"
+            >
+              {currentRole === 'sale' && (
+                <div className="flex justify-end">
+                  <QuoteRequestModal
+                    requesterName={currentUserName}
+                    onSuccess={() => {}}
+                  />
+                </div>
+              )}
+              <QuoteListPricer currentRole={currentRole} currentUserName={currentUserName} />
+            </motion.div>
+          </TabsContent>
+
+          {/* Production Tab — GĐ2: Luồng sản xuất */}
+          {canViewProduction && (
+            <TabsContent value="production" className="space-y-6">
+              <motion.div
+                key="production"
+                variants={tabContentVariants}
+                initial="hidden"
+                animate="visible"
+                exit="exit"
+              >
+                <ProductionBoard currentUserName={currentUserName} />
+              </motion.div>
+            </TabsContent>
+          )}
 
           {/* Calculator Tab */}
           <TabsContent value="calculator" className="space-y-6">
