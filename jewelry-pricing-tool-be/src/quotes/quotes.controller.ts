@@ -19,6 +19,12 @@ export class QuotesController {
     return this.quotesService.findAll(status as QuoteStatus)
   }
 
+
+  @Get('stats')
+  getStats() {
+    return this.quotesService.getStats()
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.quotesService.findOne(id)
@@ -48,6 +54,16 @@ export class QuotesController {
   @Patch(':id/price')
   updatePrice(@Param('id') id: string, @Body() dto: UpdateQuotePriceDto) {
     return this.quotesService.updatePrice(id, dto)
+  }
+
+  @Patch(':id/start-quoting')
+  startQuoting(@Param('id') id: string) {
+    return this.quotesService.startQuoting(id)
+  }
+
+  @Patch(':id/reject')
+  rejectQuote(@Param('id') id: string, @Body() body: { reason: string }) {
+    return this.quotesService.rejectQuote(id, body.reason)
   }
 
   @Patch(':id/complete-quoting')

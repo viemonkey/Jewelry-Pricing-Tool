@@ -64,8 +64,12 @@ export interface ProductionOrder {
 // DTO for creating a quote request (Sale gửi lên)
 export interface CreateQuoteRequest {
   productName: string
-  productDescription?: string
   materialType: Quote['materialType']
+  productDescription?: string
+  dimensions?: string
+  stoneRequirements?: string
+  quantity?: number
+  deadline?: string
   notes?: string
   images: File[]
   requestedBy: string

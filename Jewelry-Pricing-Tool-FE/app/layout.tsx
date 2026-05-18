@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
+import { NotificationProvider } from '@/lib/notifications'
 import './globals.css'
 
 const _geist = Geist({ subsets: ["latin"] });
@@ -37,7 +38,9 @@ export default function RootLayout({
   return (
     <html lang="vi" className="bg-background" suppressHydrationWarning>
       <body className="font-sans antialiased" suppressHydrationWarning>
-        {children}
+        <NotificationProvider>
+          {children}
+        </NotificationProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

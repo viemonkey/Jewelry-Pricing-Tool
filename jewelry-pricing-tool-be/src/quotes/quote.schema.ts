@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Document, Types, CallbackWithoutResultAndOptionalError } from 'mongoose'
+import { Document, Types } from 'mongoose'
 
 export type QuoteDocument = Quote & Document
 
@@ -13,24 +13,20 @@ export enum QuoteStatus {
 }
 
 @Schema({ timestamps: true })
-export class StoneDetail {
-  @Prop({ required: true }) name: string
-  @Prop({ required: true }) quantity: number
-  @Prop({ required: true }) pricePerUnit: number
-  @Prop({ required: true }) totalPrice: number
-}
-
-@Schema({ timestamps: true })
 export class Quote {
-  @Prop({ required: true, unique: true }) quoteCode: string
+  @Prop() quoteCode: string           // không required, không unique index ở đây
   @Prop({ required: true }) productName: string
   @Prop() productDescription: string
+  @Prop() dimensions: string         // Kích thước / trọng lượng dự kiến
+  @Prop() stoneRequirements: string  // Yêu cầu đá / phụ kiện
+  @Prop({ default: 1 }) quantity: number
+  @Prop() deadline: string           // Deadline khách yêu cầu
   @Prop({ required: true, enum: ['GOLD_24K', 'GOLD_18K', 'GOLD_14K', 'GOLD_10K', 'SILVER'] })
   materialType: string
   @Prop() weightChi: number
   @Prop() weightGram: number
   @Prop({ default: 0 }) laborCost: number
-  @Prop({ type: [Object], default: [] }) stones: StoneDetail[]
+  @Prop({ type: [Object], default: [] }) stones: any[]
   @Prop({ default: 0 }) costPrice: number
   @Prop({ default: 0 }) sellingPrice: number
   @Prop() notes: string
@@ -42,13 +38,3 @@ export class Quote {
 }
 
 export const QuoteSchema = SchemaFactory.createForClass(Quote)
-
-QuoteSchema.pre('save', async function (this: QuoteDocument & { quoteCode: string; isNew: boolean }, next: CallbackWithoutResultAndOptionalError) {
-  if (this.isNew && !this.quoteCode) {
-    const year = new Date().getFullYear()
-    const model = (this as any).constructor
-    const count = await model.countDocuments({ quoteCode: new RegExp(`^QT-${year}-`) })
-    this.quoteCode = `QT-${year}-${String(count + 1).padStart(4, '0')}`
-  }
-  next()
-})

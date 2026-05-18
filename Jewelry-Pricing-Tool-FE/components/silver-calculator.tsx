@@ -1,21 +1,25 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { calculateSilverProductPrice, formatCurrency, SILVER_MULTIPLIER } from '@/lib/pricing'
+import { calculateSilverProductPrice, formatCurrency } from '@/lib/pricing'
+import { pricingConfigApi, type PricingConfig } from '@/lib/api'
 import type { UserRole } from './header'
-import { Calculator, ArrowRight, Info, Save, FileDown, CheckCircle2 } from 'lucide-react'
+import { Calculator, ArrowRight, Info, Save, FileDown, CheckCircle2, Loader2 } from 'lucide-react'
 
 interface SilverCalculatorProps {
   currentRole: UserRole
 }
 
 export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
+  const [config, setConfig] = useState<PricingConfig | null>(null)
+  const [configLoading, setConfigLoading] = useState(true)
+
   const [productName, setProductName] = useState('')
   const [costPrice, setCostPrice] = useState<string>('')
   const [sellingPrice, setSellingPrice] = useState<string>('')
@@ -24,27 +28,47 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
 
   const canViewCost = currentRole === 'order' || currentRole === 'admin'
 
+  useEffect(() => {
+    pricingConfigApi.get()
+      .then(setConfig)
+      .catch(() => setConfig(null))
+      .finally(() => setConfigLoading(false))
+  }, [])
+
+  const silverMultiplier = config?.silverMultiplier ?? 3
+
   const result = useMemo(() => {
+    if (!config) return null
     if (calculationMode === 'cost-to-sell') {
       const cost = parseFloat(costPrice) || 0
-      if (cost > 0) {
-        return calculateSilverProductPrice(cost)
-      }
+      if (cost > 0) return calculateSilverProductPrice(cost, silverMultiplier)
     } else {
       const sell = parseFloat(sellingPrice) || 0
-      if (sell > 0) {
-        return {
-          costPrice: sell / SILVER_MULTIPLIER,
-          sellingPrice: sell,
-        }
-      }
+      if (sell > 0) return { costPrice: sell / silverMultiplier, sellingPrice: sell }
     }
     return null
-  }, [costPrice, sellingPrice, calculationMode])
+  }, [costPrice, sellingPrice, calculationMode, config, silverMultiplier])
 
   const handleSave = () => {
     setIsSaving(true)
     setTimeout(() => setIsSaving(false), 1500)
+  }
+
+  if (configLoading) {
+    return (
+      <div className="flex h-48 items-center justify-center text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+        Đang tải cấu hình giá...
+      </div>
+    )
+  }
+
+  if (!config) {
+    return (
+      <div className="flex h-48 items-center justify-center text-destructive text-sm">
+        Không thể tải cấu hình giá từ server. Vui lòng kiểm tra kết nối backend.
+      </div>
+    )
   }
 
   return (
@@ -73,7 +97,7 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
             Tính giá sản phẩm bạc
           </CardTitle>
           <CardDescription>
-            Quy tắc đặc biệt: Giá bán = Giá vốn x {SILVER_MULTIPLIER}
+            Quy tắc đặc biệt: Giá bán = Giá vốn x {silverMultiplier}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -192,7 +216,6 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
                   whileHover={{ scale: 1.02 }}
                   transition={{ type: 'spring', stiffness: 300 }}
                 >
-                  {/* Shimmer effect */}
                   <motion.div
                     className="absolute inset-0 bg-gradient-to-r from-transparent via-silver/20 to-transparent"
                     animate={{ x: ['-100%', '100%'] }}
@@ -227,7 +250,7 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
                           animate={{ scale: [1, 1.1, 1] }}
                           transition={{ duration: 1, repeat: Infinity }}
                         >
-                          x{SILVER_MULTIPLIER}
+                          x{silverMultiplier}
                         </motion.span>
                         <motion.div
                           animate={{ x: [0, 5, 0] }}
@@ -269,7 +292,7 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
                   >
                     <Info className="h-4 w-4" />
                   </motion.div>
-                  <span>Sản phẩm bạc áp dụng hệ số x{SILVER_MULTIPLIER} từ giá vốn</span>
+                  <span>Sản phẩm bạc áp dụng hệ số x{silverMultiplier} từ giá vốn</span>
                 </motion.div>
 
                 {/* Actions */}
@@ -280,29 +303,14 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
                   transition={{ delay: 0.5 }}
                 >
                   <motion.div className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Button
-                      className="w-full gap-2"
-                      variant="default"
-                      onClick={handleSave}
-                      disabled={isSaving}
-                    >
+                    <Button className="w-full gap-2" variant="default" onClick={handleSave} disabled={isSaving}>
                       <AnimatePresence mode="wait">
                         {isSaving ? (
-                          <motion.div
-                            key="saving"
-                            initial={{ scale: 0, rotate: -180 }}
-                            animate={{ scale: 1, rotate: 0 }}
-                            exit={{ scale: 0 }}
-                          >
+                          <motion.div key="saving" initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0 }}>
                             <CheckCircle2 className="h-4 w-4" />
                           </motion.div>
                         ) : (
-                          <motion.div
-                            key="save"
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0 }}
-                          >
+                          <motion.div key="save" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
                             <Save className="h-4 w-4" />
                           </motion.div>
                         )}

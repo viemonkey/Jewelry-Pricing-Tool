@@ -54,6 +54,7 @@ import {
 } from 'lucide-react'
 import { productionApi } from '@/lib/api'
 import { formatCurrency } from '@/lib/pricing'
+import { useNotifications } from '@/lib/notifications'
 import type { ProductionOrder, ProductionStatus } from '@/lib/types'
 
 // ─── Config ────────────────────────────────────────────────
@@ -76,24 +77,6 @@ const STATUS_COLOR: Record<ProductionStatus, string> = {
   COMPLETED:          'bg-success/20 text-success',
 }
 
-// ─── Demo data ─────────────────────────────────────────────
-const DEMO_ORDERS: ProductionOrder[] = [
-  {
-    _id: 'po1', orderCode: 'PO-2025-001',
-    quote: { _id: 'q3', quoteCode: 'QT-2025-003', productName: 'Vòng tay vàng 14K', materialType: 'GOLD_14K', laborCost: 300000, stones: [], costPrice: 8750000, sellingPrice: 13462000, status: 'CONFIRMED', requestedBy: 'Lê Văn C', images: [], createdAt: '', updatedAt: '' },
-    deadline: '2025-05-20', assignedTo: 'Thợ Minh', progressStatus: 'CASTING',
-    progressNotes: 'Đang đúc khuôn', completedImages: [],
-    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-  },
-  {
-    _id: 'po2', orderCode: 'PO-2025-002',
-    quote: { _id: 'q4', quoteCode: 'QT-2025-004', productName: 'Bông tai kim cương Lab', materialType: 'GOLD_18K', laborCost: 800000, stones: [], costPrice: 25000000, sellingPrice: 35714000, status: 'CONFIRMED', requestedBy: 'Phạm Thị D', images: [], createdAt: '', updatedAt: '' },
-    deadline: '2025-05-25', progressStatus: 'PENDING_PRODUCTION',
-    progressNotes: '', completedImages: [],
-    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-  },
-]
-
 // ─── Component ─────────────────────────────────────────────
 
 interface ProductionBoardProps {
@@ -101,7 +84,7 @@ interface ProductionBoardProps {
 }
 
 export function ProductionBoard({ currentUserName = 'Thợ xưởng' }: ProductionBoardProps) {
-  const [orders, setOrders] = useState<ProductionOrder[]>(DEMO_ORDERS)
+  const [orders, setOrders] = useState<ProductionOrder[]>([])
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<ProductionOrder | null>(null)
   const [progressStatus, setProgressStatus] = useState<ProductionStatus>('PENDING_PRODUCTION')
@@ -112,6 +95,7 @@ export function ProductionBoard({ currentUserName = 'Thợ xưởng' }: Producti
   const [saving, setSaving] = useState(false)
   const [mode, setMode] = useState<'progress' | 'complete' | 'view'>('view')
   const fileRef = useRef<HTMLInputElement>(null)
+  const { addNotification } = useNotifications()
 
   const fetchOrders = async () => {
     setLoading(true)
@@ -119,7 +103,7 @@ export function ProductionBoard({ currentUserName = 'Thợ xưởng' }: Producti
       const data = await productionApi.list()
       setOrders(data)
     } catch {
-      setOrders(DEMO_ORDERS)
+      setOrders([])
     } finally {
       setLoading(false)
     }
@@ -140,12 +124,19 @@ export function ProductionBoard({ currentUserName = 'Thợ xưởng' }: Producti
   const handleUpdateProgress = async () => {
     if (!selected) return
     setSaving(true)
+    const quote = typeof selected.quote === 'object' ? selected.quote : null
+    const statusLabel = PRODUCTION_STEPS.find((s) => s.status === progressStatus)?.label || progressStatus
     try {
       await productionApi.updateProgress(selected._id, { progressStatus, progressNotes })
+      addNotification({
+        type: 'info',
+        title: 'Cập nhật tiến độ',
+        message: `${quote?.productName || selected.orderCode} → ${statusLabel}`,
+      })
       setSelected(null)
       fetchOrders()
     } catch {
-      alert('Cập nhật thất bại')
+      addNotification({ type: 'error', title: 'Cập nhật thất bại', message: 'Không thể lưu tiến độ. Vui lòng thử lại.' })
     } finally {
       setSaving(false)
     }
@@ -154,12 +145,18 @@ export function ProductionBoard({ currentUserName = 'Thợ xưởng' }: Producti
   const handleComplete = async () => {
     if (!selected) return
     setSaving(true)
+    const quote = typeof selected.quote === 'object' ? selected.quote : null
     try {
       await productionApi.complete(selected._id, completedImages.map((c) => c.file))
+      addNotification({
+        type: 'success',
+        title: 'Hoàn thành sản xuất!',
+        message: `${quote?.productName || selected.orderCode} đã sản xuất xong và sẵn sàng giao.`,
+      })
       setSelected(null)
       fetchOrders()
     } catch {
-      alert('Hoàn thành thất bại')
+      addNotification({ type: 'error', title: 'Hoàn thành thất bại', message: 'Không thể lưu kết quả. Vui lòng thử lại.' })
     } finally {
       setSaving(false)
     }

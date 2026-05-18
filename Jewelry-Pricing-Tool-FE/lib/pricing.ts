@@ -1,21 +1,8 @@
-// Gold karat ratios with 5% manufacturing loss
-export const GOLD_RATIOS: Record<string, { standard: number; applied: number; label: string }> = {
-  '10K': { standard: 0.417, applied: 0.47, label: 'Vàng 10K' },
-  '14K': { standard: 0.583, applied: 0.64, label: 'Vàng 14K' },
-  '18K': { standard: 0.750, applied: 0.80, label: 'Vàng 18K' },
-  '610': { standard: 0.610, applied: 0.66, label: 'Vàng 610' },
-  '24K': { standard: 0.9999, applied: 1.05, label: 'Vàng 24K' },
-}
-
-// Profit margin tiers
-export const PROFIT_MARGINS: Array<{ maxCost: number; divisor: number; margin: string }> = [
-  { maxCost: 10_000_000, divisor: 0.65, margin: '35%' },
-  { maxCost: 50_000_000, divisor: 0.70, margin: '30%' },
-  { maxCost: Infinity, divisor: 0.75, margin: '25%' },
-]
-
-// Silver multiplier
-export const SILVER_MULTIPLIER = 3
+// ============================================================
+// pricing.ts — Logic tính giá (không còn hardcode config)
+// Tất cả config (GOLD_RATIOS, PROFIT_MARGINS, SILVER_MULTIPLIER)
+// được load từ backend qua pricingConfigApi.get()
+// ============================================================
 
 export type StoneType = 'lab_diamond' | 'natural_diamond' | 'colored_stone'
 
@@ -30,11 +17,13 @@ export interface StoneEntry {
 
 export interface GoldProductInput {
   name: string
-  karatType: keyof typeof GOLD_RATIOS
-  weight: number // in chi (1 chi = 3.75g)
-  goldPrice24K: number // VND per chi
+  karatType: string
+  weight: number          // in chi (1 chi = 3.75g)
+  goldPrice24K: number    // VND per chi
   laborCost: number
   stoneCost: number
+  goldRatios: Record<string, { standard: number; applied: number; label: string }>
+  profitMargins: Array<{ maxCost: number; divisor: number; margin: string }>
 }
 
 export interface SilverProductInput {
@@ -58,22 +47,27 @@ export interface PricingResult {
 
 // Calculate gold price by karat
 export function calculateGoldPriceByKarat(
-  karatType: keyof typeof GOLD_RATIOS,
+  karatType: string,
   weight: number,
-  goldPrice24K: number
+  goldPrice24K: number,
+  goldRatios: Record<string, { standard: number; applied: number; label: string }>
 ): number {
-  const ratio = GOLD_RATIOS[karatType].applied
+  const ratio = goldRatios[karatType]?.applied ?? 0
   return ratio * goldPrice24K * weight
 }
 
 // Get profit margin divisor based on cost
-export function getProfitDivisor(costWithVAT: number): { divisor: number; margin: string } {
-  for (const tier of PROFIT_MARGINS) {
+export function getProfitDivisor(
+  costWithVAT: number,
+  profitMargins: Array<{ maxCost: number; divisor: number; margin: string }>
+): { divisor: number; margin: string } {
+  for (const tier of profitMargins) {
     if (costWithVAT < tier.maxCost) {
       return { divisor: tier.divisor, margin: tier.margin }
     }
   }
-  return { divisor: 0.75, margin: '25%' }
+  const last = profitMargins[profitMargins.length - 1]
+  return { divisor: last?.divisor ?? 0.75, margin: last?.margin ?? '25%' }
 }
 
 // Calculate full pricing for gold product
@@ -81,14 +75,15 @@ export function calculateGoldProductPrice(input: GoldProductInput): PricingResul
   const goldPriceByKarat = calculateGoldPriceByKarat(
     input.karatType,
     input.weight,
-    input.goldPrice24K
+    input.goldPrice24K,
+    input.goldRatios
   )
 
   const costBeforeVAT = goldPriceByKarat + input.laborCost + input.stoneCost
   const vat = costBeforeVAT * 0.1
   const costWithVAT = costBeforeVAT + vat
 
-  const { divisor, margin } = getProfitDivisor(costWithVAT)
+  const { divisor, margin } = getProfitDivisor(costWithVAT, input.profitMargins)
   const suggestedPrice = Math.round(costWithVAT / divisor / 1000) * 1000 // Round to nearest 1000 VND
 
   return {
@@ -107,13 +102,16 @@ export function calculateGoldProductPrice(input: GoldProductInput): PricingResul
 }
 
 // Calculate silver product price
-export function calculateSilverProductPrice(costPrice: number): {
+export function calculateSilverProductPrice(
+  costPrice: number,
+  silverMultiplier: number
+): {
   costPrice: number
   sellingPrice: number
 } {
   return {
     costPrice,
-    sellingPrice: costPrice * SILVER_MULTIPLIER,
+    sellingPrice: costPrice * silverMultiplier,
   }
 }
 

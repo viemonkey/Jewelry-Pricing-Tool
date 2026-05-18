@@ -12,34 +12,33 @@ export class ProductionService {
     private quotesService: QuotesService,
   ) {}
 
-  async findAll(status?: ProductionStatus): Promise<ProductionOrder[]> {
+  async findAll(status?: ProductionStatus): Promise<any[]> {
     const filter = status ? { progressStatus: status } : {}
-    return this.productionModel
-      .find(filter)
-      .populate('quote')
-      .sort({ createdAt: -1 })
-      .lean() as unknown as ProductionOrder[]
+    return this.productionModel.find(filter).populate('quote').sort({ createdAt: -1 }).lean()
   }
 
-  async findOne(id: string): Promise<ProductionOrder> {
+  async findOne(id: string): Promise<any> {
     const order = await this.productionModel.findById(id).populate('quote').lean()
     if (!order) throw new NotFoundException(`Production order ${id} không tồn tại`)
-    return order as unknown as ProductionOrder
+    return order
   }
 
-  async create(quoteId: string, deadline: string, assignedTo?: string): Promise<ProductionOrder> {
+  async create(quoteId: string, deadline: string, assignedTo?: string): Promise<any> {
     await this.quotesService.markInProduction(quoteId)
+
+    const year = new Date().getFullYear()
+    const count = await this.productionModel.countDocuments()
+    const orderCode = `PO-${year}-${String(count + 1).padStart(4, '0')}`
+
     const order = new this.productionModel({
+      orderCode,
       quote: quoteId,
       deadline,
       assignedTo,
       progressStatus: ProductionStatus.PENDING_PRODUCTION,
     })
     await order.save()
-    // Fix lỗi null: dùng non-null assertion sau khi đã save thành công
-    const saved = await this.productionModel.findById(order._id).populate('quote').lean()
-    if (!saved) throw new NotFoundException()
-    return saved as unknown as ProductionOrder
+    return this.productionModel.findById(order._id).populate('quote').lean()
   }
 
   async updateProgress(
@@ -48,7 +47,7 @@ export class ProductionService {
     progressNotes?: string,
     assignedTo?: string,
     deadline?: string,
-  ): Promise<ProductionOrder> {
+  ): Promise<any> {
     const update: Record<string, unknown> = { progressStatus }
     if (progressNotes !== undefined) update.progressNotes = progressNotes
     if (assignedTo) update.assignedTo = assignedTo
@@ -59,10 +58,10 @@ export class ProductionService {
       .populate('quote')
       .lean()
     if (!order) throw new NotFoundException()
-    return order as unknown as ProductionOrder
+    return order
   }
 
-  async complete(id: string, imageUrls: string[]): Promise<ProductionOrder> {
+  async complete(id: string, imageUrls: string[]): Promise<any> {
     const order = await this.productionModel
       .findByIdAndUpdate(
         id,
@@ -72,6 +71,6 @@ export class ProductionService {
       .populate('quote')
       .lean()
     if (!order) throw new NotFoundException()
-    return order as unknown as ProductionOrder
+    return order
   }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -16,14 +16,14 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
-  GOLD_RATIOS,
   calculateGoldProductPrice,
   formatCurrency,
   type PricingResult,
 } from '@/lib/pricing'
+import { pricingConfigApi, type PricingConfig } from '@/lib/api'
 import { StoneCalculator } from './stone-calculator'
 import type { UserRole } from './header'
-import { Calculator, Info, Sparkles, Eye, EyeOff, Save, FileDown, CheckCircle2 } from 'lucide-react'
+import { Calculator, Info, Sparkles, Eye, EyeOff, Save, FileDown, CheckCircle2, Loader2 } from 'lucide-react'
 
 interface GoldCalculatorProps {
   currentRole: UserRole
@@ -34,18 +34,36 @@ const inputVariants = {
 }
 
 export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
+  const [config, setConfig] = useState<PricingConfig | null>(null)
+  const [configLoading, setConfigLoading] = useState(true)
+
   const [productName, setProductName] = useState('')
-  const [karatType, setKaratType] = useState<keyof typeof GOLD_RATIOS>('18K')
+  const [karatType, setKaratType] = useState<string>('18K')
   const [weight, setWeight] = useState<string>('1')
-  const [goldPrice24K, setGoldPrice24K] = useState<string>('9000000')
-  const [laborCost, setLaborCost] = useState<string>('500000')
+  const [goldPrice24K, setGoldPrice24K] = useState<string>('')
+  const [laborCost, setLaborCost] = useState<string>('')
   const [stoneCost, setStoneCost] = useState<number>(0)
   const [showStoneCalculator, setShowStoneCalculator] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
   const canViewCost = currentRole === 'order' || currentRole === 'admin'
 
+  useEffect(() => {
+    pricingConfigApi.get()
+      .then(setConfig)
+      .catch(() => setConfig(null))
+      .finally(() => setConfigLoading(false))
+  }, [])
+
+  const goldRatiosMap = useMemo(() => {
+    if (!config) return {}
+    return Object.fromEntries(
+      config.goldRatios.map((r) => [r.key, { standard: r.standard, applied: r.applied, label: r.label }])
+    )
+  }, [config])
+
   const result: PricingResult | null = useMemo(() => {
+    if (!config) return null
     const weightNum = parseFloat(weight) || 0
     const goldPriceNum = parseFloat(goldPrice24K) || 0
     const laborNum = parseFloat(laborCost) || 0
@@ -58,15 +76,36 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
         goldPrice24K: goldPriceNum,
         laborCost: laborNum,
         stoneCost,
+        goldRatios: goldRatiosMap,
+        profitMargins: config.profitMargins,
       })
     }
     return null
-  }, [productName, karatType, weight, goldPrice24K, laborCost, stoneCost])
+  }, [productName, karatType, weight, goldPrice24K, laborCost, stoneCost, config, goldRatiosMap])
 
   const handleSave = () => {
     setIsSaving(true)
     setTimeout(() => setIsSaving(false), 1500)
   }
+
+  if (configLoading) {
+    return (
+      <div className="flex h-48 items-center justify-center text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin mr-2" />
+        Đang tải cấu hình giá...
+      </div>
+    )
+  }
+
+  if (!config) {
+    return (
+      <div className="flex h-48 items-center justify-center text-destructive text-sm">
+        Không thể tải cấu hình giá từ server. Vui lòng kiểm tra kết nối backend.
+      </div>
+    )
+  }
+
+  const currentKaratLabel = goldRatiosMap[karatType]?.label ?? karatType
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -119,12 +158,12 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
               transition={{ delay: 0.2 }}
             >
               <Label htmlFor="karatType">Tuổi vàng</Label>
-              <Select value={karatType} onValueChange={(v) => setKaratType(v as keyof typeof GOLD_RATIOS)}>
+              <Select value={karatType} onValueChange={setKaratType}>
                 <SelectTrigger id="karatType" className="transition-all hover:border-primary/50">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(GOLD_RATIOS).map(([key, { label, applied }]) => (
+                  {config.goldRatios.map(({ key, label, applied }) => (
                     <SelectItem key={key} value={key}>
                       <div className="flex items-center gap-2">
                         <span>{label}</span>
@@ -137,7 +176,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Tỷ lệ áp dụng đã bao gồm 5% phụ phí hao hụt chế tác
+                Tỷ lệ áp dụng đã bao gồm phụ phí hao hụt chế tác
               </p>
             </motion.div>
 
@@ -188,7 +227,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                   type="number"
                   step="100000"
                   min="0"
-                  placeholder="9000000"
+                  placeholder="Nhập giá vàng 24K hôm nay"
                   value={goldPrice24K}
                   onChange={(e) => setGoldPrice24K(e.target.value)}
                   className="transition-all focus:ring-2 focus:ring-primary/50"
@@ -210,7 +249,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                   type="number"
                   step="10000"
                   min="0"
-                  placeholder="500000"
+                  placeholder="0"
                   value={laborCost}
                   onChange={(e) => setLaborCost(e.target.value)}
                   className="transition-all focus:ring-2 focus:ring-primary/50"
@@ -304,7 +343,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
               Kết quả tính giá
             </CardTitle>
             <CardDescription>
-              {productName || 'Sản phẩm vàng'} - {GOLD_RATIOS[karatType].label}
+              {productName || 'Sản phẩm vàng'} - {currentKaratLabel}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -400,7 +439,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                     </>
                   )}
 
-                  {/* Suggested Price - Visible to all roles */}
+                  {/* Suggested Price */}
                   <motion.div
                     className="rounded-lg border-2 border-primary bg-primary/5 p-6 text-center overflow-hidden relative"
                     initial={{ scale: 0.9, opacity: 0 }}
@@ -408,7 +447,6 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                     transition={{ type: 'spring', stiffness: 200, delay: 0.3 }}
                     whileHover={{ scale: 1.02 }}
                   >
-                    {/* Shimmer effect */}
                     <motion.div
                       className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent"
                       animate={{ x: ['-100%', '100%'] }}
@@ -451,21 +489,11 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                       >
                         <AnimatePresence mode="wait">
                           {isSaving ? (
-                            <motion.div
-                              key="saving"
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              exit={{ scale: 0 }}
-                            >
+                            <motion.div key="saving" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
                               <CheckCircle2 className="h-4 w-4" />
                             </motion.div>
                           ) : (
-                            <motion.div
-                              key="save"
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              exit={{ scale: 0 }}
-                            >
+                            <motion.div key="save" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
                               <Save className="h-4 w-4" />
                             </motion.div>
                           )}

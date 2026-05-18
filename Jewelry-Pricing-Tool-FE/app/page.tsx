@@ -51,9 +51,11 @@ export default function Home() {
   const [currentStep] = useState<WorkflowStep>(3)
   const [goldPrice24K, setGoldPrice24K] = useState<string>('9000000')
   const [activeTab, setActiveTab] = useState('dashboard')
+  const [latestQuote, setLatestQuote] = useState<any>(null)
 
   const canViewSettings = currentRole === 'order' || currentRole === 'admin'
   const canViewProduction = currentRole === 'workshop' || currentRole === 'admin'
+  const canViewCalculator = currentRole === 'order' || currentRole === 'admin'
   const currentUserName = currentRole === 'sale' ? 'Nguyễn Văn Sale' : currentRole === 'order' ? 'NV Báo Giá' : 'Admin'
 
   return (
@@ -95,12 +97,12 @@ export default function Home() {
           >
             <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-none lg:flex">
               {[
-                { value: 'dashboard', icon: LayoutDashboard, label: 'Bảng điều khiển' },
-                { value: 'quotes', icon: ClipboardList, label: 'Báo giá' },
-                { value: 'calculator', icon: Calculator, label: 'Tính giá' },
-                ...(canViewProduction ? [{ value: 'production', icon: Hammer, label: 'Sản xuất' }] : []),
-                ...(canViewSettings ? [{ value: 'settings', icon: Settings, label: 'Cài đặt' }] : []),
-              ].map((tab) => (
+                { value: 'dashboard', icon: LayoutDashboard, label: 'Bảng điều khiển', show: true },
+                { value: 'quotes', icon: ClipboardList, label: 'Báo giá', show: true },
+                { value: 'calculator', icon: Calculator, label: 'Tính giá', show: canViewCalculator },
+                { value: 'production', icon: Hammer, label: 'Sản xuất', show: canViewProduction },
+                { value: 'settings', icon: Settings, label: 'Cài đặt', show: canViewSettings },
+              ].filter((tab) => tab.show).map((tab) => (
                 <TabsTrigger
                   key={tab.value}
                   value={tab.value}
@@ -141,7 +143,7 @@ export default function Home() {
                   <div className="flex justify-end">
                     <QuoteRequestModal
                       requesterName={currentUserName}
-                      onSuccess={() => {}}
+                      onSuccess={(q) => { setLatestQuote(q); setActiveTab('quotes') }}
                     />
                   </div>
                 )}
@@ -163,11 +165,11 @@ export default function Home() {
                 <div className="flex justify-end">
                   <QuoteRequestModal
                     requesterName={currentUserName}
-                    onSuccess={() => {}}
+                    onSuccess={(q) => setLatestQuote(q)}
                   />
                 </div>
               )}
-              <QuoteListPricer currentRole={currentRole} currentUserName={currentUserName} />
+              <QuoteListPricer currentRole={currentRole} currentUserName={currentUserName} newQuote={latestQuote} />
             </motion.div>
           </TabsContent>
 

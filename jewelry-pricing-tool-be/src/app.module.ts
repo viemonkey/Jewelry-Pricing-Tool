@@ -8,6 +8,7 @@ import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { QuotesModule } from './quotes/quotes.module'
 import { ProductionModule } from './production/production.module'
+import { PricingConfigModule } from './pricing-config/pricing-config.module'
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ProductionModule } from './production/production.module'
     // ── Feature Modules ─────────────────────────────────────
     QuotesModule,
     ProductionModule,
+    PricingConfigModule,
     // UsersModule,   // TODO Giai đoạn 3 nâng cao
     // AuditModule,   // TODO Giai đoạn 3 nâng cao
   ],

@@ -41,6 +41,10 @@ export const quotesApi = {
     form.append('materialType', data.materialType)
     form.append('requestedBy', data.requestedBy)
     if (data.productDescription) form.append('productDescription', data.productDescription)
+    if (data.dimensions) form.append('dimensions', data.dimensions)
+    if (data.stoneRequirements) form.append('stoneRequirements', data.stoneRequirements)
+    if (data.quantity) form.append('quantity', String(data.quantity))
+    if (data.deadline) form.append('deadline', data.deadline)
     if (data.notes) form.append('notes', data.notes)
     data.images.forEach((file) => form.append('images', file))
 
@@ -57,6 +61,17 @@ export const quotesApi = {
     request<Quote>(`/quotes/${id}/price`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    }),
+
+  /** NV báo giá: Tiếp nhận yêu cầu → QUOTING */
+  startQuoting: (id: string) =>
+    request<Quote>(`/quotes/${id}/start-quoting`, { method: 'PATCH' }),
+
+  /** NV báo giá: Trả lại Sale bổ sung → PENDING (kèm lý do) */
+  rejectQuote: (id: string, reason: string) =>
+    request<Quote>(`/quotes/${id}/reject`, {
+      method: 'PATCH',
+      body: JSON.stringify({ reason }),
     }),
 
   /** NV báo giá: Hoàn thành báo giá → QUOTED */
@@ -106,6 +121,46 @@ export const productionApi = {
     if (!res.ok) throw new Error('Hoàn thành sản xuất thất bại')
     return res.json()
   },
+}
+
+// ─── STATS ─────────────────────────────────────────────────
+
+export interface QuoteStats {
+  total: number
+  pending: number
+  quoted: number
+  confirmed: number
+}
+
+export const statsApi = {
+  /** Lấy thống kê tổng quan từ backend */
+  get: () => request<QuoteStats>('/quotes/stats'),
+}
+
+// ─── PRICING CONFIG ────────────────────────────────────────
+
+export interface GoldRatioConfig {
+  key: string
+  standard: number
+  applied: number
+  label: string
+}
+
+export interface ProfitMarginConfig {
+  maxCost: number
+  divisor: number
+  margin: string
+}
+
+export interface PricingConfig {
+  goldRatios: GoldRatioConfig[]
+  profitMargins: ProfitMarginConfig[]
+  silverMultiplier: number
+}
+
+export const pricingConfigApi = {
+  /** Lấy cấu hình giá từ backend (tỷ lệ vàng, biên lợi nhuận, hệ số bạc) */
+  get: () => request<PricingConfig>('/pricing-config'),
 }
 
 // ─── UPLOAD (standalone) ───────────────────────────────────
