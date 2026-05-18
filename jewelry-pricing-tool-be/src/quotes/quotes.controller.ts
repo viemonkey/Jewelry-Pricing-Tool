@@ -66,9 +66,46 @@ export class QuotesController {
     return this.quotesService.rejectQuote(id, body.reason)
   }
 
+  @Patch(':id/info')
+  @UseInterceptors(
+    FilesInterceptor('images', 5, {
+      storage: diskStorage({
+        destination: join(process.cwd(), 'uploads', 'quotes'),
+        filename: (_, file, cb) => {
+          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9)
+          cb(null, `${unique}${extname(file.originalname)}`)
+        },
+      }),
+    }),
+  )
+  updateInfo(
+    @Param('id') id: string,
+    @Body() body: { dimensions?: string; stoneRequirements?: string; productDescription?: string; notes?: string; keepImages?: string },
+    @UploadedFiles() files: Express.Multer.File[],
+  ) {
+    const newImageUrls = (files || []).map((f) => `/uploads/quotes/${f.filename}`)
+    // keepImages là JSON string chứa mảng URL ảnh cũ muốn giữ lại
+    const keepImages: string[] = body.keepImages ? JSON.parse(body.keepImages) : []
+    const images = [...keepImages, ...newImageUrls]
+    return this.quotesService.updateInfo(id, {
+      ...body,
+      ...(images.length > 0 ? { images } : {}),
+    })
+  }
+
+  @Patch(':id/resubmit')
+  resubmit(@Param('id') id: string) {
+    return this.quotesService.resubmit(id)
+  }
+
   @Patch(':id/complete-quoting')
   completeQuoting(@Param('id') id: string) {
     return this.quotesService.completeQuoting(id)
+  }
+
+  @Patch(':id/sent-to-customer')
+  sentToCustomer(@Param('id') id: string) {
+    return this.quotesService.sentToCustomer(id)
   }
 
   @Patch(':id/confirm')

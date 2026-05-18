@@ -5,8 +5,10 @@ export type QuoteDocument = Quote & Document
 
 export enum QuoteStatus {
   PENDING = 'PENDING',
+  NEED_MORE_INFO = 'NEED_MORE_INFO', // NV order trả lại, Sale cần bổ sung
   QUOTING = 'QUOTING',
   QUOTED = 'QUOTED',
+  SENT_TO_CUSTOMER = 'SENT_TO_CUSTOMER',
   CONFIRMED = 'CONFIRMED',
   CANCELLED = 'CANCELLED',
   IN_PRODUCTION = 'IN_PRODUCTION',
@@ -30,6 +32,7 @@ export class Quote {
   @Prop({ default: 0 }) costPrice: number
   @Prop({ default: 0 }) sellingPrice: number
   @Prop() notes: string
+  @Prop() rejectReason: string  // Lý do NV order trả lại cho Sale
   @Prop({ type: [String], default: [] }) images: string[]
   @Prop({ type: String, enum: Object.values(QuoteStatus), default: QuoteStatus.PENDING })
   status: QuoteStatus

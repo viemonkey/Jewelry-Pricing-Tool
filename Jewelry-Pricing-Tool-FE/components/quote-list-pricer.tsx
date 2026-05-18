@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +19,7 @@ import {
 import {
   Calculator, CheckCircle, Eye, Loader2, RefreshCw,
   ThumbsUp, Ban, Gem, Hammer, Sparkles, TrendingUp, AlertCircle,
-  Package, Zap,
+  Package, Zap, Send, ShoppingCart, ImageIcon, X,
 } from 'lucide-react'
 import { quotesApi } from '@/lib/api'
 import { formatCurrency } from '@/lib/pricing'
@@ -27,12 +27,14 @@ import { useNotifications } from '@/lib/notifications'
 import type { Quote, QuoteStatus, UserRole } from '@/lib/types'
 
 const STATUS_CONFIG: Record<QuoteStatus, { label: string; color: string; dot: string }> = {
-  PENDING:       { label: 'Chờ báo giá',   color: 'border-amber-400/60 text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400', dot: 'bg-amber-400' },
-  QUOTING:       { label: 'Đang báo giá',  color: 'border-blue-400/60 text-blue-600 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400', dot: 'bg-blue-400' },
-  QUOTED:        { label: 'Đã báo giá',    color: 'border-emerald-400/60 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400', dot: 'bg-emerald-400' },
-  CONFIRMED:     { label: 'Đặt hàng',      color: 'border-primary/40 text-primary bg-primary/5', dot: 'bg-primary' },
-  CANCELLED:     { label: 'Đã huỷ',        color: 'border-red-400/60 text-red-500 bg-red-50 dark:bg-red-950/30 dark:text-red-400', dot: 'bg-red-400' },
-  IN_PRODUCTION: { label: 'Đang sản xuất', color: 'border-purple-400/60 text-purple-600 bg-purple-50 dark:bg-purple-950/30 dark:text-purple-400', dot: 'bg-purple-400' },
+  PENDING:            { label: 'Chờ báo giá',        color: 'border-amber-400/60 text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400', dot: 'bg-amber-400' },
+  NEED_MORE_INFO:     { label: 'Cần bổ sung',         color: 'border-orange-400/60 text-orange-600 bg-orange-50 dark:bg-orange-950/30 dark:text-orange-400', dot: 'bg-orange-500' },
+  QUOTING:            { label: 'Đang báo giá',        color: 'border-blue-400/60 text-blue-600 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400', dot: 'bg-blue-400' },
+  QUOTED:             { label: 'Đã báo giá',          color: 'border-emerald-400/60 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400', dot: 'bg-emerald-400' },
+  SENT_TO_CUSTOMER:   { label: 'Đã gửi khách',        color: 'border-violet-400/60 text-violet-600 bg-violet-50 dark:bg-violet-950/30 dark:text-violet-400', dot: 'bg-violet-400' },
+  CONFIRMED:          { label: 'Đặt hàng',            color: 'border-primary/40 text-primary bg-primary/5', dot: 'bg-primary' },
+  CANCELLED:          { label: 'Đã huỷ',              color: 'border-red-400/60 text-red-500 bg-red-50 dark:bg-red-950/30 dark:text-red-400', dot: 'bg-red-400' },
+  IN_PRODUCTION:      { label: 'Đang sản xuất',       color: 'border-purple-400/60 text-purple-600 bg-purple-50 dark:bg-purple-950/30 dark:text-purple-400', dot: 'bg-purple-400' },
 }
 
 interface PriceFormState {
@@ -399,6 +401,11 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   const [confirmCancel, setConfirmCancel] = useState<{ id: string; name: string } | null>(null)
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [editForm, setEditForm] = useState({ dimensions: '', stoneRequirements: '', productDescription: '', notes: '' })
+  const [editImages, setEditImages] = useState<{ file: File; url: string }[]>([])
+  const [keepImages, setKeepImages] = useState<string[]>([])
+  const editFileRef = useRef<HTMLInputElement>(null)
 
   const canViewCost = currentRole === 'order' || currentRole === 'admin'
   const isPricer = canViewCost
@@ -431,7 +438,16 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     setSelected(q)
     setShowRejectForm(false)
     setRejectReason('')
-    setDialogMode(mode ?? (q.status === 'PENDING' ? 'review' : q.status === 'QUOTING' ? 'pricing' : 'view'))
+    setShowEditForm(false)
+    setEditForm({ dimensions: '', stoneRequirements: '', productDescription: '', notes: '' })
+    setEditImages([])
+    setKeepImages([])
+    setDialogMode(mode ?? (
+      q.status === 'PENDING' ? 'review' :
+      q.status === 'QUOTING' ? 'pricing' :
+      q.status === 'NEED_MORE_INFO' ? 'view' :
+      'view'
+    ))
     setPriceForm({
       ...EMPTY_PRICE_FORM(currentUserName),
       weightChi: q.weightChi?.toString() || '',
@@ -498,10 +514,59 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     const q = quotes.find((x) => x._id === id)
     try {
       await quotesApi.confirm(id)
-      addNotification({ type: 'success', title: 'Đặt hàng thành công!', message: `"${q?.productName || 'Sản phẩm'}" đã được đặt hàng.` })
+      addNotification({ type: 'success', title: '🎉 Khách chốt đơn!', message: `"${q?.productName || 'Sản phẩm'}" đã được đặt hàng thành công.` })
       fetchQuotes()
     } catch {
       addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể xác nhận đơn.' })
+    }
+  }
+
+  const handleSentToCustomer = async (id: string) => {
+    const q = quotes.find((x) => x._id === id)
+    try {
+      await quotesApi.sentToCustomer(id)
+      addNotification({ type: 'info', title: '📤 Đã gửi giá cho khách', message: `"${q?.productName}" đang chờ khách phản hồi.` })
+      fetchQuotes()
+    } catch {
+      addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể cập nhật trạng thái.' })
+    }
+  }
+
+  const handleResubmit = async (id: string) => {
+    const q = quotes.find((x) => x._id === id)
+    try {
+      await quotesApi.resubmit(id)
+      addNotification({ type: 'success', title: '✅ Đã gửi lại yêu cầu', message: `"${q?.productName}" đã được gửi lại cho NV báo giá.` })
+      fetchQuotes()
+    } catch {
+      addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể gửi lại yêu cầu.' })
+    }
+  }
+
+  const handleResubmitWithEdit = async () => {
+    if (!selected) return
+    setSaving(true)
+    try {
+      await quotesApi.updateInfo(selected._id, {
+        dimensions: editForm.dimensions || (selected as any).dimensions,
+        stoneRequirements: editForm.stoneRequirements || (selected as any).stoneRequirements,
+        productDescription: editForm.productDescription || selected.productDescription,
+        notes: editForm.notes || selected.notes,
+        keepImages: keepImages,
+        newImages: editImages.map(i => i.file),
+      })
+      await quotesApi.resubmit(selected._id)
+      addNotification({ type: 'success', title: '✅ Đã gửi lại yêu cầu', message: `"${selected.productName}" đã được cập nhật và gửi lại.` })
+      // Cleanup preview URLs
+      editImages.forEach(i => URL.revokeObjectURL(i.url))
+      setSelected(null)
+      setShowEditForm(false)
+      setEditImages([])
+      fetchQuotes()
+    } catch {
+      addNotification({ type: 'error', title: 'Thất bại', message: 'Không thể gửi lại yêu cầu.' })
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -563,8 +628,10 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
           <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="ALL">Tất cả</TabsTrigger>
             <TabsTrigger value="PENDING">Chờ báo giá</TabsTrigger>
+            <TabsTrigger value="NEED_MORE_INFO">Cần bổ sung</TabsTrigger>
             <TabsTrigger value="QUOTING">Đang báo giá</TabsTrigger>
             <TabsTrigger value="QUOTED">Đã báo giá</TabsTrigger>
+            <TabsTrigger value="SENT_TO_CUSTOMER">Đã gửi khách</TabsTrigger>
             <TabsTrigger value="CONFIRMED">Đặt hàng</TabsTrigger>
             <TabsTrigger value="CANCELLED">Đã huỷ</TabsTrigger>
           </TabsList>
@@ -587,7 +654,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
             <TableBody>
               <AnimatePresence>
                 {filtered.map((q, i) => {
-                  const sc = STATUS_CONFIG[q.status]
+                  const sc = STATUS_CONFIG[q.status] ?? { label: q.status, color: 'border-gray-400/60 text-gray-600 bg-gray-50', dot: 'bg-gray-400' }
                   return (
                     <motion.tr key={q._id}
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
@@ -614,6 +681,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          {/* NV order: PENDING → Kiểm tra hoặc Tính giá */}
                           {isPricer && q.status === 'PENDING' && (
                             <>
                               <Button size="sm" variant="outline" onClick={() => openDetail(q, 'review')} className="gap-1 h-7 text-xs">
@@ -624,20 +692,51 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                               </Button>
                             </>
                           )}
+                          {/* NV order: QUOTING → Tiếp tục tính giá */}
                           {isPricer && q.status === 'QUOTING' && (
                             <Button size="sm" onClick={() => openDetail(q, 'pricing')} className="gap-1 h-7 text-xs">
                               <Calculator className="h-3 w-3" /> Tính giá
                             </Button>
                           )}
+                          {/* Sale: PENDING / QUOTING → Xem trạng thái */}
+                          {!isPricer && (q.status === 'PENDING' || q.status === 'QUOTING') && (
+                            <Button size="sm" variant="ghost" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
+                              <Eye className="h-3 w-3" /> Xem
+                            </Button>
+                          )}
+                          {/* Sale: NEED_MORE_INFO → Xem lý do + Gửi lại */}
+                          {!isPricer && q.status === 'NEED_MORE_INFO' && (
+                            <Button size="sm" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs bg-orange-500 hover:bg-orange-600">
+                              <AlertCircle className="h-3 w-3" /> Bổ sung
+                            </Button>
+                          )}
+                          {/* Sale: QUOTED → Xem báo giá + Gửi cho khách */}
                           {!isPricer && q.status === 'QUOTED' && (
                             <>
+                              <Button size="sm" variant="outline" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
+                                <Eye className="h-3 w-3" /> Xem giá
+                              </Button>
+                              <Button size="sm" onClick={() => handleSentToCustomer(q._id)} className="gap-1 h-7 text-xs bg-violet-600 hover:bg-violet-700">
+                                <Send className="h-3 w-3" /> Gửi khách
+                              </Button>
+                            </>
+                          )}
+                          {/* Sale: SENT_TO_CUSTOMER → Khách chốt hoặc Huỷ */}
+                          {!isPricer && q.status === 'SENT_TO_CUSTOMER' && (
+                            <>
                               <Button size="sm" className="gap-1 h-7 text-xs" onClick={() => handleConfirm(q._id)}>
-                                <ThumbsUp className="h-3 w-3" /> Đặt hàng
+                                <ShoppingCart className="h-3 w-3" /> Khách chốt
                               </Button>
                               <Button size="sm" variant="destructive" className="gap-1 h-7 text-xs" onClick={() => handleCancel(q._id)}>
                                 <Ban className="h-3 w-3" /> Huỷ
                               </Button>
                             </>
+                          )}
+                          {/* Xem chi tiết cho các trạng thái còn lại */}
+                          {(q.status === 'CONFIRMED' || q.status === 'CANCELLED' || q.status === 'IN_PRODUCTION') && (
+                            <Button size="sm" variant="ghost" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
+                              <Eye className="h-3 w-3" /> Xem
+                            </Button>
                           )}
                         </div>
                       </TableCell>
@@ -910,6 +1009,147 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
             ) : (
 
               /* ── REVIEW / VIEW MODE ── */
+              showEditForm && selected.status === 'NEED_MORE_INFO' ? (
+
+                /* ══ EDIT FORM — thay thế toàn bộ nội dung ══ */
+                <div className="flex flex-col" style={{ maxHeight: 'calc(80vh - 110px)' }}>
+                  {/* Header form */}
+                  <div className="px-6 py-4 border-b bg-orange-50 dark:bg-orange-950/20 shrink-0">
+                    <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 mb-1">
+                      <AlertCircle className="h-4 w-4" />
+                      <span className="text-sm font-semibold">Cập nhật thông tin bổ sung</span>
+                    </div>
+                    <p className="text-xs text-orange-600/80 dark:text-orange-400/80">
+                      Lý do trả lại: <span className="font-medium">{selected.rejectReason}</span>
+                    </p>
+                  </div>
+
+                  {/* Form fields */}
+                  <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Kích thước / Trọng lượng</Label>
+                      <Input
+                        value={editForm.dimensions}
+                        onChange={(e) => setEditForm(f => ({ ...f, dimensions: e.target.value }))}
+                        placeholder="VD: Size 12, khoảng 3 chỉ, dài 45cm..."
+                        className="h-10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Yêu cầu đá / phụ kiện</Label>
+                      <Input
+                        value={editForm.stoneRequirements}
+                        onChange={(e) => setEditForm(f => ({ ...f, stoneRequirements: e.target.value }))}
+                        placeholder="VD: 1 viên kim cương 0.3ct, đá CZ trắng..."
+                        className="h-10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Mô tả sản phẩm</Label>
+                      <Textarea
+                        value={editForm.productDescription}
+                        onChange={(e) => setEditForm(f => ({ ...f, productDescription: e.target.value }))}
+                        placeholder="Mô tả chi tiết kiểu dáng, yêu cầu đặc biệt..."
+                        rows={3}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Ghi chú thêm cho NV báo giá</Label>
+                      <Textarea
+                        value={editForm.notes}
+                        onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                        placeholder="Thông tin bổ sung, yêu cầu đặc biệt khác..."
+                        rows={2}
+                      />
+                    </div>
+
+                    {/* Ảnh sản phẩm */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Hình ảnh sản phẩm</Label>
+
+                      {/* Ảnh cũ — có thể xoá từng cái */}
+                      {keepImages.length > 0 && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-2">Ảnh hiện tại (bỏ tích để xoá)</p>
+                          <div className="flex flex-wrap gap-2">
+                            {keepImages.map((img, i) => (
+                              <div key={img} className="relative h-16 w-16 rounded-lg border overflow-hidden group">
+                                <img src={`http://localhost:3001${img}`} alt="" className="h-full w-full object-cover" />
+                                <button
+                                  onClick={() => setKeepImages(prev => prev.filter((_, idx) => idx !== i))}
+                                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                >
+                                  <X className="h-4 w-4 text-white" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Ảnh mới thêm */}
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2">Thêm ảnh mới (tối đa {5 - keepImages.length} ảnh)</p>
+                        <div className="flex flex-wrap gap-2">
+                          {editImages.map((img, i) => (
+                            <div key={img.url} className="relative h-16 w-16 rounded-lg border overflow-hidden group">
+                              <img src={img.url} alt="" className="h-full w-full object-cover" />
+                              <button
+                                onClick={() => {
+                                  URL.revokeObjectURL(img.url)
+                                  setEditImages(prev => prev.filter((_, idx) => idx !== i))
+                                }}
+                                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                              >
+                                <X className="h-4 w-4 text-white" />
+                              </button>
+                            </div>
+                          ))}
+                          {keepImages.length + editImages.length < 5 && (
+                            <button
+                              onClick={() => editFileRef.current?.click()}
+                              className="flex h-16 w-16 flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                            >
+                              <ImageIcon className="h-5 w-5" />
+                              <span className="mt-0.5 text-xs">Thêm</span>
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          ref={editFileRef}
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || [])
+                            const remaining = 5 - keepImages.length - editImages.length
+                            const newImgs = files.slice(0, remaining).map(f => ({ file: f, url: URL.createObjectURL(f) }))
+                            setEditImages(prev => [...prev, ...newImgs])
+                            e.target.value = ''
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="border-t px-6 py-4 flex gap-3 shrink-0 bg-muted/10">
+                    <Button variant="outline" className="flex-1" onClick={() => setShowEditForm(false)}>
+                      ← Quay lại
+                    </Button>
+                    <Button
+                      className="flex-1 gap-2 bg-orange-500 hover:bg-orange-600 shadow-md"
+                      disabled={saving}
+                      onClick={handleResubmitWithEdit}
+                    >
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                      Xác nhận gửi lại
+                    </Button>
+                  </div>
+                </div>
+
+              ) : (
               <div className="px-6 py-4 space-y-4">
 
                 <div className="grid grid-cols-2 gap-3 text-sm">
@@ -940,6 +1180,21 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                   <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
                     <span className="text-xs font-medium text-amber-600">📝 Ghi chú cho NV báo giá</span>
                     <p className="text-amber-800 dark:text-amber-300 mt-0.5 text-sm">{selected.notes}</p>
+                  </div>
+                )}
+
+                {/* Banner lý do trả lại — chỉ hiện khi NEED_MORE_INFO */}
+                {selected.status === 'NEED_MORE_INFO' && selected.rejectReason && (
+                  <div className="rounded-xl border-2 border-orange-400/60 bg-orange-50 dark:bg-orange-950/20 px-4 py-3">
+                    <p className="text-xs font-bold text-orange-600 dark:text-orange-400 mb-1 flex items-center gap-1.5">
+                      <AlertCircle className="h-3.5 w-3.5" /> Lý do NV báo giá trả lại
+                    </p>
+                    <p className="text-sm text-orange-800 dark:text-orange-300 leading-relaxed font-medium">{selected.rejectReason}</p>
+                    {!isPricer && (
+                      <p className="text-xs text-orange-600/80 dark:text-orange-400/80 mt-2">
+                        👆 Vui lòng cập nhật thông tin bên dưới rồi bấm <strong>Gửi lại</strong>
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -999,23 +1254,80 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                     )
                   )}
 
-                  {!isPricer && selected.status === 'QUOTED' && (
+                  {/* Cần bổ sung: nút mở form edit */}
+                  {!isPricer && selected.status === 'NEED_MORE_INFO' && !showEditForm && (
                     <div className="flex gap-2">
-                      <Button className="flex-1 gap-2" onClick={() => { handleConfirm(selected._id); setSelected(null) }}>
-                        <ThumbsUp className="h-4 w-4" /> Xác nhận đặt hàng
-                      </Button>
-                      <Button variant="destructive" className="flex-1 gap-2"
-                        onClick={() => { handleCancel(selected._id); setSelected(null) }}>
-                        <Ban className="h-4 w-4" /> Huỷ
+                      <Button variant="outline" className="flex-1" onClick={() => setSelected(null)}>Đóng</Button>
+                      <Button
+                        className="flex-1 gap-2 bg-orange-500 hover:bg-orange-600"
+                        onClick={() => {
+                          setEditForm({
+                            dimensions: (selected as any).dimensions || '',
+                            stoneRequirements: (selected as any).stoneRequirements || '',
+                            productDescription: selected.productDescription || '',
+                            notes: selected.notes || '',
+                          })
+                          setKeepImages(selected.images || [])
+                          setEditImages([])
+                          setShowEditForm(true)
+                        }}
+                      >
+                        ✏️ Chỉnh sửa & Gửi lại
                       </Button>
                     </div>
                   )}
 
-                  {dialogMode === 'view' && (
+                  {!isPricer && selected.status === 'QUOTED' && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-800 px-4 py-3">
+                        <p className="text-xs text-violet-600 dark:text-violet-400 font-semibold mb-1">💡 Bước tiếp theo</p>
+                        <p className="text-sm text-violet-800 dark:text-violet-300">Xem lại giá bán bên trên, tư vấn với khách, rồi bấm <strong>Gửi giá cho khách</strong> để chuyển sang trạng thái chờ phản hồi.</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" className="flex-1" onClick={() => setSelected(null)}>Đóng</Button>
+                        <Button
+                          className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700"
+                          disabled={saving}
+                          onClick={async () => {
+                            setSaving(true)
+                            await handleSentToCustomer(selected._id)
+                            setSaving(false)
+                            setSelected(null)
+                          }}
+                        >
+                          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          Gửi giá cho khách
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Bước 6: Khách chốt đơn */}
+                  {!isPricer && selected.status === 'SENT_TO_CUSTOMER' && (
+                    <div className="space-y-3">
+                      <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 px-4 py-3">
+                        <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold mb-1">⏳ Đang chờ khách phản hồi</p>
+                        <p className="text-sm text-amber-800 dark:text-amber-300">Khi khách đồng ý đặt hàng, bấm <strong>Khách chốt đơn</strong>. Nếu khách từ chối, bấm <strong>Khách từ chối</strong>.</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="destructive" className="flex-1 gap-2"
+                          onClick={() => { handleCancel(selected._id); setSelected(null) }}>
+                          <Ban className="h-4 w-4" /> Khách từ chối
+                        </Button>
+                        <Button className="flex-1 gap-2"
+                          onClick={() => { handleConfirm(selected._id); setSelected(null) }}>
+                          <ShoppingCart className="h-4 w-4" /> Khách chốt đơn
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {dialogMode === 'view' && selected.status !== 'QUOTED' && selected.status !== 'SENT_TO_CUSTOMER' && selected.status !== 'NEED_MORE_INFO' && (
                     <Button variant="outline" className="w-full" onClick={() => setSelected(null)}>Đóng</Button>
                   )}
                 </div>
               </div>
+              ) /* end !showEditForm ternary */
             )
           )}
         </DialogContent>

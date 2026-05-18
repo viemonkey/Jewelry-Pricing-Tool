@@ -5,12 +5,14 @@
 export type UserRole = 'sale' | 'order' | 'admin' | 'workshop'
 
 export type QuoteStatus =
-  | 'PENDING'      // Chờ báo giá
-  | 'QUOTING'      // Đang báo giá
-  | 'QUOTED'       // Đã báo giá (Sale chưa xem)
-  | 'CONFIRMED'    // Khách chốt
-  | 'CANCELLED'    // Huỷ
-  | 'IN_PRODUCTION'// Đang sản xuất
+  | 'PENDING'           // Chờ báo giá
+  | 'NEED_MORE_INFO'    // NV order trả lại — Sale cần bổ sung
+  | 'QUOTING'           // Đang báo giá
+  | 'QUOTED'            // Đã báo giá — Sale chưa gửi khách
+  | 'SENT_TO_CUSTOMER'  // Sale đã gửi giá cho khách — chờ khách trả lời
+  | 'CONFIRMED'         // Khách chốt đơn
+  | 'CANCELLED'         // Huỷ
+  | 'IN_PRODUCTION'     // Đang sản xuất
 
 export type ProductionStatus =
   | 'PENDING_PRODUCTION' // Chờ sản xuất
@@ -40,6 +42,7 @@ export interface Quote {
   costPrice: number        // Giá vốn (chỉ Order/Admin thấy)
   sellingPrice: number     // Giá bán đề xuất
   notes?: string
+  rejectReason?: string    // Lý do NV order trả lại (khi status = NEED_MORE_INFO)
   images: string[]         // URLs ảnh sản phẩm
   status: QuoteStatus
   requestedBy: string      // Tên Sale

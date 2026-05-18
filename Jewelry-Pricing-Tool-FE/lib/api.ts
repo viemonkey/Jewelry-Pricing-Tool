@@ -78,6 +78,44 @@ export const quotesApi = {
   completeQuoting: (id: string) =>
     request<Quote>(`/quotes/${id}/complete-quoting`, { method: 'PATCH' }),
 
+  /** Sale: Cập nhật thông tin bổ sung (khi bị trả lại) */
+  updateInfo: async (id: string, data: {
+    dimensions?: string
+    stoneRequirements?: string
+    productDescription?: string
+    notes?: string
+    keepImages?: string[]   // URL ảnh cũ muốn giữ lại
+    newImages?: File[]      // File ảnh mới cần upload
+  }): Promise<Quote> => {
+    const form = new FormData()
+    if (data.dimensions) form.append('dimensions', data.dimensions)
+    if (data.stoneRequirements) form.append('stoneRequirements', data.stoneRequirements)
+    if (data.productDescription) form.append('productDescription', data.productDescription)
+    if (data.notes) form.append('notes', data.notes)
+    // Gửi danh sách ảnh cũ cần giữ dưới dạng JSON string
+    form.append('keepImages', JSON.stringify(data.keepImages ?? []))
+    // Gửi file ảnh mới
+    ;(data.newImages ?? []).forEach((file) => form.append('images', file))
+
+    const res = await fetch(`${BASE_URL}/quotes/${id}/info`, {
+      method: 'PATCH',
+      body: form,
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error((err as any).message || 'Cập nhật thông tin thất bại')
+    }
+    return res.json()
+  },
+
+  /** Sale: Gửi lại sau khi bổ sung → PENDING */
+  resubmit: (id: string) =>
+    request<Quote>(`/quotes/${id}/resubmit`, { method: 'PATCH' }),
+
+  /** Sale: Đã gửi giá cho khách → SENT_TO_CUSTOMER */
+  sentToCustomer: (id: string) =>
+    request<Quote>(`/quotes/${id}/sent-to-customer`, { method: 'PATCH' }),
+
   /** Sale: Khách chốt → CONFIRMED */
   confirm: (id: string) =>
     request<Quote>(`/quotes/${id}/confirm`, { method: 'PATCH' }),

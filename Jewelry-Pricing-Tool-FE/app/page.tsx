@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Header, type UserRole } from '@/components/header'
 import { GoldCalculator } from '@/components/gold-calculator'
@@ -13,7 +13,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { GOLD_RATIOS, formatCurrency, formatNumber } from '@/lib/pricing'
+import { formatCurrency, formatNumber } from '@/lib/pricing'
+import { pricingConfigApi, type GoldRatioConfig } from '@/lib/api'
+import { useSseNotifications } from '@/lib/use-sse-notifications'
+import { useNotifications } from '@/lib/notifications'
 import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, Hammer } from 'lucide-react'
 import { QuoteRequestModal } from '@/components/quote-request-modal'
 import { QuoteListPricer } from '@/components/quote-list-pricer'
@@ -52,6 +55,31 @@ export default function Home() {
   const [goldPrice24K, setGoldPrice24K] = useState<string>('9000000')
   const [activeTab, setActiveTab] = useState('dashboard')
   const [latestQuote, setLatestQuote] = useState<any>(null)
+  const [goldRatios, setGoldRatios] = useState<GoldRatioConfig[]>([])
+
+  const { addNotification } = useNotifications()
+
+  useEffect(() => {
+    pricingConfigApi.get().then((config) => {
+      if (config?.goldRatios) setGoldRatios(config.goldRatios)
+    }).catch(() => {})
+  }, [])
+
+  // ── SSE: nhận thông báo real-time từ backend ──
+  useSseNotifications(currentRole, (event) => {
+    // Map type sang notif severity
+    const typeMap: Record<string, 'success' | 'info' | 'warning' | 'error'> = {
+      QUOTE_COMPLETED: 'success',
+      QUOTE_CONFIRMED: 'success',
+      QUOTE_CANCELLED: 'warning',
+      QUOTE_REJECTED:  'warning',
+    }
+    addNotification({
+      type: typeMap[event.type] ?? 'info',
+      title: event.title,
+      message: event.message,
+    })
+  })
 
   const canViewSettings = currentRole === 'order' || currentRole === 'admin'
   const canViewProduction = currentRole === 'workshop' || currentRole === 'admin'
@@ -340,7 +368,7 @@ export default function Home() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">
-                          {Object.entries(GOLD_RATIOS).map(([key, { label, standard, applied }], index) => (
+                          {goldRatios.map(({ key, label, standard, applied }, index) => (
                             <motion.div
                               key={key}
                               className="flex items-center justify-between rounded-lg border p-3 hover:border-primary/30 transition-colors"

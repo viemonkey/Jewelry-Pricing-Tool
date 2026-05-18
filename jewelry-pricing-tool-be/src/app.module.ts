@@ -9,6 +9,7 @@ import { AppService } from './app.service'
 import { QuotesModule } from './quotes/quotes.module'
 import { ProductionModule } from './production/production.module'
 import { PricingConfigModule } from './pricing-config/pricing-config.module'
+import { NotificationsModule } from './notifications/notifications.module'
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { PricingConfigModule } from './pricing-config/pricing-config.module'
     QuotesModule,
     ProductionModule,
     PricingConfigModule,
+    NotificationsModule,
     // UsersModule,   // TODO Giai đoạn 3 nâng cao
     // AuditModule,   // TODO Giai đoạn 3 nâng cao
   ],
