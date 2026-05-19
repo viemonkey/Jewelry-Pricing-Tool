@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar'
 import { format } from 'date-fns'
 import { vi } from 'date-fns/locale'
-import { Plus, Upload, X, ImageIcon, Loader2, FileText, CalendarIcon, Minus } from 'lucide-react'
+import { Plus, Upload, X, ImageIcon, Loader2, FileText, CalendarIcon, Minus, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { quotesApi } from '@/lib/api'
 import { useNotifications } from '@/lib/notifications'
@@ -28,18 +28,38 @@ interface QuoteRequestModalProps {
   onSuccess?: (quote: Quote) => void
 }
 
+// ── Loại chất liệu ─────────────────────────────────────────
 const MATERIAL_OPTIONS = [
-  { value: 'GOLD_24K', label: 'Vàng 24K' },
-  { value: 'GOLD_18K', label: 'Vàng 18K' },
-  { value: 'GOLD_14K', label: 'Vàng 14K' },
-  { value: 'GOLD_10K', label: 'Vàng 10K' },
-  { value: 'GOLD_610', label: 'Vàng 610' },
-  { value: 'SILVER',   label: 'Bạc 925' },
-]
+  { value: 'GOLD_24K', label: 'Vàng 24K', isGold: true },
+  { value: 'GOLD_18K', label: 'Vàng 18K', isGold: true },
+  { value: 'GOLD_14K', label: 'Vàng 14K', isGold: true },
+  { value: 'GOLD_610', label: 'Vàng 610',  isGold: true },
+  { value: 'GOLD_10K', label: 'Vàng 10K', isGold: true },
+  { value: 'SILVER',   label: 'Bạc 925',  isGold: false },
+] as const
+
+type MaterialValue = (typeof MATERIAL_OPTIONS)[number]['value']
+
+// ── Một dòng chất liệu (nhiều dòng được phép) ──────────────
+interface MaterialRow {
+  id: string          // uuid-lite: Date.now() + Math.random()
+  materialType: MaterialValue | ''
+  weight: string      // trọng lượng (chỉ hoặc gram) – chuỗi để người dùng nhập tự do
+  unit: 'chi' | 'gram'
+}
+
+function newRow(): MaterialRow {
+  return {
+    id: `${Date.now()}-${Math.random()}`,
+    materialType: '',
+    weight: '',
+    unit: 'chi',
+  }
+}
 
 interface FormErrors {
   productName?: string
-  materialType?: string
+  materials?: string
 }
 
 export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModalProps) {
@@ -52,15 +72,17 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
   const fileRef = useRef<HTMLInputElement>(null)
   const { addNotification } = useNotifications()
 
+  // ── State form ──────────────────────────────────────────
   const [form, setForm] = useState({
     productName: '',
-    materialType: '' as Quote['materialType'] | '',
     productDescription: '',
-    dimensions: '',
     stoneRequirements: '',
     quantity: 1,
     notes: '',
   })
+
+  // Danh sách chất liệu – bắt đầu với 1 dòng rỗng
+  const [materialRows, setMaterialRows] = useState<MaterialRow[]>([newRow()])
 
   const set = (key: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -68,20 +90,33 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
 
   const touch = (key: string) => setTouched((t) => ({ ...t, [key]: true }))
 
-  // ── Validation ───────────────────────────────────────────────────
+  // ── Validation ─────────────────────────────────────────
   const errors: FormErrors = {}
   if (touched.productName && !form.productName.trim())
     errors.productName = 'Vui lòng nhập tên sản phẩm'
-  if (touched.materialType && !form.materialType)
-    errors.materialType = 'Vui lòng chọn chất liệu'
+  if (touched.materials && materialRows.every((r) => !r.materialType))
+    errors.materials = 'Vui lòng chọn ít nhất 1 chất liệu'
 
-  const isValid = form.productName.trim() && form.materialType
+  const isValid = form.productName.trim() && materialRows.some((r) => r.materialType)
 
-  // ── Quantity stepper ─────────────────────────────────────────────
+  // ── Quantity stepper ───────────────────────────────────
   const stepQty = (delta: number) =>
     setForm((f) => ({ ...f, quantity: Math.max(1, f.quantity + delta) }))
 
-  // ── Image handling ───────────────────────────────────────────────
+  // ── Material row helpers ───────────────────────────────
+  const updateRow = (id: string, patch: Partial<MaterialRow>) =>
+    setMaterialRows((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+
+  const removeRow = (id: string) =>
+    setMaterialRows((rows) => rows.filter((r) => r.id !== id))
+
+  const addRow = () =>
+    setMaterialRows((rows) => [...rows, newRow()])
+
+  // Tìm các materialType đã được chọn để loại khỏi dropdown của row khác
+  const selectedTypes = materialRows.map((r) => r.materialType).filter(Boolean)
+
+  // ── Image handling ─────────────────────────────────────
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     const newPreviews = files.map((file) => ({ file, url: URL.createObjectURL(file) }))
@@ -95,21 +130,51 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
     })
   }
 
-  // ── Submit ───────────────────────────────────────────────────────
+  // ── Submit ─────────────────────────────────────────────
   const handleSubmit = async () => {
-    setTouched({ productName: true, materialType: true })
+    setTouched({ productName: true, materials: true })
     if (!isValid) return
     setLoading(true)
+
+    // Tổng hợp thông tin chất liệu thành chuỗi ghi chú
+    const filledRows = materialRows.filter((r) => r.materialType)
+    const materialSummary = filledRows
+      .map((r) => {
+        const opt = MATERIAL_OPTIONS.find((o) => o.value === r.materialType)
+        const weightStr = r.weight ? ` – ${r.weight} ${r.unit}` : ''
+        return `${opt?.label ?? r.materialType}${weightStr}`
+      })
+      .join('; ')
+
+    // materialType chính là loại đầu tiên (bắt buộc có ít nhất 1)
+    const primaryMaterial = filledRows[0].materialType as Quote['materialType']
+
+    // dimensions: ghép tất cả trọng lượng có ghi chú
+    const weightNotes = filledRows
+      .filter((r) => r.weight)
+      .map((r) => {
+        const opt = MATERIAL_OPTIONS.find((o) => o.value === r.materialType)
+        return `${opt?.label}: ${r.weight} ${r.unit}`
+      })
+      .join(', ')
+
     try {
       const quote = await quotesApi.create({
         productName: form.productName,
-        materialType: form.materialType as Quote['materialType'],
+        materialType: primaryMaterial,
         productDescription: form.productDescription,
-        dimensions: form.dimensions,
+        // Ghi đầy đủ tất cả chất liệu vào dimensions để Order/Admin biết
+        dimensions: weightNotes || undefined,
         stoneRequirements: form.stoneRequirements,
         quantity: form.quantity,
         deadline: deadlineDate ? format(deadlineDate, 'yyyy-MM-dd') : '',
-        notes: form.notes,
+        // Ghi thêm danh sách chất liệu vào notes
+        notes: [
+          filledRows.length > 1 ? `Chất liệu: ${materialSummary}` : '',
+          form.notes,
+        ]
+          .filter(Boolean)
+          .join('\n'),
         images: previews.map((p) => p.file),
         requestedBy: requesterName,
       })
@@ -134,7 +199,8 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
   }
 
   const resetForm = () => {
-    setForm({ productName: '', materialType: '', productDescription: '', dimensions: '', stoneRequirements: '', quantity: 1, notes: '' })
+    setForm({ productName: '', productDescription: '', stoneRequirements: '', quantity: 1, notes: '' })
+    setMaterialRows([newRow()])
     setDeadlineDate(undefined)
     setTouched({})
     previews.forEach((p) => URL.revokeObjectURL(p.url))
@@ -182,80 +248,197 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
             )}
           </div>
 
-          {/* Chất liệu + Số lượng */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label>Chất liệu <span className="text-destructive">*</span></Label>
-              <Select
-                value={form.materialType}
-                onValueChange={(v) => {
-                  setForm((f) => ({ ...f, materialType: v as Quote['materialType'] }))
-                  touch('materialType')
-                }}
-              >
-                <SelectTrigger
-                  aria-invalid={!!errors.materialType}
-                  className={cn(errors.materialType && 'border-destructive focus-visible:ring-destructive/30')}
+          {/* ── CHẤT LIỆU (multi-row) ───────────────────────────── */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>
+                Chất liệu <span className="text-destructive">*</span>
+              </Label>
+              {/* Nút thêm dòng — chỉ hiện khi chưa dùng hết loại */}
+              {materialRows.length < MATERIAL_OPTIONS.length && (
+                <button
+                  type="button"
+                  onClick={addRow}
+                  className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
                 >
-                  <SelectValue placeholder="Chọn chất liệu..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {MATERIAL_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.materialType && (
-                <p className="text-xs text-destructive">{errors.materialType}</p>
+                  <Layers className="h-3.5 w-3.5" />
+                  Thêm chất liệu
+                </button>
               )}
             </div>
 
-            {/* FIX: Stepper UI thay cho native number input */}
-            <div className="space-y-1.5">
-              <Label>Số lượng</Label>
-              <div className="flex items-center gap-1.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={() => stepQty(-1)}
-                  disabled={form.quantity <= 1}
-                  className="shrink-0"
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </Button>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  value={form.quantity}
-                  onChange={(e) => {
-                    const n = parseInt(e.target.value.replace(/\D/g, '')) || 1
-                    setForm((f) => ({ ...f, quantity: Math.max(1, n) }))
-                  }}
-                  className="text-center tabular-nums"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon-sm"
-                  onClick={() => stepQty(1)}
-                  className="shrink-0"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+            <div className="space-y-2">
+              <AnimatePresence initial={false}>
+                {materialRows.map((row, idx) => (
+                  <motion.div
+                    key={row.id}
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6, height: 0, marginBottom: 0 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    {/* Header dòng (chỉ hiện từ dòng 2 trở đi) */}
+                    {idx > 0 && (
+                      <div className="flex items-center gap-1 mb-1.5">
+                        <div className="h-px flex-1 bg-border" />
+                        <span className="text-[11px] text-muted-foreground px-1">
+                          Chất liệu {idx + 1}
+                        </span>
+                        <div className="h-px flex-1 bg-border" />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-[1fr_90px_52px_auto] gap-2 items-end">
+                      {/* Loại chất liệu */}
+                      <div className="space-y-1">
+                        {idx === 0 && (
+                          <span className="text-[11px] text-muted-foreground">Loại</span>
+                        )}
+                        <Select
+                          value={row.materialType}
+                          onValueChange={(v) => {
+                            updateRow(row.id, { materialType: v as MaterialValue })
+                            touch('materials')
+                          }}
+                        >
+                          <SelectTrigger
+                            className={cn(
+                              idx === 0 && errors.materials && !row.materialType &&
+                              'border-destructive focus-visible:ring-destructive/30',
+                            )}
+                          >
+                            <SelectValue placeholder="Chọn loại..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {MATERIAL_OPTIONS.map((opt) => {
+                              // Ẩn loại đã chọn ở dòng khác
+                              const usedElsewhere =
+                                selectedTypes.includes(opt.value) && row.materialType !== opt.value
+                              if (usedElsewhere) return null
+                              return (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </SelectItem>
+                              )
+                            })}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Trọng lượng */}
+                      <div className="space-y-1">
+                        {idx === 0 && (
+                          <span className="text-[11px] text-muted-foreground">Trọng lượng</span>
+                        )}
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="VD: 2.5"
+                          value={row.weight}
+                          onChange={(e) =>
+                            updateRow(row.id, { weight: e.target.value.replace(/[^0-9.]/g, '') })
+                          }
+                          className="text-right tabular-nums"
+                        />
+                      </div>
+
+                      {/* Đơn vị */}
+                      <div className="space-y-1">
+                        {idx === 0 && (
+                          <span className="text-[11px] text-muted-foreground">Đơn vị</span>
+                        )}
+                        <Select
+                          value={row.unit}
+                          onValueChange={(v) => updateRow(row.id, { unit: v as 'chi' | 'gram' })}
+                        >
+                          <SelectTrigger className="px-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="chi">Chỉ</SelectItem>
+                            <SelectItem value="gram">Gram</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Nút xoá dòng */}
+                      <div className={cn('flex', idx === 0 ? 'mt-5' : 'mt-0')}>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={materialRows.length === 1}
+                          onClick={() => removeRow(row.id)}
+                          className="h-9 w-9 text-muted-foreground hover:text-destructive disabled:opacity-30"
+                          title="Xoá dòng này"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
+
+            {errors.materials && (
+              <p className="text-xs text-destructive">{errors.materials}</p>
+            )}
+
+            {/* Preview badge tổng hợp khi có >1 dòng có dữ liệu */}
+            {(() => {
+              const filled = materialRows.filter((r) => r.materialType)
+              if (filled.length <= 1) return null
+              return (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {filled.map((r) => {
+                    const opt = MATERIAL_OPTIONS.find((o) => o.value === r.materialType)
+                    return (
+                      <Badge key={r.id} variant="secondary" className="text-xs gap-1">
+                        {opt?.label}
+                        {r.weight && <span className="opacity-70">· {r.weight} {r.unit}</span>}
+                      </Badge>
+                    )
+                  })}
+                </div>
+              )
+            })()}
           </div>
 
-          {/* Kích thước / Trọng lượng */}
+          {/* Số lượng sản phẩm */}
           <div className="space-y-1.5">
-            <Label htmlFor="dimensions">Kích thước / Trọng lượng dự kiến</Label>
-            <Input
-              id="dimensions"
-              placeholder="VD: Size 12, khoảng 3 chỉ, dài 45cm..."
-              value={form.dimensions}
-              onChange={set('dimensions')}
-            />
+            <Label>Số lượng</Label>
+            <div className="flex items-center gap-1.5 max-w-[160px]">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={() => stepQty(-1)}
+                disabled={form.quantity <= 1}
+                className="shrink-0"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </Button>
+              <Input
+                type="text"
+                inputMode="numeric"
+                value={form.quantity}
+                onChange={(e) => {
+                  const n = parseInt(e.target.value.replace(/\D/g, '')) || 1
+                  setForm((f) => ({ ...f, quantity: Math.max(1, n) }))
+                }}
+                className="text-center tabular-nums"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                onClick={() => stepQty(1)}
+                className="shrink-0"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
 
           {/* Yêu cầu đá */}
@@ -281,7 +464,7 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
             />
           </div>
 
-          {/* FIX: Deadline — Calendar Popover thay native date input */}
+          {/* Deadline */}
           <div className="space-y-1.5">
             <Label>Deadline khách yêu cầu</Label>
             <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>

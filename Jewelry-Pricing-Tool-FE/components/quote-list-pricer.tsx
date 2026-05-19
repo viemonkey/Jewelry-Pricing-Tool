@@ -19,13 +19,98 @@ import {
 import {
   Calculator, CheckCircle, Eye, Loader2, RefreshCw,
   ThumbsUp, Ban, Gem, Hammer, Sparkles, TrendingUp, AlertCircle,
-  Package, Zap, Send, ShoppingCart, ImageIcon, X,
+  Package, Zap, Send, ShoppingCart, ImageIcon, X, Layers,
 } from 'lucide-react'
 import { quotesApi, pricingConfigApi } from '@/lib/api'
 import type { PricingConfig } from '@/lib/api'
 import { formatCurrency, calculateGoldProductPrice, calculateSilverProductPrice, getProfitDivisor } from '@/lib/pricing'
 import { useNotifications } from '@/lib/notifications'
 import type { Quote, QuoteStatus, UserRole } from '@/lib/types'
+
+// ── Multi-material types & helpers ─────────────────────────────────────────
+
+export interface GoldRow {
+  id: string
+  materialType: string
+  label: string
+  weightChi: string
+  goldPrice24K: string
+  materialCost: string
+}
+
+const MATERIAL_LABEL_MAP: Record<string, string> = {
+  GOLD_24K: 'Vàng 24K',
+  GOLD_18K: 'Vàng 18K',
+  GOLD_14K: 'Vàng 14K',
+  GOLD_610: 'Vàng 610',
+  GOLD_10K: 'Vàng 10K',
+  SILVER:   'Bạc 925',
+}
+
+function labelToType(label: string): string | null {
+  const map: Record<string, string> = {
+    'Vàng 24K': 'GOLD_24K', 'Vàng 18K': 'GOLD_18K', 'Vàng 14K': 'GOLD_14K',
+    'Vàng 610': 'GOLD_610', 'Vàng 10K': 'GOLD_10K', 'Bạc 925': 'SILVER',
+  }
+  return map[label] ?? null
+}
+
+function makeGoldRow(type: string, weight = ''): GoldRow {
+  return {
+    id: `${type}-${Date.now()}-${Math.random()}`,
+    materialType: type,
+    label: MATERIAL_LABEL_MAP[type] ?? type.replace(/_/g, ' '),
+    weightChi: weight,
+    goldPrice24K: '',
+    materialCost: '',
+  }
+}
+
+/**
+ * Parse danh sách chất liệu từ Quote (Sale đã nhập qua multi-row modal).
+ * Sale lưu vào:
+ *   dimensions: "Vàng 18K: 2 chỉ, Vàng 10K: 1.5 chỉ"
+ *   notes: "Chất liệu: Vàng 18K – 2 chỉ; Vàng 10K – 1.5 chỉ\n..."
+ *   materialType: loại đầu tiên
+ */
+export function parseMaterialsFromQuote(quote: {
+  materialType: string
+  dimensions?: string
+  notes?: string
+}): GoldRow[] {
+  // 1. Thử parse từ dimensions
+  if (quote.dimensions) {
+    const rows: GoldRow[] = []
+    for (const part of quote.dimensions.split(',').map(s => s.trim())) {
+      const m = part.match(/^(Vàng \d+K|Vàng 610|Bạc 925):\s*([\d.]+)/i)
+      if (m) {
+        const t = labelToType(m[1])
+        if (t) rows.push(makeGoldRow(t, m[2]))
+      }
+    }
+    if (rows.length > 0) return rows
+  }
+
+  // 2. Thử parse từ notes
+  if (quote.notes) {
+    const line = quote.notes.split('\n').find(l => l.startsWith('Chất liệu:'))
+    if (line) {
+      const rows: GoldRow[] = []
+      const content = line.replace('Chất liệu:', '').trim()
+      for (const part of content.split(';').map(s => s.trim())) {
+        const m = part.match(/^(Vàng \d+K|Vàng 610|Bạc 925)(?:\s*[–-]\s*([\d.]+))?/i)
+        if (m) {
+          const t = labelToType(m[1])
+          if (t) rows.push(makeGoldRow(t, m[2] ?? ''))
+        }
+      }
+      if (rows.length > 0) return rows
+    }
+  }
+
+  // 3. Fallback: 1 dòng từ materialType
+  return [makeGoldRow(quote.materialType)]
+}
 
 const STATUS_CONFIG: Record<QuoteStatus, { label: string; color: string; dot: string }> = {
   PENDING:            { label: 'Chờ báo giá',        color: 'border-amber-400/60 text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400', dot: 'bg-amber-400' },
@@ -149,7 +234,6 @@ function PricingDialogTabs({
             <div className="grid grid-cols-2 gap-3">
               {[
                 { label: 'Người yêu cầu', value: selected.requestedBy, icon: '👤' },
-                { label: 'Chất liệu',     value: selected.materialType.replace(/_/g, ' '), icon: '⚙️' },
                 { label: 'Số lượng',      value: `${(selected as any).quantity ?? 1} cái`, icon: '📦' },
                 { label: 'Deadline',      value: (selected as any).deadline, icon: '📅' },
               ].map(({ label, value, icon }) => (
@@ -158,6 +242,28 @@ function PricingDialogTabs({
                   <p className="font-semibold text-sm text-foreground">{value || '—'}</p>
                 </div>
               ))}
+              {/* Chất liệu — full width, multi-row badges */}
+              {(() => {
+                const parsed = parseMaterialsFromQuote({
+                  materialType: selected.materialType,
+                  dimensions: (selected as any).dimensions,
+                  notes: selected.notes,
+                })
+                return (
+                  <div className="rounded-xl bg-muted/40 border border-border/50 px-4 py-3 col-span-2">
+                    <p className="text-xs text-muted-foreground mb-1.5">⚙️ Chất liệu</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {parsed.map((row, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-300/60 dark:border-amber-700/60 text-amber-700 dark:text-amber-300 text-xs font-semibold px-2.5 py-0.5">
+                          <Layers className="h-3 w-3" />
+                          {row.label}
+                          {row.weightChi && <span className="opacity-60 font-normal">· {row.weightChi} chỉ</span>}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
 
             {/* Full-width detail blocks */}
@@ -414,6 +520,131 @@ function SectionDivider({ label, icon }: { label: string; icon?: React.ReactNode
   )
 }
 
+// ── MultiMaterialPricingRows ────────────────────────────────────────────────
+
+interface MultiMaterialPricingRowsProps {
+  rows: GoldRow[]
+  onChange: (rows: GoldRow[]) => void
+  pricingConfig: { goldRatios: any[]; profitMargins: any[]; silverMultiplier: number } | null
+  fmt: (v: number | string) => string
+  onTotalChange: (total: number) => void
+}
+
+function MultiMaterialPricingRows({
+  rows, onChange, pricingConfig, fmt, onTotalChange,
+}: MultiMaterialPricingRowsProps) {
+  const computeCost = (type: string, price24k: string, weight: string): number => {
+    const g = parseFloat(price24k) || 0
+    const w = parseFloat(weight) || 0
+    if (!g || !w) return 0
+    const key   = type.replace('GOLD_', '')
+    const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)?.applied ?? 0
+    return Math.round(ratio * g * w)
+  }
+
+  const update = (id: string, patch: Partial<GoldRow>) => {
+    const next = rows.map(r => {
+      if (r.id !== id) return r
+      const u = { ...r, ...patch }
+      const cost = computeCost(u.materialType, u.goldPrice24K, u.weightChi)
+      u.materialCost = cost > 0 ? String(cost) : u.materialCost
+      return u
+    })
+    onChange(next)
+    onTotalChange(next.reduce((s, r) => s + (parseFloat(r.materialCost) || 0), 0))
+  }
+
+  const total = rows.reduce((s, r) => s + (parseFloat(r.materialCost) || 0), 0)
+
+  return (
+    <div className="space-y-3">
+      {rows.map((row, idx) => {
+        const key   = row.materialType.replace('GOLD_', '')
+        const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)
+        const hasData = !!(parseFloat(row.goldPrice24K) && parseFloat(row.weightChi))
+        return (
+          <motion.div key={row.id}
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15, delay: idx * 0.04 }}
+            className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2"
+          >
+            {/* Header dòng */}
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-300/60 dark:border-amber-700/60 text-amber-700 dark:text-amber-300 text-xs font-semibold px-2.5 py-0.5">
+                <Layers className="h-3 w-3" />
+                {row.label}
+                {ratio && (
+                  <span className="opacity-60 font-normal ml-0.5">· {Math.round(ratio.applied * 100)}%</span>
+                )}
+              </span>
+              {hasData && (
+                <span className="text-xs font-bold text-primary tabular-nums">{fmt(row.materialCost)}</span>
+              )}
+            </div>
+
+            {/* Inputs */}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <span className="text-[10px] text-muted-foreground font-medium">Trọng lượng (chỉ)</span>
+                <div className="relative">
+                  <input
+                    type="text" inputMode="decimal" placeholder="0"
+                    value={row.weightChi}
+                    onChange={e => update(row.id, { weightChi: e.target.value.replace(/[^0-9.]/g, '') })}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 pr-10 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/30"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">chỉ</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] text-muted-foreground font-medium">Giá vàng 24K (đ/chỉ)</span>
+                <div className="relative">
+                  <input
+                    type="text" inputMode="numeric" placeholder="9.000.000"
+                    value={row.goldPrice24K ? Number(row.goldPrice24K).toLocaleString('vi-VN') : ''}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/\./g, '').replace(/,/g, '')
+                      update(row.id, { goldPrice24K: raw })
+                    }}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 pr-5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/30"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">đ</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Công thức tính */}
+            {hasData && (
+              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200/70 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-300">
+                {ratio ? (
+                  <>{Number(row.goldPrice24K).toLocaleString('vi-VN')} × {Math.round(ratio.applied * 100)}% × {row.weightChi} chỉ = <strong>{fmt(row.materialCost)}</strong></>
+                ) : (
+                  <>Giá vàng {row.label}: <strong>{fmt(row.materialCost)}</strong></>
+                )}
+              </div>
+            )}
+          </motion.div>
+        )
+      })}
+
+      {/* Tổng cộng nhiều loại */}
+      {rows.length > 1 && total > 0 && (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          className="flex items-center justify-between rounded-xl border-2 border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 px-4 py-2.5"
+        >
+          <span className="text-sm font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+            <Layers className="h-3.5 w-3.5" />
+            Tổng giá vàng ({rows.length} loại)
+          </span>
+          <span className="text-base font-bold text-amber-700 dark:text-amber-300 tabular-nums">
+            {fmt(total)}
+          </span>
+        </motion.div>
+      )}
+    </div>
+  )
+}
+
 export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá', newQuote }: QuoteListPricerProps) {
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(false)
@@ -433,6 +664,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
 
   const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null)
   const [stoneEntries, setStoneEntriesRaw] = useState<StoneEntry[]>([])
+  const [goldRows, setGoldRows] = useState<GoldRow[]>([])
 
   // Khi stoneEntries thay đổi → tự tính tổng và cập nhật stoneCost + tái tính giá bán
   const setStoneEntries: React.Dispatch<React.SetStateAction<StoneEntry[]>> = (action) => {
@@ -522,6 +754,13 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       costPrice: q.costPrice?.toString() || '',
       sellingPrice: q.sellingPrice?.toString() || '',
     })
+    // Init multi-material rows từ dữ liệu Sale đã nhập
+    const parsedRows = parseMaterialsFromQuote({
+      materialType: q.materialType,
+      dimensions: (q as any).dimensions,
+      notes: q.notes,
+    })
+    setGoldRows(parsedRows)
   }
 
   const handleStartQuoting = async () => {
@@ -888,7 +1127,6 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                     <div className="grid grid-cols-2 gap-2.5">
                       {[
                         { label: 'Người yêu cầu', value: selected.requestedBy, icon: '👤' },
-                        { label: 'Chất liệu',     value: selected.materialType.replace(/_/g, ' '), icon: '⚙️' },
                         { label: 'Số lượng',      value: `${(selected as any).quantity ?? 1} cái`, icon: '📦' },
                         { label: 'Deadline',      value: (selected as any).deadline, icon: '📅' },
                       ].map(({ label, value, icon }) => (
@@ -897,6 +1135,28 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           <p className="font-semibold text-sm">{value || '—'}</p>
                         </div>
                       ))}
+                      {/* Chất liệu — hiển thị đầy đủ multi-row */}
+                      {(() => {
+                        const parsed = parseMaterialsFromQuote({
+                          materialType: selected.materialType,
+                          dimensions: (selected as any).dimensions,
+                          notes: selected.notes,
+                        })
+                        return (
+                          <div className="rounded-xl bg-background border border-border/60 px-3 py-2.5 col-span-2">
+                            <p className="text-xs text-muted-foreground mb-1.5">⚙️ Chất liệu</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {parsed.map((row, i) => (
+                                <span key={i} className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-300/60 dark:border-amber-700/60 text-amber-700 dark:text-amber-300 text-xs font-semibold px-2.5 py-0.5">
+                                  <Layers className="h-3 w-3" />
+                                  {row.label}
+                                  {row.weightChi && <span className="opacity-60 font-normal">· {row.weightChi} chỉ</span>}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </div>
 
                     {/* Full-width detail blocks */}
@@ -947,20 +1207,11 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
 
                   <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
 
-                    {/* Section 1: Nguyên liệu */}
+                    {/* Section 1: Nguyên liệu — multi-material */}
                     <SectionDivider label="Nguyên liệu" icon={<Gem className="h-3 w-3" />} />
-                    <div className="grid grid-cols-2 gap-3">
-                      {selected.materialType !== 'SILVER' ? (
-                        <div className="space-y-2">
-                          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Số chi vàng</Label>
-                          <div className="relative">
-                            <Input type="number" placeholder="0" value={priceForm.weightChi}
-                              className="h-10 pr-12 text-sm tabular-nums"
-                              onChange={(e) => setPriceForm((f) => ({ ...f, weightChi: e.target.value }))} />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground pointer-events-none">chi</span>
-                          </div>
-                        </div>
-                      ) : (
+
+                    {selected.materialType === 'SILVER' ? (
+                      <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-2">
                           <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Trọng lượng</Label>
                           <div className="relative">
@@ -970,10 +1221,21 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground pointer-events-none">gram</span>
                           </div>
                         </div>
-                      )}
-                      <CurrencyInput label="Giá nguyên vật liệu" value={priceForm.materialCost}
-                        onChange={updatePriceField('materialCost')} />
-                    </div>
+                        <CurrencyInput label="Giá nguyên vật liệu" value={priceForm.materialCost}
+                          onChange={updatePriceField('materialCost')} />
+                      </div>
+                    ) : (
+                      <MultiMaterialPricingRows
+                        rows={goldRows}
+                        onChange={setGoldRows}
+                        pricingConfig={pricingConfig}
+                        fmt={formatCurrency}
+                        onTotalChange={(total) => {
+                          const syntheticEvent = { target: { value: String(total) } } as React.ChangeEvent<HTMLInputElement>
+                          updatePriceField('materialCost')(syntheticEvent)
+                        }}
+                      />
+                    )}
 
                     {/* Section 2: Gia công & Đá */}
                     <SectionDivider label="Gia công & Đá quý" icon={<Hammer className="h-3 w-3" />} />
@@ -1304,7 +1566,6 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {[
                       { label: 'Người yêu cầu', value: selected.requestedBy, icon: '👤' },
-                      { label: 'Chất liệu', value: selected.materialType.replace(/_/g, ' '), icon: '⚙️' },
                       { label: 'Số lượng', value: `${(selected as any).quantity || 1} cái`, icon: '📦' },
                       { label: 'Deadline', value: (selected as any).deadline, icon: '📅' },
                     ].map(({ label, value, icon }) => (
@@ -1313,6 +1574,28 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         <p className="font-semibold mt-0.5 text-sm">{value || '—'}</p>
                       </div>
                     ))}
+                    {/* Chất liệu — multi-row */}
+                    {(() => {
+                      const parsed = parseMaterialsFromQuote({
+                        materialType: selected.materialType,
+                        dimensions: (selected as any).dimensions,
+                        notes: selected.notes,
+                      })
+                      return (
+                        <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 col-span-2">
+                          <span className="text-xs text-muted-foreground flex items-center gap-1">⚙️ Chất liệu</span>
+                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                            {parsed.map((row, i) => (
+                              <span key={i} className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-300/60 dark:border-amber-700/60 text-amber-700 dark:text-amber-300 text-xs font-semibold px-2.5 py-0.5">
+                                <Layers className="h-3 w-3" />
+                                {row.label}
+                                {row.weightChi && <span className="opacity-60 font-normal">· {row.weightChi} chỉ</span>}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
                   <div className="mt-2 space-y-2">
                     {[
