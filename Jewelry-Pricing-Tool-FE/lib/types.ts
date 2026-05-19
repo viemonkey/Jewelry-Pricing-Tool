@@ -34,7 +34,7 @@ export interface Quote {
   quoteCode: string        // VD: QT-2025-001
   productName: string
   productDescription?: string
-  materialType: 'GOLD_24K' | 'GOLD_18K' | 'GOLD_14K' | 'GOLD_10K' | 'SILVER'
+  materialType: 'GOLD_24K' | 'GOLD_18K' | 'GOLD_14K' | 'GOLD_10K' | 'GOLD_610' | 'SILVER'
   weightChi?: number       // Số chi vàng
   weightGram?: number      // Gram bạc
   laborCost: number        // Tiền công

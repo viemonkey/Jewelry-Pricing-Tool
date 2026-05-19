@@ -21,8 +21,9 @@ import {
   ThumbsUp, Ban, Gem, Hammer, Sparkles, TrendingUp, AlertCircle,
   Package, Zap, Send, ShoppingCart, ImageIcon, X,
 } from 'lucide-react'
-import { quotesApi } from '@/lib/api'
-import { formatCurrency } from '@/lib/pricing'
+import { quotesApi, pricingConfigApi } from '@/lib/api'
+import type { PricingConfig } from '@/lib/api'
+import { formatCurrency, calculateGoldProductPrice, calculateSilverProductPrice, getProfitDivisor } from '@/lib/pricing'
 import { useNotifications } from '@/lib/notifications'
 import type { Quote, QuoteStatus, UserRole } from '@/lib/types'
 
@@ -37,24 +38,43 @@ const STATUS_CONFIG: Record<QuoteStatus, { label: string; color: string; dot: st
   IN_PRODUCTION:      { label: 'Đang sản xuất',       color: 'border-purple-400/60 text-purple-600 bg-purple-50 dark:bg-purple-950/30 dark:text-purple-400', dot: 'bg-purple-400' },
 }
 
+export interface StoneEntry {
+  id: string
+  type: 'lab_diamond' | 'natural_diamond' | 'colored_stone'
+  quantity: number
+  sizeOrCarat: string
+  unitPrice: string
+  priceMethod: 'per_piece' | 'per_carat'
+}
+
 interface PriceFormState {
+  // Nguyên liệu vàng
   weightChi: string
+  goldPrice24K: string     // giá vàng 24K/chỉ — nhập tay
+  materialCost: string     // tự tính từ weight × ratio × goldPrice24K
+  // Bạc
   weightGram: string
-  materialCost: string
-  stoneCost: string
+  // Đá / phụ kiện
+  stoneCost: string       // tổng tiền đá (tự tính từ bảng hoặc nhập tay)
+  // Chi phí gia công
   laborCost: string
   processingCost: string
   finishingCost: string
   wasteCost: string
-  costPrice: string
-  sellingPrice: string
+  // Tổng hợp
+  costBeforeVAT: string
+  costWithVAT: string
+  costPrice: string        // = costWithVAT (để tương thích)
+  sellingPrice: string     // tự tính, có thể override
   quotedBy: string
 }
 
 const EMPTY_PRICE_FORM = (name: string): PriceFormState => ({
-  weightChi: '', weightGram: '', materialCost: '', stoneCost: '',
+  weightChi: '', goldPrice24K: '', materialCost: '',
+  weightGram: '',
+  stoneCost: '',
   laborCost: '', processingCost: '', finishingCost: '', wasteCost: '',
-  costPrice: '', sellingPrice: '', quotedBy: name,
+  costBeforeVAT: '', costWithVAT: '', costPrice: '', sellingPrice: '', quotedBy: name,
 })
 
 interface QuoteListPricerProps {
@@ -65,14 +85,18 @@ interface QuoteListPricerProps {
 
 // ─── Pricing Dialog Tabs component ─────────────────────────
 function PricingDialogTabs({
-  selected, priceForm, setPriceForm, updatePriceField,
+  selected, priceForm, setPriceForm,
+  stoneEntries, setStoneEntries,
+  pricingConfig,
   cost, sell, margin, profit, marginGood,
   saving, onClose, onSubmit, formatCurrency: fmt,
 }: {
   selected: Quote
   priceForm: PriceFormState
   setPriceForm: React.Dispatch<React.SetStateAction<PriceFormState>>
-  updatePriceField: (key: keyof PriceFormState) => (e: React.ChangeEvent<HTMLInputElement>) => void
+  stoneEntries: StoneEntry[]
+  setStoneEntries: React.Dispatch<React.SetStateAction<StoneEntry[]>>
+  pricingConfig: { goldRatios: any[]; profitMargins: any[]; silverMultiplier: number } | null
   cost: number; sell: number; margin: number | null; profit: number | null; marginGood: boolean
   saving: boolean
   onClose: () => void
@@ -188,138 +212,113 @@ function PricingDialogTabs({
         ) : (
 
           /* ── PRICING TAB ── */
-          <div className="px-6 py-5 space-y-4">
+          <div className="px-6 py-5 space-y-5">
 
-            {/* Section 1: Nguyên liệu */}
-            <SectionDivider label="Nguyên liệu" icon={<Gem className="h-3 w-3" />} />
-            <div className="grid grid-cols-2 gap-4">
-              {selected.materialType !== 'SILVER' ? (
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Số chi vàng</Label>
-                  <div className="relative">
-                    <Input type="number" placeholder="0" value={priceForm.weightChi}
-                      className="h-10 pr-12 text-sm tabular-nums"
-                      onChange={(e) => setPriceForm((f) => ({ ...f, weightChi: e.target.value }))} />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-semibold pointer-events-none">chi</span>
+            {selected.materialType === 'SILVER' ? (
+              /* ── BẠC: nhập giá vốn → tự ra giá bán ×3 ── */
+              <div className="space-y-4">
+                <SectionDivider label="Sản phẩm bạc" icon={<Gem className="h-3 w-3" />} />
+                <div className="rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
+                  💡 Sản phẩm bạc: <strong>Giá bán = Giá vốn × {pricingConfig?.silverMultiplier ?? 3}</strong>
+                </div>
+                <CurrencyInput label="Giá vốn bạc" value={priceForm.materialCost}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    const cost = parseFloat(v) || 0
+                    const sell = cost * (pricingConfig?.silverMultiplier ?? 3)
+                    setPriceForm(f => ({ ...f, materialCost: v, costBeforeVAT: v, costWithVAT: v, costPrice: v, sellingPrice: String(sell) }))
+                  }} icon={<Gem className="h-3 w-3" />} />
+                {parseFloat(priceForm.sellingPrice) > 0 && (
+                  <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+                    <p className="text-xs text-emerald-600 font-semibold mb-1">Giá bán đề xuất</p>
+                    <p className="text-2xl font-bold text-emerald-700">{fmt(priceForm.sellingPrice)}</p>
                   </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Trọng lượng</Label>
-                  <div className="relative">
-                    <Input type="number" placeholder="0" value={priceForm.weightGram}
-                      className="h-10 pr-14 text-sm tabular-nums"
-                      onChange={(e) => setPriceForm((f) => ({ ...f, weightGram: e.target.value }))} />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-semibold pointer-events-none">gram</span>
-                  </div>
-                </div>
-              )}
-              <CurrencyInput label="Giá nguyên vật liệu" value={priceForm.materialCost}
-                onChange={updatePriceField('materialCost')} icon={<Gem className="h-3 w-3" />} />
-            </div>
-
-            {/* Section 2: Gia công & Đá */}
-            <SectionDivider label="Gia công & Đá quý" icon={<Hammer className="h-3 w-3" />} />
-            <div className="grid grid-cols-2 gap-4">
-              <CurrencyInput label="Giá đá / phụ kiện"   value={priceForm.stoneCost}      onChange={updatePriceField('stoneCost')} />
-              <CurrencyInput label="Tiền công sản xuất"   value={priceForm.laborCost}      onChange={updatePriceField('laborCost')} />
-              <CurrencyInput label="Chi phí gia công"     value={priceForm.processingCost} onChange={updatePriceField('processingCost')} />
-              <CurrencyInput label="Chi phí hoàn thiện"   value={priceForm.finishingCost}  onChange={updatePriceField('finishingCost')} />
-            </div>
-
-            {/* Section 3: Phát sinh */}
-            <SectionDivider label="Chi phí phát sinh" icon={<Sparkles className="h-3 w-3" />} />
-            <CurrencyInput label="Hao hụt / chi phí phát sinh" value={priceForm.wasteCost}
-              onChange={updatePriceField('wasteCost')} icon={<Zap className="h-3 w-3" />} />
-
-            {/* Tổng giá vốn */}
-            <div className="rounded-xl border-2 border-primary/25 bg-gradient-to-br from-primary/5 to-amber-50/60 dark:from-primary/10 dark:to-amber-950/20 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Tổng giá vốn</p>
-                  <p className="text-2xl font-bold text-primary tabular-nums">{fmt(cost)}</p>
-                </div>
-                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                  <Calculator className="h-6 w-6 text-primary" />
-                </div>
+                )}
               </div>
-              {/* Breakdown bars */}
-              {cost > 0 && (
-                <div className="mt-3 space-y-1.5">
-                  {[
-                    { label: 'Nguyên vật liệu', value: parseFloat(priceForm.materialCost) || 0, color: 'bg-amber-400' },
-                    { label: 'Đá quý',           value: parseFloat(priceForm.stoneCost) || 0,    color: 'bg-blue-400' },
-                    { label: 'Gia công',          value: (parseFloat(priceForm.laborCost) || 0) + (parseFloat(priceForm.processingCost) || 0) + (parseFloat(priceForm.finishingCost) || 0), color: 'bg-emerald-400' },
-                    { label: 'Phát sinh',         value: parseFloat(priceForm.wasteCost) || 0,    color: 'bg-red-300' },
-                  ].filter(s => s.value > 0).map(s => (
-                    <div key={s.label} className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground w-28 shrink-0">{s.label}</span>
-                      <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all duration-500 ${s.color}`}
-                          style={{ width: `${Math.min(100, (s.value / cost) * 100)}%` }} />
-                      </div>
-                      <span className="text-xs font-semibold text-muted-foreground tabular-nums w-8 text-right shrink-0">
-                        {Math.round((s.value / cost) * 100)}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Giá bán đề xuất */}
-            <SectionDivider label="Giá bán" icon={<TrendingUp className="h-3 w-3" />} />
-            <div className="space-y-3">
-              <Label className="text-xs font-semibold text-foreground uppercase tracking-wide flex items-center gap-1.5">
-                <TrendingUp className="h-3.5 w-3.5 text-primary" /> Giá bán đề xuất
-              </Label>
-              <div className="relative">
-                <Input type="number" placeholder="0" value={priceForm.sellingPrice}
-                  className="h-12 pr-6 text-lg font-bold border-2 border-primary/30 bg-primary/5 focus-visible:ring-primary/30 text-primary tabular-nums"
-                  onChange={(e) => setPriceForm((f) => ({ ...f, sellingPrice: e.target.value }))} />
-                <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-primary/50 pointer-events-none font-bold">đ</span>
-              </div>
-
-              {/* Margin card */}
-              {margin !== null && (
-                <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                  className={`rounded-xl p-4 border-2 ${
-                    marginGood
-                      ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-700/60'
-                      : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-700/60'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center text-base font-bold ${
-                        marginGood ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50' : 'bg-orange-100 text-orange-600 dark:bg-orange-900/50'
-                      }`}>
-                        {marginGood ? '✓' : '!'}
-                      </div>
-                      <div>
-                        <p className={`text-xs font-bold uppercase tracking-wide mb-0.5 ${
-                          marginGood ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'
-                        }`}>
-                          {marginGood ? 'Biên lợi nhuận tốt' : 'Biên lợi nhuận thấp'}
-                        </p>
-                        <p className={`text-base font-bold tabular-nums ${
-                          marginGood ? 'text-emerald-700 dark:text-emerald-300' : 'text-orange-700 dark:text-orange-300'
-                        }`}>
-                          {margin}% · Lãi {fmt(profit!)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="w-20 h-2 bg-muted/50 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all duration-500 ${marginGood ? 'bg-emerald-400' : 'bg-orange-400'}`}
-                          style={{ width: `${Math.min(100, margin)}%` }} />
-                      </div>
-                      <p className="text-[10px] text-muted-foreground mt-1">Mục tiêu ≥ 20%</p>
+            ) : (
+              <>
+                {/* ── VÀNG: Step 1 — Tính giá vàng theo tuổi ── */}
+                <SectionDivider label="Bước 1 — Tính giá vàng theo tuổi" icon={<Gem className="h-3 w-3" />} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Trọng lượng (chỉ)</Label>
+                    <div className="relative">
+                      <Input type="number" placeholder="0" value={priceForm.weightChi}
+                        className="h-10 pr-10 text-sm tabular-nums"
+                        onChange={(e) => {
+                          const w = parseFloat(e.target.value) || 0
+                          const g24k = parseFloat(priceForm.goldPrice24K) || 0
+                          const karat = selected.materialType // e.g. 'GOLD_18K' → '18K'
+                          const key = karat.replace('GOLD_', '').replace('GOLD', '24K')
+                          const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)?.applied ?? 0
+                          const matCost = Math.round(ratio * g24k * w)
+                          setPriceForm(f => ({ ...f, weightChi: e.target.value, materialCost: matCost > 0 ? String(matCost) : f.materialCost }))
+                        }} />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">chỉ</span>
                     </div>
                   </div>
-                </motion.div>
-              )}
-            </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Giá vàng 24K (đ/chỉ)</Label>
+                    <div className="relative">
+                      <Input type="number" placeholder="9,000,000" value={priceForm.goldPrice24K}
+                        className="h-10 pr-6 text-sm tabular-nums"
+                        onChange={(e) => {
+                          const g24k = parseFloat(e.target.value) || 0
+                          const w = parseFloat(priceForm.weightChi) || 0
+                          const karat = selected.materialType
+                          const key = karat.replace('GOLD_', '').replace('GOLD', '24K')
+                          const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)?.applied ?? 0
+                          const matCost = Math.round(ratio * g24k * w)
+                          setPriceForm(f => ({ ...f, goldPrice24K: e.target.value, materialCost: matCost > 0 ? String(matCost) : f.materialCost }))
+                        }} />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">đ</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Hiển thị tỉ lệ áp dụng */}
+                {(() => {
+                  const key = selected.materialType.replace('GOLD_', '').replace('GOLD', '24K')
+                  const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)
+                  return ratio ? (
+                    <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                      Tỉ lệ {ratio.label}: chuẩn {Math.round(ratio.standard * 100)}% + 5% hao hụt = <strong>áp dụng {Math.round(ratio.applied * 100)}%</strong>
+                      {parseFloat(priceForm.weightChi) > 0 && parseFloat(priceForm.goldPrice24K) > 0 && (
+                        <span className="ml-2">→ Giá vàng: <strong>{fmt(priceForm.materialCost)}</strong></span>
+                      )}
+                    </div>
+                  ) : null
+                })()}
+                <CurrencyInput label="Giá vàng theo tuổi (tự tính hoặc nhập tay)" value={priceForm.materialCost}
+                  onChange={(e) => setPriceForm(f => ({ ...f, materialCost: e.target.value }))}
+                  icon={<Gem className="h-3 w-3" />} />
+
+                {/* ── Step 2 — Bảng đá chi tiết ── */}
+                <SectionDivider label="Bước 2 — Bảng tính đá / phụ kiện" icon={<Sparkles className="h-3 w-3" />} />
+                <StoneTable entries={stoneEntries} onChange={setStoneEntries} fmt={fmt} />
+
+                {/* ── Step 3 — Chi phí gia công ── */}
+                <SectionDivider label="Bước 3 — Chi phí gia công" icon={<Hammer className="h-3 w-3" />} />
+                <div className="grid grid-cols-2 gap-3">
+                  <CurrencyInput label="Tiền công sản xuất" value={priceForm.laborCost} onChange={(e) => setPriceForm(f => ({ ...f, laborCost: e.target.value }))} />
+                  <CurrencyInput label="Chi phí gia công" value={priceForm.processingCost} onChange={(e) => setPriceForm(f => ({ ...f, processingCost: e.target.value }))} />
+                  <CurrencyInput label="Chi phí hoàn thiện" value={priceForm.finishingCost} onChange={(e) => setPriceForm(f => ({ ...f, finishingCost: e.target.value }))} />
+                  <CurrencyInput label="Hao hụt / phát sinh" value={priceForm.wasteCost} onChange={(e) => setPriceForm(f => ({ ...f, wasteCost: e.target.value }))} icon={<Zap className="h-3 w-3" />} />
+                </div>
+
+                {/* ── Step 4 — Tổng hợp giá ── */}
+                <SectionDivider label="Bước 4 — Tổng hợp & Giá bán" icon={<TrendingUp className="h-3 w-3" />} />
+                <PricingSummary
+                  priceForm={priceForm}
+                  stoneEntries={stoneEntries}
+                  pricingConfig={pricingConfig}
+                  setPriceForm={setPriceForm}
+                  fmt={fmt}
+                  margin={margin}
+                  profit={profit}
+                  marginGood={marginGood}
+                />
+              </>
+            )}
           </div>
         )}
       </div>
@@ -343,6 +342,17 @@ function PricingDialogTabs({
   )
 }
 
+// ─── Helper: format số có dấu chấm VD: 7.200.000 ───────────
+function formatInputNumber(raw: string | undefined | null): string {
+  if (raw === undefined || raw === null || raw === '') return ''
+  const digits = String(raw).replace(/\D/g, '')
+  if (!digits) return ''
+  return Number(digits).toLocaleString('vi-VN')
+}
+function parseInputNumber(formatted: string): string {
+  return formatted.replace(/\./g, '').replace(/,/g, '')
+}
+
 // ─── Small helpers ──────────────────────────────────────────
 function CurrencyInput({
   label, value, onChange, highlighted = false, icon,
@@ -353,6 +363,19 @@ function CurrencyInput({
   highlighted?: boolean
   icon?: React.ReactNode
 }) {
+  // value là số thuần (VD: "7200000"), hiển thị có dấu chấm (VD: "7.200.000")
+  const displayed = formatInputNumber(value ?? '')
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = parseInputNumber(e.target.value)
+    // Tạo synthetic event với value là số thuần để các handler bên ngoài nhận đúng
+    const syntheticEvent = {
+      ...e,
+      target: { ...e.target, value: raw },
+    } as React.ChangeEvent<HTMLInputElement>
+    onChange(syntheticEvent)
+  }
+
   return (
     <div className="space-y-2">
       <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -361,10 +384,11 @@ function CurrencyInput({
       </Label>
       <div className={`relative transition-all ${highlighted ? 'ring-2 ring-primary/20 rounded-lg' : ''}`}>
         <Input
-          type="number"
+          type="text"
+          inputMode="numeric"
           placeholder="0"
-          value={value}
-          onChange={onChange}
+          value={displayed}
+          onChange={handleChange}
           className={`h-10 pr-7 text-sm tabular-nums transition-all
             ${highlighted
               ? 'border-primary/40 bg-primary/5 font-semibold focus-visible:ring-primary/30 text-primary'
@@ -406,6 +430,41 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   const [editImages, setEditImages] = useState<{ file: File; url: string }[]>([])
   const [keepImages, setKeepImages] = useState<string[]>([])
   const editFileRef = useRef<HTMLInputElement>(null)
+
+  const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null)
+  const [stoneEntries, setStoneEntriesRaw] = useState<StoneEntry[]>([])
+
+  // Khi stoneEntries thay đổi → tự tính tổng và cập nhật stoneCost + tái tính giá bán
+  const setStoneEntries: React.Dispatch<React.SetStateAction<StoneEntry[]>> = (action) => {
+    setStoneEntriesRaw((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action
+      const total = next.reduce((sum, e) => {
+        if (e.priceMethod === 'per_piece') return sum + e.quantity * e.unitPrice
+        const carat = parseFloat(e.size) || 0
+        return sum + e.quantity * carat * e.unitPrice
+      }, 0)
+      const totalStr = String(Math.round(total))
+      // Trigger updatePriceField logic manually
+      setPriceForm((f) => {
+        const n = (v: string) => parseFloat(v) || 0
+        const totalBeforeVAT = n(f.materialCost) + total + n(f.laborCost)
+          + n(f.processingCost) + n(f.finishingCost) + n(f.wasteCost)
+        const withVAT = totalBeforeVAT * 1.1
+        const updated = { ...f, stoneCost: totalStr }
+        if (totalBeforeVAT > 0) {
+          updated.costBeforeVAT = String(Math.round(totalBeforeVAT))
+          updated.costWithVAT = String(Math.round(withVAT))
+          updated.costPrice = String(Math.round(withVAT))
+        }
+        return updated
+      })
+      return next
+    })
+  }
+
+  useEffect(() => {
+    pricingConfigApi.get().then(setPricingConfig).catch(() => {})
+  }, [])
 
   const canViewCost = currentRole === 'order' || currentRole === 'admin'
   const isPricer = canViewCost
@@ -452,7 +511,14 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       ...EMPTY_PRICE_FORM(currentUserName),
       weightChi: q.weightChi?.toString() || '',
       weightGram: q.weightGram?.toString() || '',
+      materialCost: (q as any).materialCost?.toString() || '',
+      stoneCost: (q as any).stoneCost?.toString() || '',
       laborCost: q.laborCost?.toString() || '',
+      processingCost: (q as any).processingCost?.toString() || '',
+      finishingCost: (q as any).finishingCost?.toString() || '',
+      wasteCost: (q as any).wasteCost?.toString() || '',
+      costBeforeVAT: (q as any).costBeforeVAT?.toString() || '',
+      costWithVAT: (q as any).costWithVAT?.toString() || '',
       costPrice: q.costPrice?.toString() || '',
       sellingPrice: q.sellingPrice?.toString() || '',
     })
@@ -547,13 +613,21 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     if (!selected) return
     setSaving(true)
     try {
+      // Upload ảnh mới nếu có
+      let newImageUrls: string[] = []
+      if (editImages.length > 0) {
+        const { uploadApi } = await import('@/lib/api')
+        newImageUrls = await uploadApi.uploadImages(editImages.map(i => i.file))
+      }
+      // Gộp ảnh giữ lại + ảnh mới upload
+      const finalImages = [...keepImages, ...newImageUrls]
+
       await quotesApi.updateInfo(selected._id, {
         dimensions: editForm.dimensions || (selected as any).dimensions,
         stoneRequirements: editForm.stoneRequirements || (selected as any).stoneRequirements,
         productDescription: editForm.productDescription || selected.productDescription,
         notes: editForm.notes || selected.notes,
-        keepImages: keepImages,
-        newImages: editImages.map(i => i.file),
+        ...(finalImages.length > 0 ? { images: finalImages } : {}),
       })
       await quotesApi.resubmit(selected._id)
       addNotification({ type: 'success', title: '✅ Đã gửi lại yêu cầu', message: `"${selected.productName}" đã được cập nhật và gửi lại.` })
@@ -592,9 +666,21 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     setPriceForm((f) => {
       const updated = { ...f, [key]: e.target.value }
       const n = (v: string) => parseFloat(v) || 0
-      const total = n(updated.materialCost) + n(updated.stoneCost) + n(updated.laborCost)
+      // Tổng giá vốn chưa VAT = NVL + đá + tiền công + gia công + hoàn thiện + hao hụt
+      const totalBeforeVAT = n(updated.materialCost) + n(updated.stoneCost) + n(updated.laborCost)
         + n(updated.processingCost) + n(updated.finishingCost) + n(updated.wasteCost)
-      if (total > 0) updated.costPrice = String(total)
+      if (totalBeforeVAT > 0) {
+        const vat = totalBeforeVAT * 0.1
+        const withVAT = totalBeforeVAT + vat
+        updated.costBeforeVAT = String(Math.round(totalBeforeVAT))
+        updated.costWithVAT = String(Math.round(withVAT))
+        updated.costPrice = String(Math.round(withVAT))
+        // Tự tính giá bán theo bảng biên lợi nhuận từ docs
+        if (pricingConfig?.profitMargins) {
+          const { divisor } = getProfitDivisor(withVAT, pricingConfig.profitMargins)
+          updated.sellingPrice = String(Math.round(withVAT / divisor / 1000) * 1000)
+        }
+      }
       return updated
     })
   }
@@ -602,7 +688,8 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   const filtered = filterStatus === 'ALL' ? quotes : quotes.filter((q) => q.status === filterStatus)
 
   // Derived values for margin display
-  const cost = parseFloat(priceForm.costPrice) || 0
+  // costWithVAT là giá vốn thực (sau VAT 10%) — dùng để hiển thị và tính margin
+  const cost = parseFloat(priceForm.costWithVAT) || parseFloat(priceForm.costPrice) || 0
   const sell = parseFloat(priceForm.sellingPrice) || 0
   const margin = sell > 0 && cost > 0 ? Math.round(((sell - cost) / sell) * 100) : null
   const profit = sell > 0 && cost > 0 ? sell - cost : null
@@ -696,12 +783,6 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           {isPricer && q.status === 'QUOTING' && (
                             <Button size="sm" onClick={() => openDetail(q, 'pricing')} className="gap-1 h-7 text-xs">
                               <Calculator className="h-3 w-3" /> Tính giá
-                            </Button>
-                          )}
-                          {/* Sale: PENDING / QUOTING → Xem trạng thái */}
-                          {!isPricer && (q.status === 'PENDING' || q.status === 'QUOTING') && (
-                            <Button size="sm" variant="ghost" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
-                              <Eye className="h-3 w-3" /> Xem
                             </Button>
                           )}
                           {/* Sale: NEED_MORE_INFO → Xem lý do + Gửi lại */}
@@ -912,8 +993,11 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                     <div className="rounded-xl border-2 border-primary/25 bg-gradient-to-br from-primary/5 to-amber-50/60 dark:from-primary/10 dark:to-amber-950/20 p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Tổng giá vốn</p>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Giá vốn có VAT (10%)</p>
                           <p className="text-2xl font-bold text-primary tabular-nums">{formatCurrency(cost)}</p>
+                          {priceForm.costBeforeVAT && (
+                            <p className="text-xs text-muted-foreground mt-0.5">Chưa VAT: {formatCurrency(parseFloat(priceForm.costBeforeVAT))}</p>
+                          )}
                         </div>
                         <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
                           <Calculator className="h-5 w-5 text-primary" />
@@ -945,10 +1029,20 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                     {/* Giá bán */}
                     <SectionDivider label="Giá bán đề xuất" icon={<TrendingUp className="h-3 w-3" />} />
                     <div className="space-y-3">
+                    {/* Thông tin biên lợi nhuận tự động */}
+                    {cost > 0 && pricingConfig?.profitMargins && (() => {
+                      const { divisor, margin: tier } = getProfitDivisor(cost, pricingConfig.profitMargins)
+                      return (
+                        <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                          📊 Áp dụng biên <strong>{tier}</strong> (÷{divisor}) → Giá bán tự tính bên dưới
+                        </div>
+                      )
+                    })()}
                       <div className="relative">
-                        <Input type="number" placeholder="0" value={priceForm.sellingPrice}
+                        <Input type="text" inputMode="numeric" placeholder="0"
+                          value={formatInputNumber(priceForm.sellingPrice)}
                           className="h-12 pr-7 text-lg font-bold border-2 border-primary/30 bg-primary/5 focus-visible:ring-primary/30 text-primary tabular-nums"
-                          onChange={(e) => setPriceForm((f) => ({ ...f, sellingPrice: e.target.value }))} />
+                          onChange={(e) => setPriceForm((f) => ({ ...f, sellingPrice: parseInputNumber(e.target.value) }))} />
                         <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-primary/50 pointer-events-none font-bold">đ</span>
                       </div>
 
@@ -1150,40 +1244,46 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                 </div>
 
               ) : (
-              <div className="px-6 py-4 space-y-4">
+              <div className="overflow-y-auto" style={{ maxHeight: 'calc(80vh - 160px)' }}>
 
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  {[
-                    { label: 'Người yêu cầu', value: selected.requestedBy },
-                    { label: 'Chất liệu', value: selected.materialType.replace(/_/g, ' ') },
-                    { label: 'Số lượng', value: (selected as any).quantity },
-                    { label: 'Deadline', value: (selected as any).deadline },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="rounded-lg bg-muted/40 px-3 py-2.5">
-                      <span className="text-xs text-muted-foreground">{label}</span>
-                      <p className="font-semibold mt-0.5">{value || '—'}</p>
+                {/* ── HERO: Giá bán nổi bật ── */}
+                {selected.status !== 'PENDING' && selected.status !== 'QUOTING' && selected.sellingPrice > 0 && (
+                  <div className="relative overflow-hidden bg-gradient-to-br from-primary to-amber-600 px-6 py-5 text-white">
+                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, white 0%, transparent 60%)' }} />
+                    <div className="relative">
+                      {canViewCost ? (
+                        <div className="flex items-end justify-between">
+                          <div>
+                            <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Giá bán đề xuất</p>
+                            <p className="text-3xl font-bold tracking-tight">{formatCurrency(selected.sellingPrice)}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-white/70 mb-1">Giá vốn (có VAT)</p>
+                            <p className="text-base font-semibold text-white/90">{formatCurrency(selected.costPrice)}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Giá bán đề xuất</p>
+                          <p className="text-4xl font-bold tracking-tight">{formatCurrency(selected.sellingPrice)}</p>
+                        </div>
+                      )}
+                      <div className="mt-3 flex items-center gap-2">
+                        {(() => { const cfg = STATUS_CONFIG[selected.status]; return cfg ? (
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-white/20 text-white`}>
+                            <span className={`h-1.5 w-1.5 rounded-full bg-white`} />
+                            {cfg.label}
+                          </span>
+                        ) : null })()}
+                        <span className="text-xs text-white/60">{selected.quoteCode}</span>
+                      </div>
                     </div>
-                  ))}
-                  {[
-                    { label: 'Kích thước / Trọng lượng dự kiến', value: (selected as any).dimensions },
-                    { label: 'Yêu cầu đá / phụ kiện', value: (selected as any).stoneRequirements },
-                    { label: 'Mô tả sản phẩm', value: selected.productDescription },
-                  ].map(({ label, value }) => (
-                    <div key={label} className="col-span-2 rounded-lg bg-muted/40 px-3 py-2.5">
-                      <span className="text-xs text-muted-foreground">{label}</span>
-                      <p className="font-medium mt-0.5">{value || '—'}</p>
-                    </div>
-                  ))}
-                </div>
-
-                {selected.notes && (
-                  <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 px-3 py-2.5">
-                    <span className="text-xs font-medium text-amber-600">📝 Ghi chú cho NV báo giá</span>
-                    <p className="text-amber-800 dark:text-amber-300 mt-0.5 text-sm">{selected.notes}</p>
                   </div>
                 )}
 
-                {/* Banner lý do trả lại — chỉ hiện khi NEED_MORE_INFO */}
+                <div className="px-6 py-4 space-y-4">
+
+                {/* Banner lý do trả lại */}
                 {selected.status === 'NEED_MORE_INFO' && selected.rejectReason && (
                   <div className="rounded-xl border-2 border-orange-400/60 bg-orange-50 dark:bg-orange-950/20 px-4 py-3">
                     <p className="text-xs font-bold text-orange-600 dark:text-orange-400 mb-1 flex items-center gap-1.5">
@@ -1198,34 +1298,61 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                   </div>
                 )}
 
+                {/* Thông tin sản phẩm */}
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Thông tin sản phẩm</p>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {[
+                      { label: 'Người yêu cầu', value: selected.requestedBy, icon: '👤' },
+                      { label: 'Chất liệu', value: selected.materialType.replace(/_/g, ' '), icon: '⚙️' },
+                      { label: 'Số lượng', value: `${(selected as any).quantity || 1} cái`, icon: '📦' },
+                      { label: 'Deadline', value: (selected as any).deadline, icon: '📅' },
+                    ].map(({ label, value, icon }) => (
+                      <div key={label} className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">{icon} {label}</span>
+                        <p className="font-semibold mt-0.5 text-sm">{value || '—'}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {[
+                      { label: 'Kích thước / Trọng lượng dự kiến', value: (selected as any).dimensions, icon: '📐' },
+                      { label: 'Yêu cầu đá / phụ kiện', value: (selected as any).stoneRequirements, icon: '💎' },
+                      { label: 'Mô tả sản phẩm', value: selected.productDescription, icon: '📝' },
+                    ].filter(x => x.value).map(({ label, value, icon }) => (
+                      <div key={label} className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">{icon} {label}</span>
+                        <p className="font-medium mt-0.5 leading-relaxed">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {selected.notes && (
+                  <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
+                    <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 mb-1">
+                      <AlertCircle className="h-3 w-3" /> Ghi chú cho NV báo giá
+                    </p>
+                    <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">{selected.notes}</p>
+                  </div>
+                )}
+
                 {selected.images?.length > 0 && (
                   <div>
-                    <p className="text-xs text-muted-foreground mb-2">Hình ảnh sản phẩm</p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Hình ảnh sản phẩm</p>
                     <div className="flex flex-wrap gap-2">
                       {selected.images.map((img, i) => (
-                        <a key={i} href={`http://localhost:3001${img}`} target="_blank" rel="noreferrer">
+                        <a key={i} href={`http://localhost:3001${img}`} target="_blank" rel="noreferrer"
+                          className="block rounded-xl overflow-hidden border-2 border-border/40 hover:border-primary/40 hover:scale-105 transition-all shadow-sm">
                           <img src={`http://localhost:3001${img}`} alt={`Ảnh ${i + 1}`}
-                            className="h-20 w-20 rounded-lg border object-cover hover:opacity-80 transition-opacity cursor-pointer" />
+                            className="h-24 w-24 object-cover" />
                         </a>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {selected.status !== 'PENDING' && selected.status !== 'QUOTING' && selected.sellingPrice > 0 && (
-                  <div className="rounded-xl bg-primary/5 border border-primary/20 px-4 py-3 flex items-center justify-between">
-                    {canViewCost && (
-                      <div>
-                        <span className="text-xs text-muted-foreground">Giá vốn</span>
-                        <p className="font-semibold">{formatCurrency(selected.costPrice)}</p>
-                      </div>
-                    )}
-                    <div className={canViewCost ? 'text-right' : ''}>
-                      <span className="text-xs text-muted-foreground">Giá bán</span>
-                      <p className="text-xl font-bold text-primary">{formatCurrency(selected.sellingPrice)}</p>
-                    </div>
-                  </div>
-                )}
+                </div>
 
                 <div className="border-t pt-3">
                   {isPricer && dialogMode === 'review' && (

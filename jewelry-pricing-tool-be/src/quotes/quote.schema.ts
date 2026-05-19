@@ -23,7 +23,7 @@ export class Quote {
   @Prop() stoneRequirements: string  // Yêu cầu đá / phụ kiện
   @Prop({ default: 1 }) quantity: number
   @Prop() deadline: string           // Deadline khách yêu cầu
-  @Prop({ required: true, enum: ['GOLD_24K', 'GOLD_18K', 'GOLD_14K', 'GOLD_10K', 'SILVER'] })
+  @Prop({ required: true, enum: ['GOLD_24K', 'GOLD_18K', 'GOLD_14K', 'GOLD_10K', 'GOLD_610', 'SILVER'] })
   materialType: string
   @Prop() weightChi: number
   @Prop() weightGram: number

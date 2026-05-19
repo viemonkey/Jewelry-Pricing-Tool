@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -16,15 +16,38 @@ interface SilverCalculatorProps {
   currentRole: UserRole
 }
 
+// ── Currency input hook (same pattern as gold-calculator) ────────────────────
+const parseRaw = (s: string) => parseFloat(s.replace(/[^\d.]/g, '')) || 0
+
+function useCurrencyInput() {
+  const [display, setDisplay] = useState('')
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '')
+    setDisplay(raw ? new Intl.NumberFormat('vi-VN').format(Number(raw)) : '')
+  }, [])
+
+  const handleBlur = useCallback(() => {
+    const n = parseRaw(display)
+    setDisplay(n ? new Intl.NumberFormat('vi-VN').format(n) : '')
+  }, [display])
+
+  const rawValue = parseRaw(display)
+
+  return { display, handleChange, handleBlur, rawValue }
+}
+
 export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
   const [config, setConfig] = useState<PricingConfig | null>(null)
   const [configLoading, setConfigLoading] = useState(true)
 
   const [productName, setProductName] = useState('')
-  const [costPrice, setCostPrice] = useState<string>('')
-  const [sellingPrice, setSellingPrice] = useState<string>('')
   const [calculationMode, setCalculationMode] = useState<'cost-to-sell' | 'sell-to-cost'>('cost-to-sell')
   const [isSaving, setIsSaving] = useState(false)
+
+  // FIX: currency-formatted inputs
+  const costPriceInput = useCurrencyInput()
+  const sellingPriceInput = useCurrencyInput()
 
   const canViewCost = currentRole === 'order' || currentRole === 'admin'
 
@@ -40,14 +63,14 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
   const result = useMemo(() => {
     if (!config) return null
     if (calculationMode === 'cost-to-sell') {
-      const cost = parseFloat(costPrice) || 0
+      const cost = costPriceInput.rawValue
       if (cost > 0) return calculateSilverProductPrice(cost, silverMultiplier)
     } else {
-      const sell = parseFloat(sellingPrice) || 0
+      const sell = sellingPriceInput.rawValue
       if (sell > 0) return { costPrice: sell / silverMultiplier, sellingPrice: sell }
     }
     return null
-  }, [costPrice, sellingPrice, calculationMode, config, silverMultiplier])
+  }, [costPriceInput.rawValue, sellingPriceInput.rawValue, calculationMode, config, silverMultiplier])
 
   const handleSave = () => {
     setIsSaving(true)
@@ -73,132 +96,114 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
+      transition={{ duration: 0.35 }}
     >
       <Card className="hover:shadow-lg transition-shadow duration-300 overflow-hidden">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <motion.div
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-silver text-foreground"
-              whileHover={{ scale: 1.1, rotate: 5 }}
-              animate={{
-                boxShadow: [
-                  '0 0 0 0 rgba(192, 192, 192, 0)',
-                  '0 0 15px 3px rgba(192, 192, 192, 0.3)',
-                  '0 0 0 0 rgba(192, 192, 192, 0)',
-                ],
-              }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-foreground">
               <Calculator className="h-4 w-4" />
-            </motion.div>
+            </div>
             Tính giá sản phẩm bạc
           </CardTitle>
           <CardDescription>
-            Quy tắc đặc biệt: Giá bán = Giá vốn x {silverMultiplier}
+            Quy tắc đặc biệt: Giá bán = Giá vốn × {silverMultiplier}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Product Name */}
-          <motion.div
-            className="space-y-2"
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.1 }}
-          >
+        <CardContent className="space-y-5">
+
+          {/* Tên sản phẩm */}
+          <div className="space-y-2">
             <Label htmlFor="silverProductName">Tên/Mã sản phẩm</Label>
             <Input
               id="silverProductName"
               placeholder="VD: Vòng tay bạc 925"
               value={productName}
               onChange={(e) => setProductName(e.target.value)}
-              className="transition-all focus:ring-2 focus:ring-silver/50"
             />
-          </motion.div>
+          </div>
 
           {/* Calculation Mode Tabs */}
-          <motion.div
-            initial={{ opacity: 0, x: -10 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.2 }}
+          <Tabs
+            value={calculationMode}
+            onValueChange={(v) => setCalculationMode(v as 'cost-to-sell' | 'sell-to-cost')}
           >
-            <Tabs
-              value={calculationMode}
-              onValueChange={(v) => setCalculationMode(v as 'cost-to-sell' | 'sell-to-cost')}
-            >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger
-                  value="cost-to-sell"
-                  disabled={!canViewCost}
-                  className="transition-all data-[state=active]:shadow-md"
-                >
-                  Từ giá vốn
-                </TabsTrigger>
-                <TabsTrigger
-                  value="sell-to-cost"
-                  className="transition-all data-[state=active]:shadow-md"
-                >
-                  Từ giá bán
-                </TabsTrigger>
-              </TabsList>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger
+                value="cost-to-sell"
+                disabled={!canViewCost}
+              >
+                Từ giá vốn
+              </TabsTrigger>
+              <TabsTrigger value="sell-to-cost">
+                Từ giá bán
+              </TabsTrigger>
+            </TabsList>
 
-              <AnimatePresence mode="wait">
-                <TabsContent value="cost-to-sell" className="space-y-4">
-                  {canViewCost ? (
-                    <motion.div
-                      className="space-y-2"
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <Label htmlFor="costPrice">Giá vốn (VND)</Label>
-                      <Input
-                        id="costPrice"
-                        type="number"
-                        min="0"
-                        placeholder="Nhập giá vốn"
-                        value={costPrice}
-                        onChange={(e) => setCostPrice(e.target.value)}
-                        className="transition-all focus:ring-2 focus:ring-silver/50"
-                      />
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      className="rounded-lg bg-muted p-4 text-center text-sm text-muted-foreground"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                    >
-                      Bạn không có quyền xem giá vốn
-                    </motion.div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="sell-to-cost" className="space-y-4">
+            <AnimatePresence mode="wait">
+              <TabsContent value="cost-to-sell" className="space-y-4 mt-4">
+                {canViewCost ? (
                   <motion.div
                     className="space-y-2"
-                    initial={{ opacity: 0, y: 10 }}
+                    initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    transition={{ duration: 0.3 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
                   >
-                    <Label htmlFor="sellingPrice">Giá bán (VND)</Label>
+                    <Label htmlFor="costPrice">Giá vốn (VND)</Label>
+                    {/* FIX: currency formatted */}
+                    <div className="relative">
+                      <Input
+                        id="costPrice"
+                        inputMode="numeric"
+                        placeholder="VD: 500,000"
+                        value={costPriceInput.display}
+                        onChange={costPriceInput.handleChange}
+                        onBlur={costPriceInput.handleBlur}
+                        className="pr-10"
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                        đ
+                      </span>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <div className="rounded-lg bg-muted p-4 text-center text-sm text-muted-foreground">
+                    Bạn không có quyền xem giá vốn
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="sell-to-cost" className="space-y-4 mt-4">
+                <motion.div
+                  className="space-y-2"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Label htmlFor="sellingPrice">Giá bán (VND)</Label>
+                  {/* FIX: currency formatted */}
+                  <div className="relative">
                     <Input
                       id="sellingPrice"
-                      type="number"
-                      min="0"
-                      placeholder="Nhập giá bán"
-                      value={sellingPrice}
-                      onChange={(e) => setSellingPrice(e.target.value)}
-                      className="transition-all focus:ring-2 focus:ring-silver/50"
+                      inputMode="numeric"
+                      placeholder="VD: 1,500,000"
+                      value={sellingPriceInput.display}
+                      onChange={sellingPriceInput.handleChange}
+                      onBlur={sellingPriceInput.handleBlur}
+                      className="pr-10"
                     />
-                  </motion.div>
-                </TabsContent>
-              </AnimatePresence>
-            </Tabs>
-          </motion.div>
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                      đ
+                    </span>
+                  </div>
+                </motion.div>
+              </TabsContent>
+            </AnimatePresence>
+          </Tabs>
 
           {/* Result */}
           <AnimatePresence mode="wait">
@@ -206,125 +211,58 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
               <motion.div
                 key="result"
                 className="space-y-4"
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.4 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.25 }}
               >
-                <motion.div
-                  className="flex items-center justify-center gap-4 rounded-lg bg-muted/50 p-6 overflow-hidden relative"
-                  whileHover={{ scale: 1.02 }}
-                  transition={{ type: 'spring', stiffness: 300 }}
-                >
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-silver/20 to-transparent"
-                    animate={{ x: ['-100%', '100%'] }}
-                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 2 }}
-                  />
+                <div className="flex items-center justify-center gap-4 rounded-lg bg-muted/50 p-6">
                   {canViewCost && (
                     <>
-                      <motion.div
-                        className="text-center relative z-10"
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: 0.1 }}
-                      >
+                      <div className="text-center">
                         <p className="text-xs text-muted-foreground">GIÁ VỐN</p>
-                        <motion.p
-                          className="text-lg font-semibold"
-                          key={result.costPrice}
-                          initial={{ scale: 1.1 }}
-                          animate={{ scale: 1 }}
-                        >
+                        <p className="text-lg font-semibold tabular-nums">
                           {formatCurrency(result.costPrice)}
-                        </motion.p>
-                      </motion.div>
-                      <motion.div
-                        className="flex items-center gap-2 text-muted-foreground relative z-10"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.2 }}
-                      >
-                        <motion.span
-                          className="text-xs font-bold"
-                          animate={{ scale: [1, 1.1, 1] }}
-                          transition={{ duration: 1, repeat: Infinity }}
-                        >
-                          x{silverMultiplier}
-                        </motion.span>
-                        <motion.div
-                          animate={{ x: [0, 5, 0] }}
-                          transition={{ duration: 1, repeat: Infinity }}
-                        >
-                          <ArrowRight className="h-4 w-4" />
-                        </motion.div>
-                      </motion.div>
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <span className="text-xs font-bold">×{silverMultiplier}</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
                     </>
                   )}
-                  <motion.div
-                    className="text-center relative z-10"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.3 }}
-                  >
+                  <div className="text-center">
                     <p className="text-xs text-muted-foreground">GIÁ BÁN</p>
                     <motion.p
-                      className="text-2xl font-bold text-primary"
+                      className="text-2xl font-bold text-primary tabular-nums"
                       key={result.sellingPrice}
-                      initial={{ scale: 1.2, color: '#C0C0C0' }}
-                      animate={{ scale: 1, color: '#D4AF37' }}
-                      transition={{ duration: 0.5 }}
+                      initial={{ scale: 1.05, opacity: 0.7 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ duration: 0.2 }}
                     >
                       {formatCurrency(result.sellingPrice)}
                     </motion.p>
-                  </motion.div>
-                </motion.div>
+                  </div>
+                </div>
 
-                <motion.div
-                  className="flex items-center gap-2 rounded-lg bg-info/10 p-3 text-sm text-info"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4 }}
-                >
-                  <motion.div
-                    animate={{ rotate: [0, 10, -10, 0] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
-                    <Info className="h-4 w-4" />
-                  </motion.div>
-                  <span>Sản phẩm bạc áp dụng hệ số x{silverMultiplier} từ giá vốn</span>
-                </motion.div>
+                <div className="flex items-center gap-2 rounded-lg bg-muted p-3 text-sm text-muted-foreground">
+                  <Info className="h-4 w-4 shrink-0" />
+                  <span>Sản phẩm bạc áp dụng hệ số ×{silverMultiplier} từ giá vốn</span>
+                </div>
 
                 {/* Actions */}
-                <motion.div
-                  className="flex gap-2"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                >
-                  <motion.div className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Button className="w-full gap-2" variant="default" onClick={handleSave} disabled={isSaving}>
-                      <AnimatePresence mode="wait">
-                        {isSaving ? (
-                          <motion.div key="saving" initial={{ scale: 0, rotate: -180 }} animate={{ scale: 1, rotate: 0 }} exit={{ scale: 0 }}>
-                            <CheckCircle2 className="h-4 w-4" />
-                          </motion.div>
-                        ) : (
-                          <motion.div key="save" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                            <Save className="h-4 w-4" />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                      {isSaving ? 'Đã lưu!' : 'Lưu báo giá'}
-                    </Button>
-                  </motion.div>
-                  <motion.div className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Button className="w-full gap-2" variant="outline">
-                      <FileDown className="h-4 w-4" />
-                      Xuất PDF
-                    </Button>
-                  </motion.div>
-                </motion.div>
+                <div className="flex gap-2">
+                  <Button className="flex-1 gap-2" variant="default" onClick={handleSave} disabled={isSaving}>
+                    {isSaving
+                      ? <><CheckCircle2 className="h-4 w-4" />Đã lưu!</>
+                      : <><Save className="h-4 w-4" />Lưu báo giá</>
+                    }
+                  </Button>
+                  <Button className="flex-1 gap-2" variant="outline">
+                    <FileDown className="h-4 w-4" />
+                    Xuất PDF
+                  </Button>
+                </div>
               </motion.div>
             ) : (
               <motion.div
@@ -335,12 +273,7 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
                 exit={{ opacity: 0 }}
               >
                 <div className="text-center">
-                  <motion.div
-                    animate={{ y: [0, -5, 0], rotate: [0, 5, -5, 0] }}
-                    transition={{ duration: 3, repeat: Infinity }}
-                  >
-                    <Calculator className="mx-auto mb-2 h-8 w-8 opacity-20" />
-                  </motion.div>
+                  <Calculator className="mx-auto mb-2 h-8 w-8 opacity-20" />
                   <p className="text-sm">Nhập giá để xem kết quả</p>
                 </div>
               </motion.div>

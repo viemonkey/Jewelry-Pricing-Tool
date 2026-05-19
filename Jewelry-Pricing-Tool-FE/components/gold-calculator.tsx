@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -23,14 +23,44 @@ import {
 import { pricingConfigApi, type PricingConfig } from '@/lib/api'
 import { StoneCalculator } from './stone-calculator'
 import type { UserRole } from './header'
-import { Calculator, Info, Sparkles, Eye, EyeOff, Save, FileDown, CheckCircle2, Loader2 } from 'lucide-react'
+import {
+  Calculator, Info, Sparkles, Eye, EyeOff,
+  Save, FileDown, CheckCircle2, Loader2,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface GoldCalculatorProps {
   currentRole: UserRole
 }
 
-const inputVariants = {
-  focus: { scale: 1.02, borderColor: '#D4AF37' },
+// ── Currency helpers ─────────────────────────────────────────────────────────
+/** Convert formatted display string → raw number */
+const parseRaw = (s: string) => parseFloat(s.replace(/[^\d.]/g, '')) || 0
+
+/** Format number with thousand separators for display */
+const fmtDisplay = (n: number | string) => {
+  const num = typeof n === 'string' ? parseRaw(n) : n
+  if (!num) return ''
+  return new Intl.NumberFormat('vi-VN').format(num)
+}
+
+/** useCurrencyInput — keeps a display string with separators and raw number in sync */
+function useCurrencyInput(initial = '') {
+  const [display, setDisplay] = useState(initial)
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/\D/g, '')
+    setDisplay(raw ? new Intl.NumberFormat('vi-VN').format(Number(raw)) : '')
+  }, [])
+
+  const handleBlur = useCallback(() => {
+    const n = parseRaw(display)
+    setDisplay(n ? new Intl.NumberFormat('vi-VN').format(n) : '')
+  }, [display])
+
+  const rawValue = parseRaw(display)
+
+  return { display, setDisplay, handleChange, handleBlur, rawValue }
 }
 
 export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
@@ -39,12 +69,14 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
 
   const [productName, setProductName] = useState('')
   const [karatType, setKaratType] = useState<string>('18K')
-  const [weight, setWeight] = useState<string>('1')
-  const [goldPrice24K, setGoldPrice24K] = useState<string>('')
-  const [laborCost, setLaborCost] = useState<string>('')
+  const [weight, setWeight] = useState<string>('')
   const [stoneCost, setStoneCost] = useState<number>(0)
   const [showStoneCalculator, setShowStoneCalculator] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+
+  // FIX: currency-formatted inputs for gold price and labor cost
+  const goldPriceInput = useCurrencyInput()
+  const laborCostInput = useCurrencyInput()
 
   const canViewCost = currentRole === 'order' || currentRole === 'admin'
 
@@ -65,8 +97,8 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
   const result: PricingResult | null = useMemo(() => {
     if (!config) return null
     const weightNum = parseFloat(weight) || 0
-    const goldPriceNum = parseFloat(goldPrice24K) || 0
-    const laborNum = parseFloat(laborCost) || 0
+    const goldPriceNum = goldPriceInput.rawValue
+    const laborNum = laborCostInput.rawValue
 
     if (weightNum > 0 && goldPriceNum > 0) {
       return calculateGoldProductPrice({
@@ -81,10 +113,30 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
       })
     }
     return null
-  }, [productName, karatType, weight, goldPrice24K, laborCost, stoneCost, config, goldRatiosMap])
+  }, [productName, karatType, weight, goldPriceInput.rawValue, laborCostInput.rawValue, stoneCost, config, goldRatiosMap])
 
   const handleSave = () => {
+    if (!result || !productName.trim()) return
     setIsSaving(true)
+    try {
+      const history = JSON.parse(localStorage.getItem('pricing_history') || '[]')
+      const entry = {
+        id: Date.now(),
+        date: new Date().toLocaleString('vi-VN'),
+        productName,
+        karatType,
+        weight,
+        goldPrice24K: goldPriceInput.rawValue,
+        laborCost: laborCostInput.rawValue,
+        stoneCost,
+        costBeforeVAT: result.costBeforeVAT,
+        costWithVAT: result.costWithVAT,
+        suggestedPrice: result.suggestedPrice,
+        profitMargin: result.profitMargin,
+      }
+      history.unshift(entry)
+      localStorage.setItem('pricing_history', JSON.stringify(history.slice(0, 50)))
+    } catch {}
     setTimeout(() => setIsSaving(false), 1500)
   }
 
@@ -109,57 +161,38 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
-      {/* Input Form */}
+      {/* ── Input Form ─────────────────────────────────────────────── */}
       <motion.div
-        initial={{ opacity: 0, x: -30 }}
+        initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5 }}
+        transition={{ duration: 0.35 }}
       >
         <Card className="hover:shadow-lg transition-shadow duration-300">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <motion.div
-                animate={{ rotate: [0, 10, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-              >
-                <Calculator className="h-5 w-5 text-primary" />
-              </motion.div>
+              <Calculator className="h-5 w-5 text-primary" />
               Tính giá sản phẩm vàng
             </CardTitle>
-            <CardDescription>
-              Nhập thông tin sản phẩm để tính giá tự động
-            </CardDescription>
+            <CardDescription>Nhập thông tin sản phẩm để tính giá tự động</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Product Name */}
-            <motion.div
-              className="space-y-2"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Label htmlFor="productName">Tên/Mã sản phẩm</Label>
-              <motion.div whileFocus="focus" variants={inputVariants}>
-                <Input
-                  id="productName"
-                  placeholder="VD: Nhẫn kim cương 18K"
-                  value={productName}
-                  onChange={(e) => setProductName(e.target.value)}
-                  className="transition-all focus:ring-2 focus:ring-primary/50"
-                />
-              </motion.div>
-            </motion.div>
+          <CardContent className="space-y-5">
 
-            {/* Karat Type */}
-            <motion.div
-              className="space-y-2"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
+            {/* Tên sản phẩm */}
+            <div className="space-y-2">
+              <Label htmlFor="productName">Tên/Mã sản phẩm</Label>
+              <Input
+                id="productName"
+                placeholder="VD: Nhẫn kim cương 18K"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+              />
+            </div>
+
+            {/* Tuổi vàng */}
+            <div className="space-y-2">
               <Label htmlFor="karatType">Tuổi vàng</Label>
               <Select value={karatType} onValueChange={setKaratType}>
-                <SelectTrigger id="karatType" className="transition-all hover:border-primary/50">
+                <SelectTrigger id="karatType">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -178,15 +211,10 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
               <p className="text-xs text-muted-foreground">
                 Tỷ lệ áp dụng đã bao gồm phụ phí hao hụt chế tác
               </p>
-            </motion.div>
+            </div>
 
-            {/* Weight */}
-            <motion.div
-              className="space-y-2"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
+            {/* Trọng lượng */}
+            <div className="space-y-2">
               <Label htmlFor="weight">Trọng lượng (chỉ)</Label>
               <Input
                 id="weight"
@@ -196,126 +224,100 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                 placeholder="1"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
-                className="transition-all focus:ring-2 focus:ring-primary/50"
               />
-              <p className="text-xs text-muted-foreground">
-                1 chỉ = 3.75g
-              </p>
-            </motion.div>
+              <p className="text-xs text-muted-foreground">1 chỉ = 3.75g</p>
+            </div>
 
-            {/* Gold Price 24K */}
+            {/* Giá vàng 24K — FIX: currency formatted input */}
             {canViewCost && (
-              <motion.div
-                className="space-y-2"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-              >
+              <div className="space-y-2">
                 <Label htmlFor="goldPrice24K" className="flex items-center gap-2">
                   Giá vàng nguyên liệu 24K (VND/chỉ)
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 1.5, repeat: Infinity }}
-                  >
-                    <Badge variant="secondary" className="text-xs">
-                      Cập nhật hàng ngày
-                    </Badge>
-                  </motion.div>
+                  <Badge variant="secondary" className="text-xs">Cập nhật hàng ngày</Badge>
                 </Label>
-                <Input
-                  id="goldPrice24K"
-                  type="number"
-                  step="100000"
-                  min="0"
-                  placeholder="Nhập giá vàng 24K hôm nay"
-                  value={goldPrice24K}
-                  onChange={(e) => setGoldPrice24K(e.target.value)}
-                  className="transition-all focus:ring-2 focus:ring-primary/50"
-                />
-              </motion.div>
+                <div className="relative">
+                  <Input
+                    id="goldPrice24K"
+                    inputMode="numeric"
+                    placeholder="VD: 8,500,000"
+                    value={goldPriceInput.display}
+                    onChange={goldPriceInput.handleChange}
+                    onBlur={goldPriceInput.handleBlur}
+                    className="pr-10"
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    đ
+                  </span>
+                </div>
+              </div>
             )}
 
-            {/* Labor Cost */}
+            {/* Tiền công — FIX: currency formatted */}
             {canViewCost && (
-              <motion.div
-                className="space-y-2"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5 }}
-              >
+              <div className="space-y-2">
                 <Label htmlFor="laborCost">Tiền công chế tác (VND)</Label>
-                <Input
-                  id="laborCost"
-                  type="number"
-                  step="10000"
-                  min="0"
-                  placeholder="0"
-                  value={laborCost}
-                  onChange={(e) => setLaborCost(e.target.value)}
-                  className="transition-all focus:ring-2 focus:ring-primary/50"
-                />
-              </motion.div>
+                <div className="relative">
+                  <Input
+                    id="laborCost"
+                    inputMode="numeric"
+                    placeholder="VD: 500,000"
+                    value={laborCostInput.display}
+                    onChange={laborCostInput.handleChange}
+                    onBlur={laborCostInput.handleBlur}
+                    className="pr-10"
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                    đ
+                  </span>
+                </div>
+              </div>
             )}
 
-            {/* Stone Cost */}
+            {/* Tiền đá */}
             {canViewCost && (
-              <motion.div
-                className="space-y-2"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-              >
+              <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   Tiền đá
-                  <motion.div
-                    animate={{ rotate: [0, 15, -15, 0] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
-                    <Sparkles className="h-4 w-4 text-primary" />
-                  </motion.div>
+                  <Sparkles className="h-4 w-4 text-primary" />
                 </Label>
                 <div className="flex gap-2">
-                  <Input
-                    type="number"
-                    step="10000"
-                    min="0"
-                    placeholder="0"
-                    value={stoneCost || ''}
-                    onChange={(e) => setStoneCost(parseFloat(e.target.value) || 0)}
-                    className="flex-1 transition-all focus:ring-2 focus:ring-primary/50"
-                  />
-                  <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowStoneCalculator(!showStoneCalculator)}
-                      className="transition-all"
-                    >
-                      {showStoneCalculator ? (
-                        <>
-                          <EyeOff className="mr-2 h-4 w-4" />
-                          Ẩn bảng tính
-                        </>
-                      ) : (
-                        <>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Mở bảng tính đá
-                        </>
-                      )}
-                    </Button>
-                  </motion.div>
+                  <div className="relative flex-1">
+                    <Input
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={stoneCost ? new Intl.NumberFormat('vi-VN').format(stoneCost) : ''}
+                      onChange={(e) => {
+                        const raw = parseFloat(e.target.value.replace(/\D/g, '')) || 0
+                        setStoneCost(raw)
+                      }}
+                      className="pr-10"
+                    />
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                      đ
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowStoneCalculator(!showStoneCalculator)}
+                  >
+                    {showStoneCalculator
+                      ? <><EyeOff className="mr-2 h-4 w-4" />Ẩn bảng tính</>
+                      : <><Eye className="mr-2 h-4 w-4" />Mở bảng tính đá</>
+                    }
+                  </Button>
                 </div>
-              </motion.div>
+              </div>
             )}
 
-            {/* Stone Calculator Panel */}
+            {/* Stone Calculator panel */}
             <AnimatePresence>
               {showStoneCalculator && canViewCost && (
                 <motion.div
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.25 }}
                 >
                   <StoneCalculator onTotalChange={setStoneCost} />
                 </motion.div>
@@ -325,21 +327,16 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
         </Card>
       </motion.div>
 
-      {/* Results */}
+      {/* ── Results ────────────────────────────────────────────────── */}
       <motion.div
-        initial={{ opacity: 0, x: 30 }}
+        initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
+        transition={{ duration: 0.35, delay: 0.1 }}
       >
         <Card className="border-primary/20 bg-card hover:shadow-lg transition-shadow duration-300">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <motion.div
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <Info className="h-5 w-5 text-primary" />
-              </motion.div>
+              <Info className="h-5 w-5 text-primary" />
               Kết quả tính giá
             </CardTitle>
             <CardDescription>
@@ -351,163 +348,92 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
               {result ? (
                 <motion.div
                   key="result"
-                  className="space-y-6"
-                  initial={{ opacity: 0, y: 20 }}
+                  className="space-y-5"
+                  initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.4 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.25 }}
                 >
-                  {/* Cost Breakdown - Only visible to Order/Admin */}
+                  {/* Cost Breakdown — Order/Admin only */}
                   {canViewCost && (
                     <>
-                      <motion.div
-                        className="rounded-lg bg-muted/50 p-4"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.2 }}
-                      >
+                      <div className="rounded-lg bg-muted/50 p-4">
                         <h4 className="mb-3 text-sm font-medium text-muted-foreground">
                           Chi tiết giá vốn
                         </h4>
                         <div className="space-y-2">
                           {[
                             { label: `Giá vàng theo tuổi (${karatType}):`, value: result.breakdown.goldCost },
-                            { label: 'Tiền công:', value: result.breakdown.laborCost },
-                            { label: 'Tiền đá:', value: result.breakdown.stoneCost },
-                          ].map((item, index) => (
-                            <motion.div
-                              key={item.label}
-                              className="flex justify-between text-sm"
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.3 + index * 0.1 }}
-                            >
+                            { label: 'Tiền công:',                         value: result.breakdown.laborCost },
+                            { label: 'Tiền đá:',                           value: result.breakdown.stoneCost },
+                          ].map((item) => (
+                            <div key={item.label} className="flex justify-between text-sm">
                               <span>{item.label}</span>
-                              <motion.span
-                                className="font-medium"
-                                key={item.value}
-                                initial={{ scale: 1.1, color: '#D4AF37' }}
-                                animate={{ scale: 1, color: 'inherit' }}
-                                transition={{ duration: 0.3 }}
-                              >
+                              <span className="font-medium tabular-nums">
                                 {formatCurrency(item.value)}
-                              </motion.span>
-                            </motion.div>
+                              </span>
+                            </div>
                           ))}
                           <Separator />
-                          <motion.div
-                            className="flex justify-between text-sm"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.6 }}
-                          >
+                          <div className="flex justify-between text-sm">
                             <span>Giá vốn (chưa VAT):</span>
-                            <span className="font-medium">{formatCurrency(result.costBeforeVAT)}</span>
-                          </motion.div>
-                          <motion.div
-                            className="flex justify-between text-sm"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.7 }}
-                          >
+                            <span className="font-medium tabular-nums">{formatCurrency(result.costBeforeVAT)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
                             <span>VAT (10%):</span>
-                            <span className="font-medium">{formatCurrency(result.breakdown.vat)}</span>
-                          </motion.div>
-                          <motion.div
-                            className="flex justify-between font-medium"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.8 }}
-                          >
+                            <span className="font-medium tabular-nums">{formatCurrency(result.breakdown.vat)}</span>
+                          </div>
+                          <div className="flex justify-between font-medium">
                             <span>Giá vốn (có VAT):</span>
-                            <span className="text-primary">{formatCurrency(result.costWithVAT)}</span>
-                          </motion.div>
+                            <span className="text-primary tabular-nums">{formatCurrency(result.costWithVAT)}</span>
+                          </div>
                         </div>
-                      </motion.div>
+                      </div>
 
-                      <motion.div
-                        className="flex items-center gap-2 text-sm text-muted-foreground"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: 0.9 }}
-                      >
-                        <Info className="h-4 w-4" />
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Info className="h-4 w-4 shrink-0" />
                         Áp dụng biên lợi nhuận: {result.profitMargin}
-                      </motion.div>
+                      </div>
 
                       <Separator />
                     </>
                   )}
 
                   {/* Suggested Price */}
-                  <motion.div
-                    className="rounded-lg border-2 border-primary bg-primary/5 p-6 text-center overflow-hidden relative"
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: 'spring', stiffness: 200, delay: 0.3 }}
-                    whileHover={{ scale: 1.02 }}
-                  >
-                    <motion.div
-                      className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent"
-                      animate={{ x: ['-100%', '100%'] }}
-                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-                    />
-                    <p className="mb-1 text-sm text-muted-foreground relative z-10">GIÁ BÁN ĐỀ XUẤT</p>
+                  <div className="rounded-lg border-2 border-primary bg-primary/5 p-6 text-center">
+                    <p className="mb-1 text-sm text-muted-foreground">GIÁ BÁN ĐỀ XUẤT</p>
                     <motion.p
-                      className="text-3xl font-bold text-primary relative z-10"
+                      className="text-3xl font-bold text-primary tabular-nums"
                       key={result.suggestedPrice}
-                      initial={{ scale: 1.2, opacity: 0 }}
+                      initial={{ scale: 1.05, opacity: 0.7 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      transition={{ type: 'spring', stiffness: 300 }}
+                      transition={{ duration: 0.2 }}
                     >
                       {formatCurrency(result.suggestedPrice)}
                     </motion.p>
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.5 }}
-                    >
-                      <Badge variant="secondary" className="mt-2 relative z-10">
-                        Biên lợi nhuận: {result.profitMargin}
-                      </Badge>
-                    </motion.div>
-                  </motion.div>
+                    <Badge variant="secondary" className="mt-2">
+                      Biên lợi nhuận: {result.profitMargin}
+                    </Badge>
+                  </div>
 
                   {/* Actions */}
-                  <motion.div
-                    className="flex gap-2"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.6 }}
-                  >
-                    <motion.div className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                      <Button
-                        className="w-full gap-2"
-                        variant="default"
-                        onClick={handleSave}
-                        disabled={isSaving}
-                      >
-                        <AnimatePresence mode="wait">
-                          {isSaving ? (
-                            <motion.div key="saving" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                              <CheckCircle2 className="h-4 w-4" />
-                            </motion.div>
-                          ) : (
-                            <motion.div key="save" initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ scale: 0 }}>
-                              <Save className="h-4 w-4" />
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                        {isSaving ? 'Đã lưu!' : 'Lưu báo giá'}
-                      </Button>
-                    </motion.div>
-                    <motion.div className="flex-1" whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                      <Button className="w-full gap-2" variant="outline">
-                        <FileDown className="h-4 w-4" />
-                        Xuất PDF
-                      </Button>
-                    </motion.div>
-                  </motion.div>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 gap-2"
+                      variant="default"
+                      onClick={handleSave}
+                      disabled={isSaving || !productName.trim()}
+                    >
+                      {isSaving
+                        ? <><CheckCircle2 className="h-4 w-4" />Đã lưu!</>
+                        : <><Save className="h-4 w-4" />Lưu báo giá</>
+                      }
+                    </Button>
+                    <Button className="flex-1 gap-2" variant="outline">
+                      <FileDown className="h-4 w-4" />
+                      Xuất PDF
+                    </Button>
+                  </div>
                 </motion.div>
               ) : (
                 <motion.div
@@ -518,13 +444,8 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                   exit={{ opacity: 0 }}
                 >
                   <div className="text-center">
-                    <motion.div
-                      animate={{ y: [0, -5, 0] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    >
-                      <Calculator className="mx-auto mb-3 h-12 w-12 opacity-20" />
-                    </motion.div>
-                    <p>Nhập thông tin sản phẩm để xem kết quả tính giá</p>
+                    <Calculator className="mx-auto mb-3 h-12 w-12 opacity-20" />
+                    <p className="text-sm">Nhập thông tin sản phẩm để xem kết quả tính giá</p>
                   </div>
                 </motion.div>
               )}
