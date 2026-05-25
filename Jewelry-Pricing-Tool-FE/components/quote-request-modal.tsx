@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
@@ -15,9 +15,12 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
-import { format } from 'date-fns'
+import { format, addYears } from 'date-fns'
 import { vi } from 'date-fns/locale'
-import { Plus, Upload, X, ImageIcon, Loader2, FileText, CalendarIcon, Minus, Layers } from 'lucide-react'
+import {
+  Plus, Upload, X, ImageIcon, Loader2, FileText,
+  CalendarIcon, Minus, Layers, Sparkles,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { quotesApi } from '@/lib/api'
 import { useNotifications } from '@/lib/notifications'
@@ -28,7 +31,6 @@ interface QuoteRequestModalProps {
   onSuccess?: (quote: Quote) => void
 }
 
-// ── Loại chất liệu ─────────────────────────────────────────
 const MATERIAL_OPTIONS = [
   { value: 'GOLD_24K', label: 'Vàng 24K', isGold: true },
   { value: 'GOLD_18K', label: 'Vàng 18K', isGold: true },
@@ -40,87 +42,128 @@ const MATERIAL_OPTIONS = [
 
 type MaterialValue = (typeof MATERIAL_OPTIONS)[number]['value']
 
-// ── Một dòng chất liệu (nhiều dòng được phép) ──────────────
+type ProductCategory = 'NHAN' | 'DAY_CHUYEN' | 'VONG_LAC_TAY' | 'LAC_CHAN'
+
+const PRODUCT_CATEGORIES: { value: ProductCategory; label: string; icon: string }[] = [
+  { value: 'NHAN',         label: 'Nhẫn',           icon: '💍' },
+  { value: 'DAY_CHUYEN',   label: 'Dây chuyền',     icon: '📿' },
+  { value: 'VONG_LAC_TAY', label: 'Vòng / Lắc tay', icon: '⌚' },
+  { value: 'LAC_CHAN',     label: 'Lắc chân',        icon: '✨' },
+]
+
+const RING_SIZES     = ['5', '6', '7', '8', '9', '10']
+const BRACELET_SIZES = ['15cm', '16cm', '17cm', '18cm']
+const ANKLET_SIZES   = ['21cm', '22cm', '23cm', '24cm']
+const NECKLACE_SIZES = ['40cm', '42cm', '45cm']
+
+const STONE_OPTIONS = [
+  { value: 'kim-cuong-lab',         label: 'Kim cương lab' },
+  { value: 'kim-cuong-thien-nhien', label: 'Kim cương thiên nhiên' },
+  { value: 'da-mau',                label: 'Đá màu' },
+]
+
+const MAX_DEADLINE = addYears(new Date(), 1)
+
 interface MaterialRow {
-  id: string          // uuid-lite: Date.now() + Math.random()
+  id: string
   materialType: MaterialValue | ''
-  weight: string      // trọng lượng (chỉ hoặc gram) – chuỗi để người dùng nhập tự do
+  weight: string
   unit: 'chi' | 'gram'
 }
 
 function newRow(): MaterialRow {
-  return {
-    id: `${Date.now()}-${Math.random()}`,
-    materialType: '',
-    weight: '',
-    unit: 'chi',
-  }
+  return { id: `${Date.now()}-${Math.random()}`, materialType: '', weight: '', unit: 'chi' }
 }
 
 interface FormErrors {
   productName?: string
   materials?: string
+  category?: string
 }
 
+// ── Shared design tokens ───────────────────────────────────────
+const GOLD = '#B8860B'
+const GOLD_LIGHT = '#FDF8EC'
+const GOLD_MID = '#E8C84A'
+const SURFACE = '#FAFAF8'
+const BORDER = '#E8E2D6'
+const TEXT_PRIMARY = '#1C1A16'
+const TEXT_MUTED = '#8B7D6B'
+
 export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModalProps) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]       = useState(false)
   const [loading, setLoading] = useState(false)
   const [previews, setPreviews] = useState<{ file: File; url: string }[]>([])
-  const [touched, setTouched] = useState<Record<string, boolean>>({})
+  const [touched, setTouched]  = useState<Record<string, boolean>>({})
   const [deadlineDate, setDeadlineDate] = useState<Date | undefined>(undefined)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const { addNotification } = useNotifications()
 
-  // ── State form ──────────────────────────────────────────
-  const [form, setForm] = useState({
-    productName: '',
-    productDescription: '',
-    stoneRequirements: '',
-    quantity: 1,
-    notes: '',
-  })
-
-  // Danh sách chất liệu – bắt đầu với 1 dòng rỗng
+  const [form, setForm] = useState({ productName: '', productDescription: '', quantity: 1, notes: '' })
+  const [category, setCategory] = useState<ProductCategory | ''>('')
+  const [ringSize, setRingSize] = useState('')
+  const [ringSizeCustom, setRingSizeCustom] = useState('')
+  const [necklaceSize, setNecklaceSize] = useState('')
+  const [necklaceSizeCustom, setNecklaceSizeCustom] = useState('')
+  const [braceletSize, setBraceletSize] = useState('')
+  const [braceletSizeCustom, setBraceletSizeCustom] = useState('')
+  const [ankletSize, setAnkletSize] = useState('')
+  const [ankletSizeCustom, setAnkletSizeCustom] = useState('')
+  const [stoneType, setStoneType] = useState('')
+  const [stoneNote, setStoneNote] = useState('')
   const [materialRows, setMaterialRows] = useState<MaterialRow[]>([newRow()])
+
+  useEffect(() => {
+    return () => { previews.forEach((p) => URL.revokeObjectURL(p.url)) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const set = (key: keyof typeof form) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm((f) => ({ ...f, [key]: e.target.value }))
 
+  const setAndTouch = (key: keyof typeof form) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setForm((f) => ({ ...f, [key]: e.target.value }))
+      setTouched((t) => ({ ...t, [key]: true }))
+    }
+
   const touch = (key: string) => setTouched((t) => ({ ...t, [key]: true }))
 
-  // ── Validation ─────────────────────────────────────────
+  const handleCategoryChange = (val: ProductCategory) => {
+    setCategory(val)
+    setRingSize(''); setRingSizeCustom('')
+    setNecklaceSize(''); setNecklaceSizeCustom('')
+    setBraceletSize(''); setBraceletSizeCustom('')
+    setAnkletSize(''); setAnkletSizeCustom('')
+    touch('category')
+  }
+
   const errors: FormErrors = {}
-  if (touched.productName && !form.productName.trim())
-    errors.productName = 'Vui lòng nhập tên sản phẩm'
-  if (touched.materials && materialRows.every((r) => !r.materialType))
-    errors.materials = 'Vui lòng chọn ít nhất 1 chất liệu'
+  if (touched.productName && !form.productName.trim()) errors.productName = 'Vui lòng nhập tên sản phẩm'
+  if (touched.materials && materialRows.every((r) => !r.materialType)) errors.materials = 'Vui lòng chọn ít nhất 1 chất liệu'
+  if (touched.category && !category) errors.category = 'Vui lòng chọn loại sản phẩm'
 
-  const isValid = form.productName.trim() && materialRows.some((r) => r.materialType)
+  const isValid = form.productName.trim() && materialRows.some((r) => r.materialType) && !!category
 
-  // ── Quantity stepper ───────────────────────────────────
   const stepQty = (delta: number) =>
     setForm((f) => ({ ...f, quantity: Math.max(1, f.quantity + delta) }))
 
-  // ── Material row helpers ───────────────────────────────
   const updateRow = (id: string, patch: Partial<MaterialRow>) =>
     setMaterialRows((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)))
-
   const removeRow = (id: string) =>
     setMaterialRows((rows) => rows.filter((r) => r.id !== id))
-
   const addRow = () =>
     setMaterialRows((rows) => [...rows, newRow()])
 
-  // Tìm các materialType đã được chọn để loại khỏi dropdown của row khác
   const selectedTypes = materialRows.map((r) => r.materialType).filter(Boolean)
 
-  // ── Image handling ─────────────────────────────────────
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     const newPreviews = files.map((file) => ({ file, url: URL.createObjectURL(file) }))
     setPreviews((prev) => [...prev, ...newPreviews].slice(0, 5))
+    e.target.value = ''
   }
 
   const removeImage = (idx: number) => {
@@ -130,447 +173,758 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
     })
   }
 
-  // ── Submit ─────────────────────────────────────────────
+  const buildSizeString = (): string => {
+    if (category === 'NHAN') {
+      const s = ringSize === 'other' ? ringSizeCustom : ringSize
+      return s ? `Size nhẫn: ${s}` : ''
+    }
+    if (category === 'DAY_CHUYEN') {
+      const s = necklaceSize === 'other' ? necklaceSizeCustom : necklaceSize
+      return s ? `Dài: ${s}` : ''
+    }
+    if (category === 'VONG_LAC_TAY') {
+      const s = braceletSize === 'other' ? braceletSizeCustom : braceletSize
+      return s ? `Chu vi: ${s}` : ''
+    }
+    if (category === 'LAC_CHAN') {
+      const s = ankletSize === 'other' ? ankletSizeCustom : ankletSize
+      return s ? `Chu vi: ${s}` : ''
+    }
+    return ''
+  }
+
   const handleSubmit = async () => {
-    setTouched({ productName: true, materials: true })
+    setTouched({ productName: true, materials: true, category: true })
     if (!isValid) return
     setLoading(true)
 
-    // Tổng hợp thông tin chất liệu thành chuỗi ghi chú
     const filledRows = materialRows.filter((r) => r.materialType)
-    const materialSummary = filledRows
-      .map((r) => {
-        const opt = MATERIAL_OPTIONS.find((o) => o.value === r.materialType)
-        const weightStr = r.weight ? ` – ${r.weight} ${r.unit}` : ''
-        return `${opt?.label ?? r.materialType}${weightStr}`
-      })
-      .join('; ')
+    const materialSummary = filledRows.map((r) => {
+      const opt = MATERIAL_OPTIONS.find((o) => o.value === r.materialType)
+      return `${opt?.label ?? r.materialType}${r.weight ? ` – ${r.weight} ${r.unit}` : ''}`
+    }).join('; ')
 
-    // materialType chính là loại đầu tiên (bắt buộc có ít nhất 1)
     const primaryMaterial = filledRows[0].materialType as Quote['materialType']
+    const weightNotes = filledRows.filter((r) => r.weight).map((r) => {
+      const opt = MATERIAL_OPTIONS.find((o) => o.value === r.materialType)
+      return `${opt?.label}: ${r.weight} ${r.unit}`
+    }).join(', ')
 
-    // dimensions: ghép tất cả trọng lượng có ghi chú
-    const weightNotes = filledRows
-      .filter((r) => r.weight)
-      .map((r) => {
-        const opt = MATERIAL_OPTIONS.find((o) => o.value === r.materialType)
-        return `${opt?.label}: ${r.weight} ${r.unit}`
-      })
-      .join(', ')
+    const catLabel   = PRODUCT_CATEGORIES.find((c) => c.value === category)?.label ?? ''
+    const sizeStr    = buildSizeString()
+    const stoneLabel = STONE_OPTIONS.find((s) => s.value === stoneType)?.label ?? ''
+    const stoneReq   = [stoneLabel, stoneNote].filter(Boolean).join(' – ')
+    const dimensionParts = [catLabel && `Loại: ${catLabel}`, sizeStr, weightNotes].filter(Boolean)
 
     try {
       const quote = await quotesApi.create({
         productName: form.productName,
         materialType: primaryMaterial,
         productDescription: form.productDescription,
-        // Ghi đầy đủ tất cả chất liệu vào dimensions để Order/Admin biết
-        dimensions: weightNotes || undefined,
-        stoneRequirements: form.stoneRequirements,
+        dimensions: dimensionParts.join(' | ') || undefined,
+        stoneRequirements: stoneReq || undefined,
         quantity: form.quantity,
         deadline: deadlineDate ? format(deadlineDate, 'yyyy-MM-dd') : '',
-        // Ghi thêm danh sách chất liệu vào notes
-        notes: [
-          filledRows.length > 1 ? `Chất liệu: ${materialSummary}` : '',
-          form.notes,
-        ]
-          .filter(Boolean)
-          .join('\n'),
+        notes: [filledRows.length > 1 ? `Chất liệu: ${materialSummary}` : '', form.notes].filter(Boolean).join('\n'),
         images: previews.map((p) => p.file),
         requestedBy: requesterName,
       })
       resetForm()
       setOpen(false)
-      addNotification({
-        type: 'success',
-        title: 'Đã gửi yêu cầu báo giá!',
-        message: `Mã yêu cầu: ${quote.quoteCode || ''}. NV báo giá sẽ xử lý sớm nhất.`,
-      })
+      addNotification({ type: 'success', title: 'Đã gửi yêu cầu báo giá!', message: `Mã yêu cầu: ${quote.quoteCode || ''}. NV báo giá sẽ xử lý sớm nhất.` })
       onSuccess?.(quote)
     } catch (err) {
       console.error(err)
-      addNotification({
-        type: 'error',
-        title: 'Tạo yêu cầu thất bại',
-        message: 'Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại.',
-      })
+      addNotification({ type: 'error', title: 'Tạo yêu cầu thất bại', message: 'Có lỗi xảy ra khi gửi yêu cầu. Vui lòng thử lại.' })
     } finally {
       setLoading(false)
     }
   }
 
   const resetForm = () => {
-    setForm({ productName: '', productDescription: '', stoneRequirements: '', quantity: 1, notes: '' })
+    setForm({ productName: '', productDescription: '', quantity: 1, notes: '' })
     setMaterialRows([newRow()])
     setDeadlineDate(undefined)
     setTouched({})
-    previews.forEach((p) => URL.revokeObjectURL(p.url))
-    setPreviews([])
+    setCategory('')
+    setRingSize(''); setRingSizeCustom('')
+    setNecklaceSize(''); setNecklaceSizeCustom('')
+    setBraceletSize(''); setBraceletSizeCustom('')
+    setAnkletSize(''); setAnkletSizeCustom('')
+    setStoneType(''); setStoneNote('')
+    setPreviews((prev) => { prev.forEach((p) => URL.revokeObjectURL(p.url)); return [] })
+  }
+
+  // ── Pill chip — refined version ────────────────────────────
+  const Chip = ({
+    label, selected, onClick,
+  }: { label: string; selected: boolean; onClick: () => void }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={selected}
+      style={{
+        padding: '5px 14px',
+        borderRadius: '999px',
+        border: selected ? `1.5px solid ${GOLD}` : `1.5px solid ${BORDER}`,
+        background: selected ? GOLD_LIGHT : 'transparent',
+        color: selected ? GOLD : TEXT_MUTED,
+        fontSize: '13px',
+        fontWeight: selected ? 600 : 400,
+        cursor: 'pointer',
+        transition: 'all 0.18s ease',
+        whiteSpace: 'nowrap' as const,
+        letterSpacing: '0.01em',
+      }}
+    >
+      {label}
+    </button>
+  )
+
+  // ── Category card chip ─────────────────────────────────────
+  const CatChip = ({
+    value, label, icon,
+  }: { value: ProductCategory; label: string; icon: string }) => {
+    const selected = category === value
+    return (
+      <button
+        type="button"
+        onClick={() => handleCategoryChange(value)}
+        aria-pressed={selected}
+        style={{
+          display: 'flex',
+          flexDirection: 'column' as const,
+          alignItems: 'center',
+          gap: '4px',
+          padding: '10px 14px',
+          borderRadius: '12px',
+          border: selected ? `2px solid ${GOLD}` : `1.5px solid ${BORDER}`,
+          background: selected ? GOLD_LIGHT : 'white',
+          cursor: 'pointer',
+          transition: 'all 0.18s ease',
+          minWidth: '76px',
+          boxShadow: selected ? `0 0 0 3px ${GOLD}22` : 'none',
+        }}
+      >
+        <span style={{ fontSize: '20px', lineHeight: 1 }}>{icon}</span>
+        <span style={{
+          fontSize: '11.5px',
+          fontWeight: selected ? 600 : 400,
+          color: selected ? GOLD : TEXT_MUTED,
+          whiteSpace: 'nowrap' as const,
+        }}>
+          {label}
+        </span>
+      </button>
+    )
+  }
+
+  // ── Section divider label ──────────────────────────────────
+  const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+      <div style={{ height: '1px', width: '12px', background: GOLD, borderRadius: '1px', flexShrink: 0 }} />
+      <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.12em', color: TEXT_MUTED, textTransform: 'uppercase' as const }}>
+        {children}
+      </span>
+    </div>
+  )
+
+  // ── Styled input wrapper ───────────────────────────────────
+  const fieldStyle = {
+    width: '100%',
+    padding: '9px 12px',
+    borderRadius: '10px',
+    border: `1.5px solid ${BORDER}`,
+    background: 'white',
+    fontSize: '13.5px',
+    color: TEXT_PRIMARY,
+    outline: 'none',
+    transition: 'border-color 0.18s',
+    boxSizing: 'border-box' as const,
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!loading) { setOpen(o); if (!o) resetForm() } }}>
-      <DialogTrigger asChild>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Tạo yêu cầu báo giá
-        </Button>
-      </DialogTrigger>
+    <>
+      {/* Inject refined styles */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
+        .qrm-dialog [data-slot="dialog-content"] {
+          border-radius: 20px !important;
+          border: 1px solid ${BORDER} !important;
+          box-shadow: 0 32px 80px -12px rgba(0,0,0,0.18), 0 8px 24px -4px rgba(0,0,0,0.08) !important;
+          padding: 0 !important;
+          max-width: min(860px, 95vw) !important;
+          max-height: 92vh !important;
+          overflow: hidden !important;
+          font-family: 'DM Sans', sans-serif !important;
+        }
+        .qrm-input:focus { border-color: ${GOLD} !important; box-shadow: 0 0 0 3px ${GOLD}18 !important; }
+        .qrm-textarea:focus { border-color: ${GOLD} !important; box-shadow: 0 0 0 3px ${GOLD}18 !important; }
+        .qrm-select [data-slot="select-trigger"] {
+          border-radius: 10px !important;
+          border: 1.5px solid ${BORDER} !important;
+          font-size: 13px !important;
+          height: 38px !important;
+        }
+        .qrm-select [data-slot="select-trigger"]:focus { border-color: ${GOLD} !important; box-shadow: 0 0 0 3px ${GOLD}18 !important; }
+        .qrm-scrollbody { overflow-y: auto; max-height: calc(92vh - 140px); }
+        .qrm-scrollbody::-webkit-scrollbar { width: 4px; }
+        .qrm-scrollbody::-webkit-scrollbar-track { background: transparent; }
+        .qrm-scrollbody::-webkit-scrollbar-thumb { background: ${BORDER}; border-radius: 4px; }
+        .qrm-img-btn:hover { border-color: ${GOLD} !important; color: ${GOLD} !important; }
+        .qrm-chip-del:hover { opacity: 1 !important; background: #FEE2E2 !important; color: #DC2626 !important; }
+      `}</style>
 
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-primary" />
-            Tạo yêu cầu báo giá mới
-          </DialogTitle>
-          <DialogDescription>
-            Nhập đầy đủ thông tin để NV báo giá xử lý nhanh nhất.
-          </DialogDescription>
-        </DialogHeader>
+      <Dialog open={open} onOpenChange={(o) => { if (!loading) { setOpen(o); if (!o) resetForm() } }} >
+        <DialogTrigger asChild>
+          <Button className="gap-2">
+            <Plus className="h-4 w-4" />
+            Tạo yêu cầu báo giá
+          </Button>
+        </DialogTrigger>
 
-        <div className="space-y-4 py-2">
+        <div className="qrm-dialog">
+          <DialogContent style={{ fontFamily: "'DM Sans', sans-serif" }}>
 
-          {/* Tên sản phẩm */}
-          <div className="space-y-1.5">
-            <Label htmlFor="productName">
-              Tên sản phẩm <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="productName"
-              placeholder="VD: Nhẫn kim cương, Dây chuyền vàng..."
-              value={form.productName}
-              onChange={set('productName')}
-              onBlur={() => touch('productName')}
-              aria-invalid={!!errors.productName}
-              className={cn(errors.productName && 'border-destructive focus-visible:ring-destructive/30')}
-            />
-            {errors.productName && (
-              <p className="text-xs text-destructive">{errors.productName}</p>
-            )}
-          </div>
-
-          {/* ── CHẤT LIỆU (multi-row) ───────────────────────────── */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>
-                Chất liệu <span className="text-destructive">*</span>
-              </Label>
-              {/* Nút thêm dòng — chỉ hiện khi chưa dùng hết loại */}
-              {materialRows.length < MATERIAL_OPTIONS.length && (
-                <button
-                  type="button"
-                  onClick={addRow}
-                  className="flex items-center gap-1 text-xs text-primary hover:text-primary/80 transition-colors"
-                >
-                  <Layers className="h-3.5 w-3.5" />
-                  Thêm chất liệu
-                </button>
-              )}
+            {/* ── Header ──────────────────────────────────── */}
+            <div style={{
+              padding: '24px 28px 20px',
+              borderBottom: `1px solid ${BORDER}`,
+              background: `linear-gradient(135deg, ${GOLD_LIGHT} 0%, white 60%)`,
+              borderRadius: '20px 20px 0 0',
+              flexShrink: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '36px', height: '36px', borderRadius: '10px',
+                  background: `linear-gradient(135deg, ${GOLD_MID}, ${GOLD})`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  <FileText style={{ width: '16px', height: '16px', color: 'white' }} />
+                </div>
+                <div>
+                  <h2 style={{
+                    margin: 0, fontSize: '17px', fontWeight: 600, color: TEXT_PRIMARY,
+                    fontFamily: "'DM Serif Display', serif",
+                    letterSpacing: '-0.01em',
+                  }}>
+                    Tạo yêu cầu báo giá
+                  </h2>
+                  <p style={{ margin: 0, fontSize: '12.5px', color: TEXT_MUTED, marginTop: '1px' }}>
+                    Điền đầy đủ để NV xử lý nhanh nhất
+                  </p>
+                </div>
+                <div style={{
+                  marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px',
+                  background: `${GOLD}15`, borderRadius: '999px', padding: '4px 10px',
+                }}>
+                  <Sparkles style={{ width: '12px', height: '12px', color: GOLD }} />
+                  <span style={{ fontSize: '11px', fontWeight: 600, color: GOLD }}>{requesterName}</span>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <AnimatePresence initial={false}>
-                {materialRows.map((row, idx) => (
-                  <motion.div
-                    key={row.id}
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6, height: 0, marginBottom: 0 }}
-                    transition={{ duration: 0.15 }}
-                  >
-                    {/* Header dòng (chỉ hiện từ dòng 2 trở đi) */}
-                    {idx > 0 && (
-                      <div className="flex items-center gap-1 mb-1.5">
-                        <div className="h-px flex-1 bg-border" />
-                        <span className="text-[11px] text-muted-foreground px-1">
-                          Chất liệu {idx + 1}
-                        </span>
-                        <div className="h-px flex-1 bg-border" />
-                      </div>
-                    )}
+            {/* ── Body ────────────────────────────────────── */}
+            <div className="qrm-scrollbody">
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1px 1fr',
+                gap: 0,
+              }}>
 
-                    <div className="grid grid-cols-[1fr_90px_52px_auto] gap-2 items-end">
-                      {/* Loại chất liệu */}
-                      <div className="space-y-1">
-                        {idx === 0 && (
-                          <span className="text-[11px] text-muted-foreground">Loại</span>
-                        )}
-                        <Select
-                          value={row.materialType}
-                          onValueChange={(v) => {
-                            updateRow(row.id, { materialType: v as MaterialValue })
-                            touch('materials')
+                {/* ── CỘT TRÁI ── */}
+                <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+
+                  {/* Tên sản phẩm */}
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: TEXT_MUTED, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                      Tên sản phẩm <span style={{ color: '#E53935' }}>*</span>
+                    </label>
+                    <input
+                      className="qrm-input"
+                      placeholder="VD: Nhẫn kim cương, Dây chuyền vàng..."
+                      value={form.productName}
+                      onChange={setAndTouch('productName')}
+                      onBlur={() => touch('productName')}
+                      aria-invalid={!!errors.productName}
+                      style={{
+                        ...fieldStyle,
+                        borderColor: errors.productName ? '#E53935' : BORDER,
+                      }}
+                    />
+                    {errors.productName && (
+                      <p role="alert" style={{ margin: '5px 0 0', fontSize: '11.5px', color: '#E53935' }}>
+                        {errors.productName}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Loại sản phẩm */}
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: TEXT_MUTED, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
+                      Loại sản phẩm <span style={{ color: '#E53935' }}>*</span>
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }} role="group" aria-label="Loại sản phẩm">
+                      {PRODUCT_CATEGORIES.map((cat) => (
+                        <CatChip key={cat.value} {...cat} />
+                      ))}
+                    </div>
+                    {errors.category && (
+                      <p role="alert" style={{ margin: '6px 0 0', fontSize: '11.5px', color: '#E53935' }}>
+                        {errors.category}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Thuộc tính theo loại */}
+                  <AnimatePresence mode="wait">
+                    {category && (
+                      <motion.div
+                        key={category}
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                        transition={{ duration: 0.18 }}
+                        style={{
+                          borderRadius: '14px',
+                          border: `1.5px solid ${GOLD}55`,
+                          background: GOLD_LIGHT,
+                          padding: '14px 16px',
+                        }}
+                      >
+                        <SectionLabel>
+                          {category === 'NHAN' && 'Size nhẫn'}
+                          {category === 'DAY_CHUYEN' && 'Chiều dài dây chuyền'}
+                          {category === 'VONG_LAC_TAY' && 'Chu vi vòng / lắc tay'}
+                          {category === 'LAC_CHAN' && 'Chu vi lắc chân'}
+                        </SectionLabel>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }} role="group">
+                          {(category === 'NHAN' ? RING_SIZES
+                            : category === 'DAY_CHUYEN' ? NECKLACE_SIZES
+                            : category === 'VONG_LAC_TAY' ? BRACELET_SIZES
+                            : ANKLET_SIZES
+                          ).map((s) => {
+                            const cur = category === 'NHAN' ? ringSize : category === 'DAY_CHUYEN' ? necklaceSize : category === 'VONG_LAC_TAY' ? braceletSize : ankletSize
+                            const setCur = category === 'NHAN' ? setRingSize : category === 'DAY_CHUYEN' ? setNecklaceSize : category === 'VONG_LAC_TAY' ? setBraceletSize : setAnkletSize
+                            const setCustom = category === 'NHAN' ? setRingSizeCustom : category === 'DAY_CHUYEN' ? setNecklaceSizeCustom : category === 'VONG_LAC_TAY' ? setBraceletSizeCustom : setAnkletSizeCustom
+                            return (
+                              <Chip key={s} label={s} selected={cur === s}
+                                onClick={() => { setCur(s); setCustom('') }} />
+                            )
+                          })}
+                          {(() => {
+                            const cur = category === 'NHAN' ? ringSize : category === 'DAY_CHUYEN' ? necklaceSize : category === 'VONG_LAC_TAY' ? braceletSize : ankletSize
+                            const setCur = category === 'NHAN' ? setRingSize : category === 'DAY_CHUYEN' ? setNecklaceSize : category === 'VONG_LAC_TAY' ? setBraceletSize : setAnkletSize
+                            const customVal = category === 'NHAN' ? ringSizeCustom : category === 'DAY_CHUYEN' ? necklaceSizeCustom : category === 'VONG_LAC_TAY' ? braceletSizeCustom : ankletSizeCustom
+                            const setCustom = category === 'NHAN' ? setRingSizeCustom : category === 'DAY_CHUYEN' ? setNecklaceSizeCustom : category === 'VONG_LAC_TAY' ? setBraceletSizeCustom : setAnkletSizeCustom
+                            return (
+                              <>
+                                <Chip label="Khác" selected={cur === 'other'} onClick={() => setCur('other')} />
+                                {cur === 'other' && (
+                                  <input
+                                    className="qrm-input"
+                                    placeholder="Nhập kích thước..."
+                                    value={customVal}
+                                    onChange={(e) => setCustom(e.target.value)}
+                                    style={{ ...fieldStyle, marginTop: '8px', background: 'white' }}
+                                  />
+                                )}
+                              </>
+                            )
+                          })()}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Mô tả */}
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: TEXT_MUTED, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                      Mô tả sản phẩm
+                    </label>
+                    <textarea
+                      className="qrm-textarea"
+                      placeholder="Mô tả kiểu dáng, yêu cầu đặc biệt..."
+                      rows={3}
+                      value={form.productDescription}
+                      onChange={set('productDescription')}
+                      style={{ ...fieldStyle, resize: 'vertical', lineHeight: '1.55', minHeight: '80px' }}
+                    />
+                  </div>
+
+                  {/* Ảnh sản phẩm */}
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: TEXT_MUTED, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
+                      Hình ảnh <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: TEXT_MUTED, opacity: 0.7 }}>(tối đa 5)</span>
+                    </label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                      <AnimatePresence>
+                        {previews.map((p, i) => (
+                          <motion.div
+                            key={p.url}
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            transition={{ duration: 0.15 }}
+                            style={{ position: 'relative', width: '64px', height: '64px', borderRadius: '10px', overflow: 'hidden', border: `1.5px solid ${BORDER}`, flexShrink: 0 }}
+                          >
+                            <img src={p.url} alt={`Ảnh ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <button
+                              type="button"
+                              className="qrm-chip-del"
+                              aria-label={`Xoá ảnh ${i + 1}`}
+                              onClick={() => removeImage(i)}
+                              style={{
+                                position: 'absolute', top: '3px', right: '3px',
+                                width: '18px', height: '18px', borderRadius: '50%',
+                                background: 'rgba(0,0,0,0.5)', color: 'white',
+                                border: 'none', cursor: 'pointer',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                opacity: 0.85, transition: 'all 0.15s',
+                              }}
+                            >
+                              <X style={{ width: '10px', height: '10px' }} />
+                            </button>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                      {previews.length < 5 && (
+                        <button
+                          type="button"
+                          className="qrm-img-btn"
+                          aria-label="Thêm ảnh"
+                          onClick={() => fileRef.current?.click()}
+                          style={{
+                            width: '64px', height: '64px', borderRadius: '10px',
+                            border: `2px dashed ${BORDER}`,
+                            background: SURFACE, cursor: 'pointer',
+                            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                            gap: '3px', color: TEXT_MUTED, transition: 'all 0.18s',
                           }}
                         >
-                          <SelectTrigger
-                            className={cn(
-                              idx === 0 && errors.materials && !row.materialType &&
-                              'border-destructive focus-visible:ring-destructive/30',
-                            )}
-                          >
-                            <SelectValue placeholder="Chọn loại..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {MATERIAL_OPTIONS.map((opt) => {
-                              // Ẩn loại đã chọn ở dòng khác
-                              const usedElsewhere =
-                                selectedTypes.includes(opt.value) && row.materialType !== opt.value
-                              if (usedElsewhere) return null
-                              return (
-                                <SelectItem key={opt.value} value={opt.value}>
-                                  {opt.label}
-                                </SelectItem>
-                              )
-                            })}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                          <ImageIcon style={{ width: '18px', height: '18px' }} />
+                          <span style={{ fontSize: '11px' }}>Thêm</span>
+                        </button>
+                      )}
+                      <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleImageSelect} />
+                    </div>
+                  </div>
+                </div>
 
-                      {/* Trọng lượng */}
-                      <div className="space-y-1">
-                        {idx === 0 && (
-                          <span className="text-[11px] text-muted-foreground">Trọng lượng</span>
-                        )}
-                        <Input
-                          type="text"
-                          inputMode="decimal"
-                          placeholder="VD: 2.5"
-                          value={row.weight}
-                          onChange={(e) =>
-                            updateRow(row.id, { weight: e.target.value.replace(/[^0-9.]/g, '') })
-                          }
-                          className="text-right tabular-nums"
-                        />
-                      </div>
+                {/* ── DIVIDER DỌC ── */}
+                <div style={{ background: BORDER, width: '1px', flexShrink: 0 }} />
 
-                      {/* Đơn vị */}
-                      <div className="space-y-1">
-                        {idx === 0 && (
-                          <span className="text-[11px] text-muted-foreground">Đơn vị</span>
-                        )}
-                        <Select
-                          value={row.unit}
-                          onValueChange={(v) => updateRow(row.id, { unit: v as 'chi' | 'gram' })}
-                        >
-                          <SelectTrigger className="px-2">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="chi">Chỉ</SelectItem>
-                            <SelectItem value="gram">Gram</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                {/* ── CỘT PHẢI ── */}
+                <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-                      {/* Nút xoá dòng */}
-                      <div className={cn('flex', idx === 0 ? 'mt-5' : 'mt-0')}>
-                        <Button
+                  {/* Chất liệu */}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: TEXT_MUTED, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                        Chất liệu <span style={{ color: '#E53935' }}>*</span>
+                      </label>
+                      {materialRows.length < MATERIAL_OPTIONS.length && (
+                        <button
                           type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={materialRows.length === 1}
-                          onClick={() => removeRow(row.id)}
-                          className="h-9 w-9 text-muted-foreground hover:text-destructive disabled:opacity-30"
-                          title="Xoá dòng này"
+                          onClick={addRow}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '4px',
+                            fontSize: '11.5px', fontWeight: 600, color: GOLD,
+                            background: GOLD_LIGHT, border: 'none', cursor: 'pointer',
+                            padding: '4px 10px', borderRadius: '999px',
+                          }}
                         >
-                          <X className="h-4 w-4" />
-                        </Button>
+                          <Layers style={{ width: '12px', height: '12px' }} />
+                          Thêm chất liệu
+                        </button>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }} className="qrm-select">
+                      <AnimatePresence initial={false}>
+                        {materialRows.map((row, idx) => (
+                          <motion.div
+                            key={row.id}
+                            initial={{ opacity: 0, y: -6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.15 }}
+                          >
+                            {idx > 0 && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                <div style={{ height: '1px', flex: 1, background: BORDER }} />
+                                <span style={{ fontSize: '10px', color: TEXT_MUTED, letterSpacing: '0.06em' }}>CHẤT LIỆU {idx + 1}</span>
+                                <div style={{ height: '1px', flex: 1, background: BORDER }} />
+                              </div>
+                            )}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 72px 60px 36px', gap: '6px', alignItems: 'end' }}>
+                              {idx === 0 && (
+                                <>
+                                  <span style={{ fontSize: '10.5px', color: TEXT_MUTED, gridColumn: 1 }}>Loại</span>
+                                  <span style={{ fontSize: '10.5px', color: TEXT_MUTED, gridColumn: 2 }}>Trọng lượng</span>
+                                  <span style={{ fontSize: '10.5px', color: TEXT_MUTED, gridColumn: 3 }}>Đơn vị</span>
+                                </>
+                              )}
+                              {idx === 0 && <div style={{ gridColumn: 4 }} />}
+                              <Select
+                                value={row.materialType}
+                                onValueChange={(v) => { updateRow(row.id, { materialType: v as MaterialValue }); touch('materials') }}
+                              >
+                                <SelectTrigger className={cn(errors.materials && !row.materialType && 'border-destructive')}>
+                                  <SelectValue placeholder="Chọn loại..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {MATERIAL_OPTIONS.map((opt) => {
+                                    if (selectedTypes.includes(opt.value) && row.materialType !== opt.value) return null
+                                    return <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                  })}
+                                </SelectContent>
+                              </Select>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="2.5"
+                                className="qrm-input"
+                                value={row.weight}
+                                onChange={(e) => updateRow(row.id, { weight: e.target.value.replace(/[^0-9.]/g, '') })}
+                                style={{ ...fieldStyle, textAlign: 'right', padding: '8px 10px', fontSize: '13px' }}
+                              />
+                              <Select value={row.unit} onValueChange={(v) => updateRow(row.id, { unit: v as 'chi' | 'gram' })}>
+                                <SelectTrigger className="px-2"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="chi">Chỉ</SelectItem>
+                                  <SelectItem value="gram">Gram</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <button
+                                type="button"
+                                disabled={materialRows.length === 1}
+                                onClick={() => removeRow(row.id)}
+                                aria-label={`Xoá chất liệu ${idx + 1}`}
+                                style={{
+                                  width: '34px', height: '34px', borderRadius: '8px',
+                                  border: `1.5px solid ${BORDER}`, background: 'white',
+                                  cursor: materialRows.length === 1 ? 'not-allowed' : 'pointer',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  color: materialRows.length === 1 ? BORDER : TEXT_MUTED,
+                                  transition: 'all 0.15s',
+                                  marginTop: idx === 0 ? '18px' : 0,
+                                  alignSelf: 'end',
+                                }}
+                              >
+                                <X style={{ width: '13px', height: '13px' }} />
+                              </button>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
+
+                    {errors.materials && (
+                      <p role="alert" style={{ margin: '6px 0 0', fontSize: '11.5px', color: '#E53935' }}>{errors.materials}</p>
+                    )}
+
+                    {(() => {
+                      const filled = materialRows.filter((r) => r.materialType)
+                      if (filled.length <= 1) return null
+                      return (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '8px' }}>
+                          {filled.map((r) => {
+                            const opt = MATERIAL_OPTIONS.find((o) => o.value === r.materialType)
+                            return (
+                              <span key={r.id} style={{
+                                fontSize: '11.5px', padding: '3px 10px', borderRadius: '999px',
+                                background: GOLD_LIGHT, color: GOLD, fontWeight: 500, border: `1px solid ${GOLD}44`,
+                              }}>
+                                {opt?.label}{r.weight && ` · ${r.weight} ${r.unit}`}
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )
+                    })()}
+                  </div>
+
+                  {/* Đá / phụ kiện */}
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: TEXT_MUTED, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
+                      Yêu cầu đá / phụ kiện
+                    </label>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }} role="group" aria-label="Loại đá">
+                      {STONE_OPTIONS.map((s) => (
+                        <Chip key={s.value} label={s.label} selected={stoneType === s.value}
+                          onClick={() => setStoneType(stoneType === s.value ? '' : s.value)} />
+                      ))}
+                    </div>
+                    <input
+                      className="qrm-input"
+                      placeholder="Ghi chú (VD: 0.3ct, màu D, VS1...)"
+                      value={stoneNote}
+                      onChange={(e) => setStoneNote(e.target.value)}
+                      style={fieldStyle}
+                    />
+                  </div>
+
+                  {/* Số lượng + Deadline — side by side */}
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                    {/* Số lượng */}
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: TEXT_MUTED, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                        Số lượng
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', border: `1.5px solid ${BORDER}`, borderRadius: '10px', overflow: 'hidden', background: 'white' }}>
+                        <button
+                          type="button"
+                          onClick={() => stepQty(-1)}
+                          disabled={form.quantity <= 1}
+                          aria-label="Giảm"
+                          style={{
+                            width: '36px', height: '38px', border: 'none', background: 'transparent',
+                            cursor: form.quantity <= 1 ? 'not-allowed' : 'pointer',
+                            color: form.quantity <= 1 ? BORDER : TEXT_MUTED,
+                            fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Minus style={{ width: '14px', height: '14px' }} />
+                        </button>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={form.quantity}
+                          onChange={(e) => {
+                            const n = parseInt(e.target.value.replace(/\D/g, '')) || 1
+                            setForm((f) => ({ ...f, quantity: Math.max(1, n) }))
+                          }}
+                          style={{
+                            flex: 1, border: 'none', outline: 'none', textAlign: 'center',
+                            fontSize: '14px', fontWeight: 600, color: TEXT_PRIMARY,
+                            background: 'transparent', minWidth: 0,
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => stepQty(1)}
+                          aria-label="Tăng"
+                          style={{
+                            width: '36px', height: '38px', border: 'none', background: 'transparent',
+                            cursor: 'pointer', color: TEXT_MUTED,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <Plus style={{ width: '14px', height: '14px' }} />
+                        </button>
                       </div>
                     </div>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
 
-            {errors.materials && (
-              <p className="text-xs text-destructive">{errors.materials}</p>
-            )}
+                    {/* Deadline */}
+                    <div>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: TEXT_MUTED, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                        Deadline
+                      </label>
+                      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            style={{
+                              ...fieldStyle,
+                              display: 'flex', alignItems: 'center', gap: '8px',
+                              cursor: 'pointer', color: deadlineDate ? TEXT_PRIMARY : TEXT_MUTED,
+                              height: '40px',
+                            }}
+                          >
+                            <CalendarIcon style={{ width: '14px', height: '14px', flexShrink: 0, color: GOLD }} />
+                            <span style={{ fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {deadlineDate ? format(deadlineDate, 'dd/MM/yyyy', { locale: vi }) : 'Chọn ngày...'}
+                            </span>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={deadlineDate}
+                            onSelect={(d) => { setDeadlineDate(d); setCalendarOpen(false) }}
+                            disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0)) || d > MAX_DEADLINE}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
 
-            {/* Preview badge tổng hợp khi có >1 dòng có dữ liệu */}
-            {(() => {
-              const filled = materialRows.filter((r) => r.materialType)
-              if (filled.length <= 1) return null
-              return (
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {filled.map((r) => {
-                    const opt = MATERIAL_OPTIONS.find((o) => o.value === r.materialType)
-                    return (
-                      <Badge key={r.id} variant="secondary" className="text-xs gap-1">
-                        {opt?.label}
-                        {r.weight && <span className="opacity-70">· {r.weight} {r.unit}</span>}
-                      </Badge>
-                    )
-                  })}
+                  {/* Ghi chú */}
+                  <div>
+                    <label style={{ fontSize: '12px', fontWeight: 600, color: TEXT_MUTED, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                      Ghi chú cho NV báo giá
+                    </label>
+                    <textarea
+                      className="qrm-textarea"
+                      placeholder="Thông tin thêm, yêu cầu đặc biệt..."
+                      rows={3}
+                      value={form.notes}
+                      onChange={set('notes')}
+                      style={{ ...fieldStyle, resize: 'vertical', lineHeight: '1.55', minHeight: '80px' }}
+                    />
+                  </div>
+
                 </div>
-              )
-            })()}
-          </div>
+              </div>
+            </div>
 
-          {/* Số lượng sản phẩm */}
-          <div className="space-y-1.5">
-            <Label>Số lượng</Label>
-            <div className="flex items-center gap-1.5 max-w-[160px]">
-              <Button
+            {/* ── Footer ──────────────────────────────────── */}
+            <div style={{
+              padding: '16px 28px',
+              borderTop: `1px solid ${BORDER}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: '10px',
+              background: SURFACE,
+              borderRadius: '0 0 20px 20px',
+              flexShrink: 0,
+            }}>
+              <button
                 type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={() => stepQty(-1)}
-                disabled={form.quantity <= 1}
-                className="shrink-0"
-              >
-                <Minus className="h-3.5 w-3.5" />
-              </Button>
-              <Input
-                type="text"
-                inputMode="numeric"
-                value={form.quantity}
-                onChange={(e) => {
-                  const n = parseInt(e.target.value.replace(/\D/g, '')) || 1
-                  setForm((f) => ({ ...f, quantity: Math.max(1, n) }))
+                onClick={() => setOpen(false)}
+                disabled={loading}
+                style={{
+                  padding: '9px 20px', borderRadius: '10px',
+                  border: `1.5px solid ${BORDER}`, background: 'white',
+                  fontSize: '13.5px', fontWeight: 500, color: TEXT_MUTED,
+                  cursor: 'pointer', transition: 'all 0.18s',
                 }}
-                className="text-center tabular-nums"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                onClick={() => stepQty(1)}
-                className="shrink-0"
               >
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
+                Huỷ
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={loading}
+                style={{
+                  padding: '9px 24px', borderRadius: '10px',
+                  border: 'none',
+                  background: loading ? '#C9A227' : `linear-gradient(135deg, ${GOLD_MID}, ${GOLD})`,
+                  fontSize: '13.5px', fontWeight: 600, color: 'white',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  boxShadow: `0 4px 14px ${GOLD}55`,
+                  transition: 'all 0.18s',
+                  letterSpacing: '0.01em',
+                }}
+              >
+                {loading ? (
+                  <><Loader2 style={{ width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} />Đang gửi...</>
+                ) : (
+                  <><Upload style={{ width: '14px', height: '14px' }} />Gửi yêu cầu</>
+                )}
+              </button>
             </div>
-          </div>
 
-          {/* Yêu cầu đá */}
-          <div className="space-y-1.5">
-            <Label htmlFor="stoneRequirements">Yêu cầu đá / phụ kiện</Label>
-            <Input
-              id="stoneRequirements"
-              placeholder="VD: 1 viên kim cương 0.3ct, đá CZ trắng..."
-              value={form.stoneRequirements}
-              onChange={set('stoneRequirements')}
-            />
-          </div>
-
-          {/* Mô tả sản phẩm */}
-          <div className="space-y-1.5">
-            <Label htmlFor="productDescription">Mô tả sản phẩm</Label>
-            <Textarea
-              id="productDescription"
-              placeholder="Mô tả chi tiết kiểu dáng, yêu cầu đặc biệt..."
-              rows={2}
-              value={form.productDescription}
-              onChange={set('productDescription')}
-            />
-          </div>
-
-          {/* Deadline */}
-          <div className="space-y-1.5">
-            <Label>Deadline khách yêu cầu</Label>
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    'w-full justify-start text-left font-normal',
-                    !deadlineDate && 'text-muted-foreground',
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {deadlineDate
-                    ? format(deadlineDate, 'dd/MM/yyyy', { locale: vi })
-                    : 'Chọn ngày deadline...'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={deadlineDate}
-                  onSelect={(d) => {
-                    setDeadlineDate(d)
-                    setCalendarOpen(false)
-                  }}
-                  disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0))}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Ảnh sản phẩm */}
-          <div className="space-y-1.5">
-            <Label>Hình ảnh sản phẩm (tối đa 5 ảnh)</Label>
-            <div className="flex flex-wrap gap-2">
-              <AnimatePresence>
-                {previews.map((p, i) => (
-                  <motion.div
-                    key={p.url}
-                    initial={{ opacity: 0, scale: 0.85 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.85 }}
-                    transition={{ duration: 0.15 }}
-                    className="relative h-16 w-16 overflow-hidden rounded-md border"
-                  >
-                    <img src={p.url} alt="" className="h-full w-full object-cover" />
-                    <button
-                      onClick={() => removeImage(i)}
-                      className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-destructive-foreground"
-                    >
-                      <X className="h-2.5 w-2.5" />
-                    </button>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-              {previews.length < 5 && (
-                <button
-                  onClick={() => fileRef.current?.click()}
-                  className="flex h-16 w-16 flex-col items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/30 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
-                >
-                  <ImageIcon className="h-5 w-5" />
-                  <span className="mt-0.5 text-xs">Thêm</span>
-                </button>
-              )}
-            </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={handleImageSelect}
-            />
-          </div>
-
-          {/* Ghi chú */}
-          <div className="space-y-1.5">
-            <Label htmlFor="notes">Ghi chú thêm cho NV báo giá</Label>
-            <Textarea
-              id="notes"
-              placeholder="Thông tin thêm, yêu cầu đặc biệt khác..."
-              rows={2}
-              value={form.notes}
-              onChange={set('notes')}
-            />
-          </div>
-
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Người tạo:</span>
-            <Badge variant="secondary">{requesterName}</Badge>
-          </div>
+          </DialogContent>
         </div>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
-            Huỷ
-          </Button>
-          <Button onClick={handleSubmit} disabled={loading} className="gap-2">
-            {loading
-              ? <><Loader2 className="h-4 w-4 animate-spin" />Đang gửi...</>
-              : <><Upload className="h-4 w-4" />Gửi yêu cầu</>
-            }
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      </Dialog>
+    </>
   )
 }

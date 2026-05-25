@@ -21,6 +21,7 @@ import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardL
 import { QuoteRequestModal } from '@/components/quote-request-modal'
 import { QuoteListPricer } from '@/components/quote-list-pricer'
 import { ProductionBoard } from '@/components/production-board'
+import { SaleDashboard } from '@/components/sale-dashboard'
 
 const tabContentVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -156,24 +157,18 @@ export default function Home() {
                 exit="exit"
                 className="space-y-6"
               >
-                {/* Stats */}
-                <StatsCards />
-
-                {/* Workflow Status */}
-                <WorkflowStatus currentStep={currentStep} />
-
-                {/* Recent Quotes */}
-                {/* Recent Quotes */}
-                <RecentQuotes currentRole={currentRole} />
-
-                {/* Sale: nút tạo yêu cầu báo giá nhanh từ dashboard */}
-                {currentRole === 'sale' && (
-                  <div className="flex justify-end">
-                    <QuoteRequestModal
-                      requesterName={currentUserName}
-                      onSuccess={(q) => { setLatestQuote(q); setActiveTab('quotes') }}
-                    />
-                  </div>
+                {/* Sale role: dùng Aurelian Atelier dashboard */}
+                {currentRole === 'sale' ? (
+                  <SaleDashboard
+                    currentUserName={currentUserName}
+                    onCreateSuccess={(q) => { setLatestQuote(q); setActiveTab('quotes') }}
+                  />
+                ) : (
+                  <>
+                    <StatsCards />
+                    <WorkflowStatus currentStep={currentStep} />
+                    <RecentQuotes currentRole={currentRole} />
+                  </>
                 )}
               </motion.div>
             </TabsContent>
