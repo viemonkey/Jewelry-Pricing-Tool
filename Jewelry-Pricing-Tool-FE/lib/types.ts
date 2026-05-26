@@ -82,9 +82,13 @@ export interface CreateQuoteRequest {
 export interface UpdateQuotePrice {
   weightChi?: number
   weightGram?: number
-  laborCost: number
+  goldPrice24K?: number    // Giá vàng 24K/chỉ tại thời điểm báo giá — lưu để restore
+  materialCost?: number    // Giá vàng theo tuổi (tự tính)
+  stoneCost?: number       // Tổng tiền đá
+  costBeforeVAT?: number   // Giá vốn chưa VAT
+  laborCost: number        // Tiền công chế tác
   stones: StoneDetail[]
-  costPrice: number
-  sellingPrice: number
+  costPrice: number        // Giá vốn có VAT
+  sellingPrice: number     // Giá bán đề xuất
   quotedBy: string
 }

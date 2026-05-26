@@ -19,6 +19,7 @@ const DEFAULT_CONFIG = {
     { maxCost: 999_999_999_999, divisor: 0.75, margin: '25%' },
   ],
   silverMultiplier: 3,
+  goldPrice24K: 9_000_000,
 }
 
 @Injectable()
@@ -33,6 +34,12 @@ export class PricingConfigService implements OnModuleInit {
     const count = await this.model.countDocuments()
     if (count === 0) {
       await this.model.create(DEFAULT_CONFIG)
+    } else {
+      const config = await this.model.findOne()
+      if (config && (config as any).goldPrice24K === undefined) {
+        ;(config as any).goldPrice24K = 9_000_000
+        await (config as any).save()
+      }
     }
   }
 

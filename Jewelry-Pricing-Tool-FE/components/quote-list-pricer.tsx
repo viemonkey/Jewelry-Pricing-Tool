@@ -36,6 +36,7 @@ export interface GoldRow {
   weightChi: string
   goldPrice24K: string
   materialCost: string
+  weightUnit?: 'chi' | 'gram'
 }
 
 const MATERIAL_LABEL_MAP: Record<string, string> = {
@@ -63,6 +64,7 @@ function makeGoldRow(type: string, weight = ''): GoldRow {
     weightChi: weight,
     goldPrice24K: '',
     materialCost: '',
+    weightUnit: type === 'SILVER' ? 'gram' : 'chi',
   }
 }
 
@@ -81,11 +83,20 @@ export function parseMaterialsFromQuote(quote: {
   // 1. Thử parse từ dimensions
   if (quote.dimensions) {
     const rows: GoldRow[] = []
-    for (const part of quote.dimensions.split(',').map(s => s.trim())) {
-      const m = part.match(/^(Vàng \d+K|Vàng 610|Bạc 925):\s*([\d.]+)/i)
+    for (const part of quote.dimensions.split(/[|,;]/).map(s => s.trim())) {
+      const m = part.match(/^(Vàng \d+K|Vàng 610|Bạc 925):\s*([\d.]+)\s*(chỉ|chi|g|gram|gr)?/i)
       if (m) {
         const t = labelToType(m[1])
-        if (t) rows.push(makeGoldRow(t, m[2]))
+        if (t) {
+          const row = makeGoldRow(t, m[2])
+          const unitStr = (m[3] || '').toLowerCase()
+          if (unitStr === 'g' || unitStr === 'gram' || unitStr === 'gr') {
+            row.weightUnit = 'gram'
+          } else {
+            row.weightUnit = 'chi'
+          }
+          rows.push(row)
+        }
       }
     }
     if (rows.length > 0) return rows
@@ -97,11 +108,20 @@ export function parseMaterialsFromQuote(quote: {
     if (line) {
       const rows: GoldRow[] = []
       const content = line.replace('Chất liệu:', '').trim()
-      for (const part of content.split(';').map(s => s.trim())) {
-        const m = part.match(/^(Vàng \d+K|Vàng 610|Bạc 925)(?:\s*[–-]\s*([\d.]+))?/i)
+      for (const part of content.split(/[;|]/).map(s => s.trim())) {
+        const m = part.match(/^(Vàng \d+K|Vàng 610|Bạc 925)(?:\s*[–-]\s*([\d.]+)\s*(chỉ|chi|g|gram|gr)?)?/i)
         if (m) {
           const t = labelToType(m[1])
-          if (t) rows.push(makeGoldRow(t, m[2] ?? ''))
+          if (t) {
+            const row = makeGoldRow(t, m[2] ?? '')
+            const unitStr = (m[3] || '').toLowerCase()
+            if (unitStr === 'g' || unitStr === 'gram' || unitStr === 'gr') {
+              row.weightUnit = 'gram'
+            } else {
+              row.weightUnit = 'chi'
+            }
+            rows.push(row)
+          }
         }
       }
       if (rows.length > 0) return rows
@@ -111,6 +131,7 @@ export function parseMaterialsFromQuote(quote: {
   // 3. Fallback: 1 dòng từ materialType
   return [makeGoldRow(quote.materialType)]
 }
+
 
 const STATUS_CONFIG: Record<QuoteStatus, { label: string; color: string; dot: string }> = {
   PENDING:            { label: 'Chờ báo giá',        color: 'border-amber-400/60 text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400', dot: 'bg-amber-400' },
@@ -178,7 +199,7 @@ function PricingDialogTabs({
   setPriceForm: React.Dispatch<React.SetStateAction<PriceFormState>>
   stoneEntries: StoneEntry[]
   setStoneEntries: React.Dispatch<React.SetStateAction<StoneEntry[]>>
-  pricingConfig: { goldRatios: any[]; profitMargins: any[]; silverMultiplier: number } | null
+  pricingConfig: { goldRatios: any[]; profitMargins: any[]; silverMultiplier: number; goldPrice24K?: number } | null
   cost: number; sell: number; margin: number | null; profit: number | null; marginGood: boolean
   saving: boolean
   onClose: () => void
@@ -512,12 +533,211 @@ function SectionDivider({ label, icon }: { label: string; icon?: React.ReactNode
   )
 }
 
+// ── StoneTable ──────────────────────────────────────────────────────────────
+
+const STONE_TYPE_LABELS: Record<string, string> = {
+  lab_diamond: 'Kim cương lab',
+  natural_diamond: 'Kim cương thiên nhiên',
+  colored_stone: 'Đá màu / phụ kiện',
+}
+
+function makeStoneEntry(type: StoneEntry['type'] = 'lab_diamond'): StoneEntry {
+  return {
+    id: `stone-${Date.now()}-${Math.random()}`,
+    type,
+    quantity: 1,
+    sizeOrCarat: '',
+    unitPrice: '',
+    priceMethod: 'per_piece',
+  }
+}
+
+function StoneTable({
+  entries,
+  onChange,
+  fmt,
+}: {
+  entries: StoneEntry[]
+  onChange: React.Dispatch<React.SetStateAction<StoneEntry[]>>
+  fmt: (v: number | string) => string
+}) {
+  const update = (id: string, patch: Partial<StoneEntry>) => {
+    onChange((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)))
+  }
+
+  const remove = (id: string) => {
+    onChange((prev) => prev.filter((e) => e.id !== id))
+  }
+
+  const add = () => {
+    onChange((prev) => [...prev, makeStoneEntry()])
+  }
+
+  const rowTotal = (e: StoneEntry) => {
+    const price = parseFloat(e.unitPrice) || 0
+    const qty = e.quantity || 0
+    if (e.priceMethod === 'per_piece') return qty * price
+    const carat = parseFloat(e.sizeOrCarat) || 0
+    return qty * carat * price
+  }
+
+  const grandTotal = entries.reduce((s, e) => s + rowTotal(e), 0)
+
+  return (
+    <div className="space-y-3">
+      {entries.map((entry, idx) => {
+        const total = rowTotal(entry)
+        return (
+          <motion.div
+            key={entry.id}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15, delay: idx * 0.04 }}
+            className="rounded-xl border border-border/60 bg-blue-50/40 dark:bg-blue-950/20 p-3 space-y-2"
+          >
+            {/* Row header */}
+            <div className="flex items-center justify-between gap-2">
+              <select
+                value={entry.type}
+                onChange={(e) => update(entry.id, { type: e.target.value as StoneEntry['type'] })}
+                className="flex-1 h-7 rounded-md border border-input bg-background px-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-ring/30"
+              >
+                <option value="lab_diamond">Kim cương lab</option>
+                <option value="natural_diamond">Kim cương thiên nhiên</option>
+                <option value="colored_stone">Đá màu / phụ kiện</option>
+              </select>
+              {total > 0 && (
+                <span className="text-xs font-bold text-blue-600 dark:text-blue-400 tabular-nums whitespace-nowrap">
+                  {fmt(total)}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => remove(entry.id)}
+                className="text-muted-foreground hover:text-destructive transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Inputs */}
+            <div className="grid grid-cols-2 gap-2">
+              {/* Số lượng */}
+              <div className="space-y-1">
+                <span className="text-[10px] text-muted-foreground font-medium">Số lượng</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  placeholder="1"
+                  value={entry.quantity}
+                  onChange={(e) => update(entry.id, { quantity: parseInt(e.target.value) || 1 })}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/30"
+                />
+              </div>
+
+              {/* Kích thước / carat */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground font-medium">
+                    {entry.priceMethod === 'per_carat' ? 'Trọng lượng (carat)' : 'Kích thước / mô tả'}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  placeholder={entry.priceMethod === 'per_carat' ? '0.5' : '3mm'}
+                  value={entry.sizeOrCarat}
+                  onChange={(e) => update(entry.id, { sizeOrCarat: e.target.value })}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/30"
+                />
+              </div>
+
+              {/* Đơn giá */}
+              <div className="space-y-1">
+                <span className="text-[10px] text-muted-foreground font-medium">
+                  Đơn giá (đ/{entry.priceMethod === 'per_carat' ? 'carat' : 'viên'})
+                </span>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={entry.unitPrice ? Number(entry.unitPrice).toLocaleString('vi-VN') : ''}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\./g, '').replace(/,/g, '')
+                      update(entry.id, { unitPrice: raw })
+                    }}
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 pr-5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/30"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">đ</span>
+                </div>
+              </div>
+
+              {/* Cách tính */}
+              <div className="space-y-1">
+                <span className="text-[10px] text-muted-foreground font-medium">Cách tính giá</span>
+                <select
+                  value={entry.priceMethod}
+                  onChange={(e) => update(entry.id, { priceMethod: e.target.value as StoneEntry['priceMethod'] })}
+                  className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring/30"
+                >
+                  <option value="per_piece">Theo viên</option>
+                  <option value="per_carat">Theo carat</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Formula display */}
+            {total > 0 && (
+              <div className="rounded-lg bg-blue-100 dark:bg-blue-900/30 border border-blue-200/70 px-3 py-1.5 text-xs text-blue-700 dark:text-blue-300">
+                {entry.priceMethod === 'per_piece' ? (
+                  <>{entry.quantity} viên × {Number(entry.unitPrice).toLocaleString('vi-VN')}đ = <strong>{fmt(total)}</strong></>
+                ) : (
+                  <>{entry.quantity} viên × {entry.sizeOrCarat} ct × {Number(entry.unitPrice).toLocaleString('vi-VN')}đ/ct = <strong>{fmt(total)}</strong></>
+                )}
+              </div>
+            )}
+          </motion.div>
+        )
+      })}
+
+      {/* Add button */}
+      <button
+        type="button"
+        onClick={add}
+        className="w-full rounded-xl border-2 border-dashed border-blue-300/60 dark:border-blue-700/60 py-2.5 text-xs font-medium text-blue-500 dark:text-blue-400 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20 transition-colors flex items-center justify-center gap-1.5"
+      >
+        <Sparkles className="h-3.5 w-3.5" />
+        Thêm dòng đá / phụ kiện
+      </button>
+
+      {/* Grand total */}
+      {entries.length > 1 && grandTotal > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center justify-between rounded-xl border-2 border-blue-300/60 bg-blue-50 dark:bg-blue-950/20 px-4 py-2.5"
+        >
+          <span className="text-sm font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+            <Gem className="h-3.5 w-3.5" />
+            Tổng tiền đá ({entries.length} loại)
+          </span>
+          <span className="text-base font-bold text-blue-700 dark:text-blue-300 tabular-nums">
+            {fmt(grandTotal)}
+          </span>
+        </motion.div>
+      )}
+    </div>
+  )
+}
+
 // ── MultiMaterialPricingRows ────────────────────────────────────────────────
 
 interface MultiMaterialPricingRowsProps {
   rows: GoldRow[]
   onChange: (rows: GoldRow[]) => void
-  pricingConfig: { goldRatios: any[]; profitMargins: any[]; silverMultiplier: number } | null
+  pricingConfig: { goldRatios: any[]; profitMargins: any[]; silverMultiplier: number; goldPrice24K?: number } | null
   fmt: (v: number | string) => string
   onTotalChange: (total: number) => void
 }
@@ -525,21 +745,23 @@ interface MultiMaterialPricingRowsProps {
 function MultiMaterialPricingRows({
   rows, onChange, pricingConfig, fmt, onTotalChange,
 }: MultiMaterialPricingRowsProps) {
-  const computeCost = (type: string, price24k: string, weight: string): number => {
+  const computeCost = (type: string, price24k: string, weight: string, unit?: string): number => {
     const g = parseFloat(price24k) || 0
-    const w = parseFloat(weight) || 0
+    let w = parseFloat(weight) || 0
     if (!g || !w) return 0
+    // Nếu đơn vị là gram, đổi sang chỉ trước khi tính (1 chỉ = 3.75g)
+    if (unit === 'gram') w = w / 3.75
     const key   = type.replace('GOLD_', '')
     const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)?.applied ?? 0
     return Math.round(ratio * g * w)
   }
 
-  const update = (id: string, patch: Partial<GoldRow>) => {
+  const update = (id: string, patch: Partial<GoldRow> & { weightUnit?: string }) => {
     const next = rows.map(r => {
       if (r.id !== id) return r
       const u = { ...r, ...patch }
-      const cost = computeCost(u.materialType, u.goldPrice24K, u.weightChi)
-      u.materialCost = cost > 0 ? String(cost) : u.materialCost
+      const cost = computeCost(u.materialType, u.goldPrice24K, u.weightChi, (u as any).weightUnit)
+      u.materialCost = String(cost)
       return u
     })
     onChange(next)
@@ -577,19 +799,48 @@ function MultiMaterialPricingRows({
             {/* Inputs */}
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
-                <span className="text-[10px] text-muted-foreground font-medium">Trọng lượng (chỉ)</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-muted-foreground font-medium">Trọng lượng</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const isGram = (row as any).weightUnit === 'gram'
+                      if (isGram) {
+                        // gram → chỉ (1 chỉ = 3.75g)
+                        const grams = parseFloat(row.weightChi) || 0
+                        const chi = grams > 0 ? String(Math.round((grams / 3.75) * 1000) / 1000) : ''
+                        update(row.id, { weightChi: chi, weightUnit: 'chi' } as any)
+                      } else {
+                        // chỉ → gram
+                        const chi = parseFloat(row.weightChi) || 0
+                        const grams = chi > 0 ? String(Math.round(chi * 3.75 * 1000) / 1000) : ''
+                        update(row.id, { weightChi: grams, weightUnit: 'gram' } as any)
+                      }
+                    }}
+                    className="text-[10px] text-primary underline underline-offset-2 hover:text-primary/70 transition-colors"
+                  >
+                    {(row as any).weightUnit === 'gram' ? 'Đổi sang chỉ' : 'Đổi sang gram'}
+                  </button>
+                </div>
                 <div className="relative">
                   <input
                     type="text" inputMode="decimal" placeholder="0"
                     value={row.weightChi}
                     onChange={e => update(row.id, { weightChi: e.target.value.replace(/[^0-9.]/g, '') })}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 pr-10 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/30"
+                    className="w-full h-9 rounded-md border border-input bg-background px-3 pr-12 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/30"
                   />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">chỉ</span>
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none font-medium">
+                    {(row as any).weightUnit === 'gram' ? 'gram' : 'chỉ'}
+                  </span>
                 </div>
+                {(row as any).weightUnit === 'gram' && parseFloat(row.weightChi) > 0 && (
+                  <p className="text-[10px] text-muted-foreground">
+                    ≈ {Math.round((parseFloat(row.weightChi) / 3.75) * 1000) / 1000} chỉ (dùng để tính giá)
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
-                <span className="text-[10px] text-muted-foreground font-medium">Giá vàng 24K (đ/chỉ)</span>
+                <span className="text-[10px] text-muted-foreground font-medium">Giá vàng gốc 24K (đ/chỉ)</span>
                 <div className="relative">
                   <input
                     type="text" inputMode="numeric" placeholder="9.000.000"
@@ -602,6 +853,11 @@ function MultiMaterialPricingRows({
                   />
                   <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">đ</span>
                 </div>
+                {ratio && parseFloat(row.goldPrice24K) > 0 && (
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium leading-none mt-1">
+                    ≈ Quy đổi {row.label}: {Number(Math.round(ratio.applied * (parseFloat(row.goldPrice24K) || 0))).toLocaleString('vi-VN')} đ/chỉ
+                  </p>
+                )}
               </div>
             </div>
 
@@ -657,34 +913,111 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null)
   const [stoneEntries, setStoneEntriesRaw] = useState<StoneEntry[]>([])
   const [goldRows, setGoldRows] = useState<GoldRow[]>([])
+  const [stoneInputMethod, setStoneInputMethod] = useState<'direct' | 'table'>('direct')
+
+  const calculateQuotePrices = (
+    currentForm: PriceFormState,
+    materialType: string,
+    currentStones: StoneEntry[],
+    activeStoneMethod: 'direct' | 'table'
+  ): PriceFormState => {
+    const updated = { ...currentForm }
+    const n = (v: string) => parseFloat(v) || 0
+
+    if (materialType === 'SILVER') {
+      const cost = n(updated.materialCost)
+      updated.laborCost = '0'
+      updated.stoneCost = '0'
+      updated.costBeforeVAT = String(cost)
+      updated.costWithVAT = String(cost)
+      updated.costPrice = String(cost)
+      
+      const multiplier = pricingConfig?.silverMultiplier ?? 3
+      updated.sellingPrice = String(Math.round((cost * multiplier) / 1000) * 1000)
+    } else {
+      // 1. Tiền nguyên liệu vàng (lấy từ materialCost hiện tại)
+      const goldCost = n(updated.materialCost)
+
+      // 2. Tính tiền đá
+      let stoneCostVal = 0
+      if (activeStoneMethod === 'table') {
+        stoneCostVal = currentStones.reduce((sum, e) => {
+          const price = parseFloat(e.unitPrice) || 0
+          if (e.priceMethod === 'per_piece') return sum + e.quantity * price
+          const carat = parseFloat(e.sizeOrCarat) || 0
+          return sum + e.quantity * carat * price
+        }, 0)
+        updated.stoneCost = String(Math.round(stoneCostVal))
+      } else {
+        stoneCostVal = n(updated.stoneCost)
+      }
+
+      // 3. Tiền công chế tác
+      const laborCostVal = n(updated.laborCost)
+
+      // 4. Tính toán giá vốn và VAT
+      const totalBeforeVAT = goldCost + stoneCostVal + laborCostVal
+      const vat = totalBeforeVAT * 0.1
+      const withVAT = totalBeforeVAT + vat
+
+      updated.costBeforeVAT = String(Math.round(totalBeforeVAT))
+      updated.costWithVAT = String(Math.round(withVAT))
+      updated.costPrice = String(Math.round(withVAT))
+
+      // 5. Tính giá bán dựa trên Profit Margins
+      if (pricingConfig?.profitMargins) {
+        const { divisor } = getProfitDivisor(withVAT, pricingConfig.profitMargins)
+        updated.sellingPrice = totalBeforeVAT > 0 ? String(Math.round(withVAT / divisor / 1000) * 1000) : '0'
+      }
+    }
+
+    return updated
+  }
+
+  const handleSilverCostChange = (val: string) => {
+    setPriceForm((f) => {
+      const updated = { ...f, materialCost: val }
+      return calculateQuotePrices(updated, selected?.materialType || '', stoneEntries, stoneInputMethod)
+    })
+  }
+
+  const handleSilverSellingPriceChange = (val: string) => {
+    setPriceForm((f) => {
+      const updated = { ...f, sellingPrice: val }
+      if (selected?.materialType === 'SILVER') {
+        const multiplier = pricingConfig?.silverMultiplier ?? 3
+        const sellVal = parseFloat(val) || 0
+        const costVal = sellVal / multiplier
+        
+        updated.materialCost = String(Math.round(costVal))
+        updated.costBeforeVAT = String(Math.round(costVal))
+        updated.costWithVAT = String(Math.round(costVal))
+        updated.costPrice = String(Math.round(costVal))
+        updated.laborCost = '0'
+        updated.stoneCost = '0'
+      }
+      return updated
+    })
+  }
+
+  const handleStoneMethodChange = (method: 'direct' | 'table') => {
+    setStoneInputMethod(method)
+    setPriceForm((f) => {
+      return calculateQuotePrices(f, selected?.materialType || '', stoneEntries, method)
+    })
+  }
 
   // Khi stoneEntries thay đổi → tự tính tổng và cập nhật stoneCost + tái tính giá bán
   const setStoneEntries: React.Dispatch<React.SetStateAction<StoneEntry[]>> = (action) => {
     setStoneEntriesRaw((prev) => {
       const next = typeof action === 'function' ? action(prev) : action
-      const total = next.reduce((sum, e) => {
-        if (e.priceMethod === 'per_piece') return sum + e.quantity * e.unitPrice
-        const carat = parseFloat(e.size) || 0
-        return sum + e.quantity * carat * e.unitPrice
-      }, 0)
-      const totalStr = String(Math.round(total))
-      // Trigger updatePriceField logic manually
       setPriceForm((f) => {
-        const n = (v: string) => parseFloat(v) || 0
-        // Giá vốn chưa VAT = Giá vàng theo tuổi + Tiền đá + Tiền công chế tác
-        const totalBeforeVAT = n(f.materialCost) + total + n(f.laborCost)
-        const withVAT = totalBeforeVAT * 1.1
-        const updated = { ...f, stoneCost: totalStr }
-        if (totalBeforeVAT > 0) {
-          updated.costBeforeVAT = String(Math.round(totalBeforeVAT))
-          updated.costWithVAT = String(Math.round(withVAT))
-          updated.costPrice = String(Math.round(withVAT))
-        }
-        return updated
+        return calculateQuotePrices(f, selected?.materialType || '', next, stoneInputMethod)
       })
       return next
     })
   }
+
 
   useEffect(() => {
     pricingConfigApi.get().then(setPricingConfig).catch(() => {})
@@ -731,25 +1064,98 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       q.status === 'NEED_MORE_INFO' ? 'view' :
       'view'
     ))
-    setPriceForm({
-      ...EMPTY_PRICE_FORM(currentUserName),
-      weightChi: q.weightChi?.toString() || '',
-      weightGram: q.weightGram?.toString() || '',
-      materialCost: (q as any).materialCost?.toString() || '',
-      stoneCost: (q as any).stoneCost?.toString() || '',
-      laborCost: q.laborCost?.toString() || '',
-      costBeforeVAT: (q as any).costBeforeVAT?.toString() || '',
-      costWithVAT: (q as any).costWithVAT?.toString() || '',
-      costPrice: q.costPrice?.toString() || '',
-      sellingPrice: q.sellingPrice?.toString() || '',
-    })
+
     // Init multi-material rows từ dữ liệu Sale đã nhập
     const parsedRows = parseMaterialsFromQuote({
       materialType: q.materialType,
       dimensions: (q as any).dimensions,
       notes: q.notes,
     })
-    setGoldRows(parsedRows)
+
+    // Pre-fill giá vàng: ưu tiên giá đã lưu trong quote, fallback về giá hệ thống hôm nay
+    const savedGoldPrice = (q as any).goldPrice24K?.toString() || ''
+    const systemGoldPrice = pricingConfig?.goldPrice24K?.toString() || ''
+    const goldPriceToLoad = savedGoldPrice || systemGoldPrice
+
+    // Tự động điền giá vàng hệ thống và tính lại giá trị cho từng dòng vàng
+    const mappedRows = parsedRows.map(row => {
+      const finalPrice = row.goldPrice24K || goldPriceToLoad
+      const g = parseFloat(finalPrice) || 0
+      let w = parseFloat(row.weightChi) || 0
+      let cost = 0
+      if (g && w) {
+        let weightInChi = w
+        if ((row as any).weightUnit === 'gram') weightInChi = w / 3.75
+        const key = row.materialType.replace('GOLD_', '')
+        const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)?.applied ?? 0
+        cost = Math.round(ratio * g * weightInChi)
+      }
+      return {
+        ...row,
+        goldPrice24K: finalPrice,
+        materialCost: String(cost)
+      }
+    })
+    setGoldRows(mappedRows)
+
+    const computedTotalMaterialCost = mappedRows.reduce((sum, r) => sum + (parseFloat(r.materialCost) || 0), 0)
+    const initialMaterialCost = (q as any).materialCost?.toString() || (computedTotalMaterialCost > 0 ? String(computedTotalMaterialCost) : '')
+
+    let initialWeightGram = q.weightGram?.toString() || ''
+    let initialWeightChi = q.weightChi?.toString() || ''
+
+    // Nếu chưa có cân lượng trong DB (quote mới), tự động điền từ parsedRows
+    if (parsedRows.length > 0) {
+      const firstRow = parsedRows[0]
+      const parsedWeight = parseFloat(firstRow.weightChi) || 0
+      if (parsedWeight > 0) {
+        if (q.materialType === 'SILVER') {
+          if (!initialWeightGram) {
+            if (firstRow.weightUnit === 'chi') {
+              initialWeightGram = String(parsedWeight * 3.75)
+            } else {
+              initialWeightGram = String(parsedWeight)
+            }
+          }
+        } else {
+          if (!initialWeightChi) {
+            if (firstRow.weightUnit === 'gram') {
+              initialWeightChi = String(parsedWeight / 3.75)
+            } else {
+              initialWeightChi = String(parsedWeight)
+            }
+          }
+        }
+      }
+    }
+
+    const savedSellingPrice = q.sellingPrice?.toString() || ''
+    const initialFormState = {
+      ...EMPTY_PRICE_FORM(currentUserName),
+      weightChi: initialWeightChi,
+      weightGram: initialWeightGram,
+      goldPrice24K: goldPriceToLoad,
+      materialCost: initialMaterialCost,
+      stoneCost: (q as any).stoneCost?.toString() || '',
+      laborCost: q.laborCost?.toString() || '',
+      costBeforeVAT: (q as any).costBeforeVAT?.toString() || '',
+      costWithVAT: (q as any).costWithVAT?.toString() || '',
+      costPrice: q.costPrice?.toString() || '',
+      sellingPrice: savedSellingPrice,
+    }
+
+    const savedStones = (q as any).stones || []
+    setStoneEntriesRaw(savedStones)
+    const activeMethod = savedStones.length > 0 ? 'table' : 'direct'
+    setStoneInputMethod(activeMethod)
+
+    // Tự động tính toán lại toàn bộ form nếu chưa từng được báo giá (mới mở lần đầu)
+    if (!q.sellingPrice || q.sellingPrice === 0) {
+      const recalculatedForm = calculateQuotePrices(initialFormState, q.materialType, savedStones, activeMethod)
+      setPriceForm(recalculatedForm)
+    } else {
+      setPriceForm(initialFormState)
+    }
   }
 
   const handleStartQuoting = async () => {
@@ -785,8 +1191,12 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       await quotesApi.updatePrice(selected._id, {
         weightChi: priceForm.weightChi ? parseFloat(priceForm.weightChi) : undefined,
         weightGram: priceForm.weightGram ? parseFloat(priceForm.weightGram) : undefined,
+        goldPrice24K: priceForm.goldPrice24K ? parseFloat(priceForm.goldPrice24K) : undefined,
         laborCost: parseFloat(priceForm.laborCost) || 0,
-        stones: [],
+        materialCost: parseFloat(priceForm.materialCost) || 0,
+        stoneCost: parseFloat(priceForm.stoneCost) || 0,
+        costBeforeVAT: parseFloat(priceForm.costBeforeVAT) || 0,
+        stones: stoneInputMethod === 'table' ? stoneEntries : [],
         costPrice: parseFloat(priceForm.costPrice) || 0,
         sellingPrice: parseFloat(priceForm.sellingPrice) || 0,
         quotedBy: priceForm.quotedBy,
@@ -889,29 +1299,13 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể huỷ báo giá.' })
     }
   }
-
   const updatePriceField = (key: keyof PriceFormState) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawVal = e.target.value
     setPriceForm((f) => {
-      const updated = { ...f, [key]: e.target.value }
-      const n = (v: string) => parseFloat(v) || 0
-      // Giá vốn chưa VAT = Giá vàng theo tuổi + Tiền đá + Tiền công chế tác (theo docs)
-      const totalBeforeVAT = n(updated.materialCost) + n(updated.stoneCost) + n(updated.laborCost)
-      if (totalBeforeVAT > 0) {
-        const vat = totalBeforeVAT * 0.1
-        const withVAT = totalBeforeVAT + vat
-        updated.costBeforeVAT = String(Math.round(totalBeforeVAT))
-        updated.costWithVAT = String(Math.round(withVAT))
-        updated.costPrice = String(Math.round(withVAT))
-        // Tự tính giá bán theo bảng biên lợi nhuận từ docs
-        if (pricingConfig?.profitMargins) {
-          const { divisor } = getProfitDivisor(withVAT, pricingConfig.profitMargins)
-          updated.sellingPrice = String(Math.round(withVAT / divisor / 1000) * 1000)
-        }
-      }
-      return updated
+      const nextForm = { ...f, [key]: rawVal }
+      return calculateQuotePrices(nextForm, selected?.materialType || '', stoneEntries, stoneInputMethod)
     })
   }
-
   const filtered = filterStatus === 'ALL' ? quotes : quotes.filter((q) => q.status === filterStatus)
 
   // Derived values for margin display
@@ -1195,136 +1589,237 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
 
                   <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
 
-                    {/* Section 1: Nguyên liệu — multi-material */}
-                    <SectionDivider label="Nguyên liệu" icon={<Gem className="h-3 w-3" />} />
-
                     {selected.materialType === 'SILVER' ? (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Trọng lượng</Label>
-                          <div className="relative">
-                            <Input type="number" placeholder="0" value={priceForm.weightGram}
-                              className="h-10 pr-14 text-sm tabular-nums"
-                              onChange={(e) => setPriceForm((f) => ({ ...f, weightGram: e.target.value }))} />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground pointer-events-none">gram</span>
+                      /* ── BẠC: Luồng tối giản & đặc biệt ── */
+                      <div className="space-y-4">
+                        <SectionDivider label="Sản phẩm bạc" icon={<Gem className="h-3 w-3" />} />
+                        <div className="rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
+                          💡 Sản phẩm bạc: <strong>Giá bán = Giá vốn × {pricingConfig?.silverMultiplier ?? 3}</strong>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Trọng lượng (gram)</Label>
+                            <div className="relative">
+                              <Input type="number" placeholder="0" value={priceForm.weightGram}
+                                className="h-10 pr-14 text-sm tabular-nums"
+                                onChange={(e) => setPriceForm((f) => ({ ...f, weightGram: e.target.value }))} />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground pointer-events-none">gram</span>
+                            </div>
+                          </div>
+                          <CurrencyInput
+                            label="Giá vốn bạc (đầu vào)"
+                            value={priceForm.materialCost}
+                            onChange={(e) => handleSilverCostChange(e.target.value)}
+                            icon={<Gem className="h-3 w-3" />}
+                          />
+                        </div>
+
+                        {/* Tổng giá vốn hiển thị đơn giản */}
+                        <div className="rounded-xl border border-border bg-muted/30 p-4 flex justify-between items-center text-sm">
+                          <div>
+                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Tổng giá vốn bạc</p>
+                            <p className="text-lg font-bold text-foreground mt-0.5">{formatCurrency(parseFloat(priceForm.materialCost) || 0)}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Trạng thái thuế</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Không tính VAT</p>
                           </div>
                         </div>
-                        <CurrencyInput label="Giá nguyên vật liệu" value={priceForm.materialCost}
-                          onChange={updatePriceField('materialCost')} />
+
+                        {/* Giá bán đề xuất */}
+                        <SectionDivider label="Giá bán đề xuất" icon={<TrendingUp className="h-3 w-3" />} />
+                        <div className="space-y-3">
+                          <div className="relative">
+                            <Input
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="0"
+                              value={formatInputNumber(priceForm.sellingPrice)}
+                              className="h-12 pr-7 text-lg font-bold border-2 border-primary/30 bg-primary/5 focus-visible:ring-primary/30 text-primary tabular-nums"
+                              onChange={(e) => handleSilverSellingPriceChange(parseInputNumber(e.target.value))}
+                            />
+                            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-primary/50 pointer-events-none font-bold">đ</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground italic">
+                            * Thay đổi giá vốn sẽ tự động tính lại giá bán và ngược lại.
+                          </p>
+                        </div>
                       </div>
                     ) : (
-                      <MultiMaterialPricingRows
-                        rows={goldRows}
-                        onChange={setGoldRows}
-                        pricingConfig={pricingConfig}
-                        fmt={formatCurrency}
-                        onTotalChange={(total) => {
-                          const syntheticEvent = { target: { value: String(total) } } as React.ChangeEvent<HTMLInputElement>
-                          updatePriceField('materialCost')(syntheticEvent)
-                        }}
-                      />
-                    )}
+                      /* ── VÀNG: Luồng đầy đủ ── */
+                      <>
+                        {/* Section 1: Nguyên liệu — multi-material */}
+                        <SectionDivider label="Nguyên liệu" icon={<Gem className="h-3 w-3" />} />
+                        <MultiMaterialPricingRows
+                          rows={goldRows}
+                          onChange={setGoldRows}
+                          pricingConfig={pricingConfig}
+                          fmt={formatCurrency}
+                          onTotalChange={(total) => {
+                            setPriceForm((f) => {
+                              const nextForm = { ...f, materialCost: String(total) }
+                              return calculateQuotePrices(nextForm, selected?.materialType || '', stoneEntries, stoneInputMethod)
+                            })
+                          }}
+                        />
 
-                    {/* Section 2: Gia công & Đá quý — theo docs chỉ có tiền đá + tiền công */}
-                    <SectionDivider label="Gia công & Đá quý" icon={<Hammer className="h-3 w-3" />} />
-                    <div className="grid grid-cols-2 gap-3">
-                      <CurrencyInput label="Tiền đá / phụ kiện"   value={priceForm.stoneCost}  onChange={updatePriceField('stoneCost')} />
-                      <CurrencyInput label="Tiền công chế tác"     value={priceForm.laborCost}  onChange={updatePriceField('laborCost')} icon={<Hammer className="h-3 w-3" />} />
-                    </div>
+                        {/* Section 2: Bảng tính đá / phụ kiện */}
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tiền đá / phụ kiện</span>
+                          <div className="flex rounded-md bg-muted p-0.5 text-[10px] font-medium">
+                            <button
+                              type="button"
+                              onClick={() => handleStoneMethodChange('direct')}
+                              className={`px-2.5 py-1 rounded transition-all ${
+                                stoneInputMethod === 'direct'
+                                  ? 'bg-background text-foreground shadow-sm font-semibold'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              Nhập tổng tiền
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleStoneMethodChange('table')}
+                              className={`px-2.5 py-1 rounded transition-all ${
+                                stoneInputMethod === 'table'
+                                  ? 'bg-background text-foreground shadow-sm font-semibold'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              }`}
+                            >
+                              Tính từ bảng đá
+                            </button>
+                          </div>
+                        </div>
 
-                    {/* Tổng giá vốn */}
-                    <div className="rounded-xl border-2 border-primary/25 bg-gradient-to-br from-primary/5 to-amber-50/60 dark:from-primary/10 dark:to-amber-950/20 p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Giá vốn có VAT (10%)</p>
-                          <p className="text-2xl font-bold text-primary tabular-nums">{formatCurrency(cost)}</p>
-                          {priceForm.costBeforeVAT && (
-                            <p className="text-xs text-muted-foreground mt-0.5">Chưa VAT: {formatCurrency(parseFloat(priceForm.costBeforeVAT))}</p>
+                        {stoneInputMethod === 'direct' ? (
+                          <CurrencyInput
+                            label="Tổng tiền đá / phụ kiện"
+                            value={priceForm.stoneCost}
+                            onChange={updatePriceField('stoneCost')}
+                            icon={<Sparkles className="h-3.5 w-3.5" />}
+                          />
+                        ) : (
+                          <>
+                            <StoneTable entries={stoneEntries} onChange={setStoneEntries} fmt={formatCurrency} />
+                            {parseFloat(priceForm.stoneCost) > 0 && (
+                              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 px-3 py-2 text-xs text-blue-700 dark:text-blue-300 flex justify-between">
+                                <span>Tổng tiền đá / phụ kiện</span>
+                                <strong>{formatCurrency(priceForm.stoneCost)}</strong>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Section 3: Tiền công chế tác */}
+                        <SectionDivider label="Tiền công chế tác" icon={<Hammer className="h-3 w-3" />} />
+                        <CurrencyInput label="Tiền công chế tác" value={priceForm.laborCost} onChange={updatePriceField('laborCost')} icon={<Hammer className="h-3 w-3" />} />
+
+                        {/* Tổng giá vốn */}
+                        <div className="rounded-xl border-2 border-primary/25 bg-gradient-to-br from-primary/5 to-amber-50/60 dark:from-primary/10 dark:to-amber-950/20 p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-4 mb-1">
+                                <div>
+                                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Giá vốn chưa VAT</p>
+                                  <p className="text-base font-semibold text-foreground tabular-nums">
+                                    {priceForm.costBeforeVAT ? formatCurrency(parseFloat(priceForm.costBeforeVAT)) : '0 đ'}
+                                  </p>
+                                </div>
+                                <span className="text-muted-foreground text-xs">+10% →</span>
+                                <div>
+                                  <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Giá vốn có VAT</p>
+                                  <p className="text-xl font-bold text-primary tabular-nums">{formatCurrency(cost)}</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+                              <Calculator className="h-5 w-5 text-primary" />
+                            </div>
+                          </div>
+                          {cost > 0 && (
+                            <div className="mt-3 space-y-1.5">
+                              {[
+                                { label: 'Nguyên vật liệu', value: parseFloat(priceForm.materialCost) || 0, color: 'bg-amber-400' },
+                                { label: 'Đá quý',           value: parseFloat(priceForm.stoneCost) || 0,    color: 'bg-blue-400' },
+                                { label: 'Tiền công',         value: parseFloat(priceForm.laborCost) || 0, color: 'bg-emerald-400' },
+                              ].filter(s => s.value > 0).map(s => (
+                                <div key={s.label} className="flex items-center gap-3">
+                                  <span className="text-xs text-muted-foreground w-28 shrink-0">{s.label}</span>
+                                  <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
+                                    <div className={`h-full rounded-full transition-all duration-500 ${s.color}`}
+                                      style={{ width: `${Math.min(100, (s.value / cost) * 100)}%` }} />
+                                  </div>
+                                  <span className="text-xs font-semibold text-muted-foreground tabular-nums w-8 text-right shrink-0">
+                                    {Math.round((s.value / cost) * 100)}%
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
-                        <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                          <Calculator className="h-5 w-5 text-primary" />
-                        </div>
-                      </div>
-                      {cost > 0 && (
-                        <div className="mt-3 space-y-1.5">
-                          {[
-                            { label: 'Nguyên vật liệu', value: parseFloat(priceForm.materialCost) || 0, color: 'bg-amber-400' },
-                            { label: 'Đá quý',           value: parseFloat(priceForm.stoneCost) || 0,    color: 'bg-blue-400' },
-                            { label: 'Tiền công',         value: parseFloat(priceForm.laborCost) || 0, color: 'bg-emerald-400' },
-                          ].filter(s => s.value > 0).map(s => (
-                            <div key={s.label} className="flex items-center gap-3">
-                              <span className="text-xs text-muted-foreground w-28 shrink-0">{s.label}</span>
-                              <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full transition-all duration-500 ${s.color}`}
-                                  style={{ width: `${Math.min(100, (s.value / cost) * 100)}%` }} />
+
+                        {/* Giá bán */}
+                        <SectionDivider label="Giá bán đề xuất" icon={<TrendingUp className="h-3 w-3" />} />
+                        <div className="space-y-3">
+                          {/* Thông tin biên lợi nhuận tự động */}
+                          {cost > 0 && pricingConfig?.profitMargins && (() => {
+                            const { divisor, margin: tier } = getProfitDivisor(cost, pricingConfig.profitMargins)
+                            return (
+                              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                                📊 Áp dụng biên <strong>{tier}</strong> (÷{divisor}) → Giá bán tự tính bên dưới
                               </div>
-                              <span className="text-xs font-semibold text-muted-foreground tabular-nums w-8 text-right shrink-0">
-                                {Math.round((s.value / cost) * 100)}%
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Giá bán */}
-                    <SectionDivider label="Giá bán đề xuất" icon={<TrendingUp className="h-3 w-3" />} />
-                    <div className="space-y-3">
-                    {/* Thông tin biên lợi nhuận tự động */}
-                    {cost > 0 && pricingConfig?.profitMargins && (() => {
-                      const { divisor, margin: tier } = getProfitDivisor(cost, pricingConfig.profitMargins)
-                      return (
-                        <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                          📊 Áp dụng biên <strong>{tier}</strong> (÷{divisor}) → Giá bán tự tính bên dưới
-                        </div>
-                      )
-                    })()}
-                      <div className="relative">
-                        <Input type="text" inputMode="numeric" placeholder="0"
-                          value={formatInputNumber(priceForm.sellingPrice)}
-                          className="h-12 pr-7 text-lg font-bold border-2 border-primary/30 bg-primary/5 focus-visible:ring-primary/30 text-primary tabular-nums"
-                          onChange={(e) => setPriceForm((f) => ({ ...f, sellingPrice: parseInputNumber(e.target.value) }))} />
-                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-primary/50 pointer-events-none font-bold">đ</span>
-                      </div>
-
-                      {margin !== null && (
-                        <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                          className={`rounded-xl p-3.5 border-2 flex items-center justify-between gap-4 ${
-                            marginGood
-                              ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-700/60'
-                              : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-700/60'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`h-10 w-10 rounded-full flex items-center justify-center text-base font-bold shrink-0 ${
-                              marginGood ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50' : 'bg-orange-100 text-orange-600 dark:bg-orange-900/50'
-                            }`}>
-                              {marginGood ? '✓' : '!'}
-                            </div>
-                            <div>
-                              <p className={`text-xs font-bold uppercase tracking-wide mb-0.5 ${
-                                marginGood ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'
-                              }`}>
-                                {marginGood ? 'Biên lợi nhuận tốt' : 'Biên lợi nhuận thấp'}
-                              </p>
-                              <p className={`text-base font-bold tabular-nums ${
-                                marginGood ? 'text-emerald-700 dark:text-emerald-300' : 'text-orange-700 dark:text-orange-300'
-                              }`}>
-                                {margin}% · Lãi {formatCurrency(profit!)}
-                              </p>
-                            </div>
+                            )
+                          })()}
+                          <div className="relative">
+                            <Input type="text" inputMode="numeric" placeholder="0"
+                              value={formatInputNumber(priceForm.sellingPrice)}
+                              className="h-12 pr-7 text-lg font-bold border-2 border-primary/30 bg-primary/5 focus-visible:ring-primary/30 text-primary tabular-nums"
+                              onChange={(e) => setPriceForm((f) => ({ ...f, sellingPrice: parseInputNumber(e.target.value) }))} />
+                            <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-primary/50 pointer-events-none font-bold">đ</span>
                           </div>
-                          <div className="text-right shrink-0">
-                            <div className="w-16 h-2 bg-muted/50 rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full transition-all duration-500 ${marginGood ? 'bg-emerald-400' : 'bg-orange-400'}`}
-                                style={{ width: `${Math.min(100, margin)}%` }} />
-                            </div>
-                            <p className="text-[10px] text-muted-foreground mt-1">Mục tiêu ≥ 20%</p>
-                          </div>
-                        </motion.div>
-                      )}
-                    </div>
+
+                          {margin !== null && (
+                            <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                              className={`rounded-xl p-3.5 border-2 flex items-center justify-between gap-4 ${
+                                marginGood
+                                  ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-700/60'
+                                  : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-700/60'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`h-10 w-10 rounded-full flex items-center justify-center text-base font-bold shrink-0 ${
+                                  marginGood ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50' : 'bg-orange-100 text-orange-600 dark:bg-orange-900/50'
+                                }`}>
+                                  {marginGood ? '✓' : '!'}
+                                </div>
+                                <div>
+                                  <p className={`text-xs font-bold uppercase tracking-wide mb-0.5 ${
+                                    marginGood ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'
+                                  }`}>
+                                    {marginGood ? 'Biên lợi nhuận tốt' : 'Biên lợi nhuận thấp'}
+                                  </p>
+                                  <p className={`text-base font-bold tabular-nums ${
+                                    marginGood ? 'text-emerald-700 dark:text-emerald-300' : 'text-orange-700 dark:text-orange-300'
+                                  }`}>
+                                    {margin}% · Lãi {formatCurrency(profit!)}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <div className="w-16 h-2 bg-muted/50 rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full transition-all duration-500 ${marginGood ? 'bg-emerald-400' : 'bg-orange-400'}`}
+                                    style={{ width: `${Math.min(100, margin)}%` }} />
+                                </div>
+                                <p className="text-[10px] text-muted-foreground mt-1">Mục tiêu ≥ 20%</p>
+                              </div>
+                            </motion.div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
                   </div>
 
                   {/* Footer */}
@@ -1612,6 +2107,56 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         </a>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Chi tiết chi phí cấu thành (chỉ cho NV Order/Admin và khi báo giá đã hoàn thành) */}
+                {canViewCost && selected.status !== 'PENDING' && selected.status !== 'QUOTING' && (
+                  <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 space-y-3">
+                    <p className="text-xs font-semibold text-primary uppercase tracking-wider flex items-center gap-1.5 border-b pb-1.5">
+                      <Calculator className="h-3.5 w-3.5" /> Chi tiết cấu thành giá vốn
+                    </p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+                      <div className="space-y-0.5">
+                        <span className="text-muted-foreground font-medium">Giá vàng 24K:</span>
+                        <p className="font-semibold text-foreground">
+                          {selected.goldPrice24K ? `${formatCurrency(selected.goldPrice24K)} / chỉ` : '—'}
+                        </p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-muted-foreground font-medium">Tiền công chế tác:</span>
+                        <p className="font-semibold text-foreground">{formatCurrency(selected.laborCost || 0)}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-muted-foreground font-medium">Tiền nguyên liệu vàng/bạc:</span>
+                        <p className="font-semibold text-foreground">{formatCurrency((selected as any).materialCost || 0)}</p>
+                      </div>
+                      <div className="space-y-0.5">
+                        <span className="text-muted-foreground font-medium">Tiền đá / phụ kiện:</span>
+                        <p className="font-semibold text-foreground">{formatCurrency((selected as any).stoneCost || 0)}</p>
+                      </div>
+                    </div>
+
+                    {/* Hiển thị chi tiết danh sách đá nếu có */}
+                    {(selected as any).stones && (selected as any).stones.length > 0 && (
+                      <div className="border-t border-primary/10 pt-2 mt-2 space-y-1.5">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Bảng tính đá chi tiết:</span>
+                        <div className="space-y-1">
+                          {(selected as any).stones.map((stone: any, idx: number) => (
+                            <div key={idx} className="flex justify-between text-xs text-muted-foreground bg-background/60 dark:bg-muted/30 px-2.5 py-1.5 rounded-lg border border-border/40">
+                              <span className="font-medium text-foreground">
+                                {STONE_TYPE_LABELS[stone.type] || stone.type} ({stone.quantity} viên {stone.sizeOrCarat ? `· ${stone.sizeOrCarat}` : ''})
+                              </span>
+                              <span className="font-semibold text-primary">
+                                {stone.priceMethod === 'per_carat'
+                                  ? `${stone.quantity} viên × ${stone.sizeOrCarat} ct × ${formatCurrency(parseFloat(stone.unitPrice) || 0)}`
+                                  : `${stone.quantity} viên × ${formatCurrency(parseFloat(stone.unitPrice) || 0)}`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

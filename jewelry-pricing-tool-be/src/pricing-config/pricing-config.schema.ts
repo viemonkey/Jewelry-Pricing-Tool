@@ -22,6 +22,9 @@ export class PricingConfig {
 
   @Prop({ required: true, default: 3 })
   silverMultiplier: number
+
+  @Prop({ required: true, default: 9000000 })
+  goldPrice24K: number
 }
 
 export const PricingConfigSchema = SchemaFactory.createForClass(PricingConfig)

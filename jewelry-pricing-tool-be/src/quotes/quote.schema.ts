@@ -28,6 +28,11 @@ export class Quote {
   @Prop() weightChi: number
   @Prop() weightGram: number
   @Prop({ default: 0 }) laborCost: number
+  @Prop() goldPrice24K: number
+  @Prop() materialCost: number
+  @Prop() stoneCost: number
+  @Prop() costBeforeVAT: number
+  @Prop() costWithVAT: number
   @Prop({ type: [Object], default: [] }) stones: any[]
   @Prop({ default: 0 }) costPrice: number
   @Prop({ default: 0 }) sellingPrice: number
