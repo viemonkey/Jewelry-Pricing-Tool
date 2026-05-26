@@ -141,11 +141,8 @@ interface PriceFormState {
   weightGram: string
   // Đá / phụ kiện
   stoneCost: string       // tổng tiền đá (tự tính từ bảng hoặc nhập tay)
-  // Chi phí gia công
+  // Tiền công chế tác (theo docs: tiền công chế tác)
   laborCost: string
-  processingCost: string
-  finishingCost: string
-  wasteCost: string
   // Tổng hợp
   costBeforeVAT: string
   costWithVAT: string
@@ -158,7 +155,7 @@ const EMPTY_PRICE_FORM = (name: string): PriceFormState => ({
   weightChi: '', goldPrice24K: '', materialCost: '',
   weightGram: '',
   stoneCost: '',
-  laborCost: '', processingCost: '', finishingCost: '', wasteCost: '',
+  laborCost: '',
   costBeforeVAT: '', costWithVAT: '', costPrice: '', sellingPrice: '', quotedBy: name,
 })
 
@@ -402,14 +399,9 @@ function PricingDialogTabs({
                 <SectionDivider label="Bước 2 — Bảng tính đá / phụ kiện" icon={<Sparkles className="h-3 w-3" />} />
                 <StoneTable entries={stoneEntries} onChange={setStoneEntries} fmt={fmt} />
 
-                {/* ── Step 3 — Chi phí gia công ── */}
-                <SectionDivider label="Bước 3 — Chi phí gia công" icon={<Hammer className="h-3 w-3" />} />
-                <div className="grid grid-cols-2 gap-3">
-                  <CurrencyInput label="Tiền công sản xuất" value={priceForm.laborCost} onChange={(e) => setPriceForm(f => ({ ...f, laborCost: e.target.value }))} />
-                  <CurrencyInput label="Chi phí gia công" value={priceForm.processingCost} onChange={(e) => setPriceForm(f => ({ ...f, processingCost: e.target.value }))} />
-                  <CurrencyInput label="Chi phí hoàn thiện" value={priceForm.finishingCost} onChange={(e) => setPriceForm(f => ({ ...f, finishingCost: e.target.value }))} />
-                  <CurrencyInput label="Hao hụt / phát sinh" value={priceForm.wasteCost} onChange={(e) => setPriceForm(f => ({ ...f, wasteCost: e.target.value }))} icon={<Zap className="h-3 w-3" />} />
-                </div>
+                {/* ── Step 3 — Tiền công chế tác (theo docs) ── */}
+                <SectionDivider label="Bước 3 — Tiền công chế tác" icon={<Hammer className="h-3 w-3" />} />
+                <CurrencyInput label="Tiền công chế tác" value={priceForm.laborCost} onChange={(e) => setPriceForm(f => ({ ...f, laborCost: e.target.value }))} icon={<Hammer className="h-3 w-3" />} />
 
                 {/* ── Step 4 — Tổng hợp giá ── */}
                 <SectionDivider label="Bước 4 — Tổng hợp & Giá bán" icon={<TrendingUp className="h-3 w-3" />} />
@@ -679,8 +671,8 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       // Trigger updatePriceField logic manually
       setPriceForm((f) => {
         const n = (v: string) => parseFloat(v) || 0
+        // Giá vốn chưa VAT = Giá vàng theo tuổi + Tiền đá + Tiền công chế tác
         const totalBeforeVAT = n(f.materialCost) + total + n(f.laborCost)
-          + n(f.processingCost) + n(f.finishingCost) + n(f.wasteCost)
         const withVAT = totalBeforeVAT * 1.1
         const updated = { ...f, stoneCost: totalStr }
         if (totalBeforeVAT > 0) {
@@ -746,9 +738,6 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       materialCost: (q as any).materialCost?.toString() || '',
       stoneCost: (q as any).stoneCost?.toString() || '',
       laborCost: q.laborCost?.toString() || '',
-      processingCost: (q as any).processingCost?.toString() || '',
-      finishingCost: (q as any).finishingCost?.toString() || '',
-      wasteCost: (q as any).wasteCost?.toString() || '',
       costBeforeVAT: (q as any).costBeforeVAT?.toString() || '',
       costWithVAT: (q as any).costWithVAT?.toString() || '',
       costPrice: q.costPrice?.toString() || '',
@@ -905,9 +894,8 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     setPriceForm((f) => {
       const updated = { ...f, [key]: e.target.value }
       const n = (v: string) => parseFloat(v) || 0
-      // Tổng giá vốn chưa VAT = NVL + đá + tiền công + gia công + hoàn thiện + hao hụt
+      // Giá vốn chưa VAT = Giá vàng theo tuổi + Tiền đá + Tiền công chế tác (theo docs)
       const totalBeforeVAT = n(updated.materialCost) + n(updated.stoneCost) + n(updated.laborCost)
-        + n(updated.processingCost) + n(updated.finishingCost) + n(updated.wasteCost)
       if (totalBeforeVAT > 0) {
         const vat = totalBeforeVAT * 0.1
         const withVAT = totalBeforeVAT + vat
@@ -1237,19 +1225,12 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                       />
                     )}
 
-                    {/* Section 2: Gia công & Đá */}
+                    {/* Section 2: Gia công & Đá quý — theo docs chỉ có tiền đá + tiền công */}
                     <SectionDivider label="Gia công & Đá quý" icon={<Hammer className="h-3 w-3" />} />
                     <div className="grid grid-cols-2 gap-3">
-                      <CurrencyInput label="Giá đá / phụ kiện"   value={priceForm.stoneCost}      onChange={updatePriceField('stoneCost')} />
-                      <CurrencyInput label="Tiền công sản xuất"   value={priceForm.laborCost}      onChange={updatePriceField('laborCost')} />
-                      <CurrencyInput label="Chi phí gia công"     value={priceForm.processingCost} onChange={updatePriceField('processingCost')} />
-                      <CurrencyInput label="Chi phí hoàn thiện"   value={priceForm.finishingCost}  onChange={updatePriceField('finishingCost')} />
+                      <CurrencyInput label="Tiền đá / phụ kiện"   value={priceForm.stoneCost}  onChange={updatePriceField('stoneCost')} />
+                      <CurrencyInput label="Tiền công chế tác"     value={priceForm.laborCost}  onChange={updatePriceField('laborCost')} icon={<Hammer className="h-3 w-3" />} />
                     </div>
-
-                    {/* Section 3: Phát sinh */}
-                    <SectionDivider label="Chi phí phát sinh" icon={<Sparkles className="h-3 w-3" />} />
-                    <CurrencyInput label="Hao hụt / chi phí phát sinh" value={priceForm.wasteCost}
-                      onChange={updatePriceField('wasteCost')} />
 
                     {/* Tổng giá vốn */}
                     <div className="rounded-xl border-2 border-primary/25 bg-gradient-to-br from-primary/5 to-amber-50/60 dark:from-primary/10 dark:to-amber-950/20 p-4">
@@ -1270,8 +1251,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           {[
                             { label: 'Nguyên vật liệu', value: parseFloat(priceForm.materialCost) || 0, color: 'bg-amber-400' },
                             { label: 'Đá quý',           value: parseFloat(priceForm.stoneCost) || 0,    color: 'bg-blue-400' },
-                            { label: 'Gia công',          value: (parseFloat(priceForm.laborCost) || 0) + (parseFloat(priceForm.processingCost) || 0) + (parseFloat(priceForm.finishingCost) || 0), color: 'bg-emerald-400' },
-                            { label: 'Phát sinh',         value: parseFloat(priceForm.wasteCost) || 0,    color: 'bg-red-300' },
+                            { label: 'Tiền công',         value: parseFloat(priceForm.laborCost) || 0, color: 'bg-emerald-400' },
                           ].filter(s => s.value > 0).map(s => (
                             <div key={s.label} className="flex items-center gap-3">
                               <span className="text-xs text-muted-foreground w-28 shrink-0">{s.label}</span>
