@@ -19,7 +19,8 @@ import {
 import {
   Calculator, CheckCircle, Eye, Loader2, RefreshCw,
   ThumbsUp, Ban, Gem, Hammer, Sparkles, TrendingUp, AlertCircle,
-  Package, Zap, Send, ShoppingCart, ImageIcon, X, Layers,
+  Package, Zap, Send, ShoppingCart, ImageIcon, X, Layers, FileText,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { quotesApi, pricingConfigApi } from '@/lib/api'
 import type { PricingConfig } from '@/lib/api'
@@ -134,14 +135,14 @@ export function parseMaterialsFromQuote(quote: {
 
 
 const STATUS_CONFIG: Record<QuoteStatus, { label: string; color: string; dot: string }> = {
-  PENDING:            { label: 'Chờ báo giá',        color: 'border-amber-400/60 text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400', dot: 'bg-amber-400' },
-  NEED_MORE_INFO:     { label: 'Cần bổ sung',         color: 'border-orange-400/60 text-orange-600 bg-orange-50 dark:bg-orange-950/30 dark:text-orange-400', dot: 'bg-orange-500' },
-  QUOTING:            { label: 'Đang báo giá',        color: 'border-blue-400/60 text-blue-600 bg-blue-50 dark:bg-blue-950/30 dark:text-blue-400', dot: 'bg-blue-400' },
-  QUOTED:             { label: 'Đã báo giá',          color: 'border-emerald-400/60 text-emerald-600 bg-emerald-50 dark:bg-emerald-950/30 dark:text-emerald-400', dot: 'bg-emerald-400' },
-  SENT_TO_CUSTOMER:   { label: 'Đã gửi khách',        color: 'border-violet-400/60 text-violet-600 bg-violet-50 dark:bg-violet-950/30 dark:text-violet-400', dot: 'bg-violet-400' },
-  CONFIRMED:          { label: 'Đặt hàng',            color: 'border-primary/40 text-primary bg-primary/5', dot: 'bg-primary' },
-  CANCELLED:          { label: 'Đã huỷ',              color: 'border-red-400/60 text-red-500 bg-red-50 dark:bg-red-950/30 dark:text-red-400', dot: 'bg-red-400' },
-  IN_PRODUCTION:      { label: 'Đang sản xuất',       color: 'border-purple-400/60 text-purple-600 bg-purple-50 dark:bg-purple-950/30 dark:text-purple-400', dot: 'bg-purple-400' },
+  PENDING:            { label: 'Chờ báo giá',        color: 'bg-[#F1C40F] text-black border-transparent shadow-sm whitespace-nowrap font-semibold', dot: 'bg-black/40' },
+  NEED_MORE_INFO:     { label: 'Cần bổ sung',         color: 'bg-[#E74C3C] text-white border-transparent shadow-sm whitespace-nowrap font-semibold', dot: 'bg-white/80' },
+  QUOTING:            { label: 'Đang báo giá',        color: 'bg-[#9B59B6] text-white border-transparent shadow-sm whitespace-nowrap font-semibold', dot: 'bg-white/80' },
+  QUOTED:             { label: 'Đã báo giá',          color: 'bg-[#2ECC71] text-white border-transparent shadow-sm whitespace-nowrap font-semibold', dot: 'bg-white/80' },
+  SENT_TO_CUSTOMER:   { label: 'Đã gửi khách',        color: 'bg-[#1ABC9C] text-white border-transparent shadow-sm whitespace-nowrap font-semibold', dot: 'bg-white/80' },
+  CONFIRMED:          { label: 'Đặt hàng',            color: 'bg-[#E67E22] text-white border-transparent shadow-sm whitespace-nowrap font-semibold', dot: 'bg-white/80' },
+  CANCELLED:          { label: 'Đã huỷ',              color: 'bg-[#95A5A6] text-white border-transparent shadow-sm whitespace-nowrap font-semibold', dot: 'bg-white/80' },
+  IN_PRODUCTION:      { label: 'Đang sản xuất',       color: 'bg-[#34495E] text-white border-transparent shadow-sm whitespace-nowrap font-semibold', dot: 'bg-white/80' },
 }
 
 export interface StoneEntry {
@@ -184,6 +185,7 @@ interface QuoteListPricerProps {
   currentRole: UserRole
   currentUserName?: string
   newQuote?: Quote | null
+  action?: React.ReactNode
 }
 
 // ─── Pricing Dialog Tabs component ─────────────────────────
@@ -893,10 +895,12 @@ function MultiMaterialPricingRows({
   )
 }
 
-export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá', newQuote }: QuoteListPricerProps) {
+export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá', newQuote, action }: QuoteListPricerProps) {
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(false)
   const [filterStatus, setFilterStatus] = useState<QuoteStatus | 'ALL'>('ALL')
+  const [page, setPage] = useState(1)
+  const perPage = 8
   const [selected, setSelected] = useState<Quote | null>(null)
   const [dialogMode, setDialogMode] = useState<'review' | 'pricing' | 'view'>('view')
   const [priceForm, setPriceForm] = useState<PriceFormState>(EMPTY_PRICE_FORM(currentUserName))
@@ -1307,6 +1311,8 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     })
   }
   const filtered = filterStatus === 'ALL' ? quotes : quotes.filter((q) => q.status === filterStatus)
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
+  const paginated = filtered.slice((page - 1) * perPage, page * perPage)
 
   // Derived values for margin display
   // costWithVAT là giá vốn thực (sau VAT 10%) — dùng để hiển thị và tính margin
@@ -1325,14 +1331,17 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
             {isPricer ? 'Xử lý và hoàn thành báo giá cho các yêu cầu từ Sale' : 'Theo dõi trạng thái và xác nhận báo giá'}
           </CardDescription>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchQuotes} disabled={loading} className="gap-1">
-          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          Làm mới
-        </Button>
+        <div className="flex items-center gap-2">
+          {action}
+          <Button variant="outline" size="sm" onClick={fetchQuotes} disabled={loading} className="gap-1.5 h-9 rounded-lg">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Làm mới
+          </Button>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <Tabs value={filterStatus} onValueChange={(v) => setFilterStatus(v as QuoteStatus | 'ALL')}>
+        <Tabs value={filterStatus} onValueChange={(v) => { setFilterStatus(v as QuoteStatus | 'ALL'); setPage(1) }} className="pt-2">
           <TabsList className="flex-wrap h-auto gap-1">
             <TabsTrigger value="ALL">Tất cả</TabsTrigger>
             <TabsTrigger value="PENDING">Chờ báo giá</TabsTrigger>
@@ -1348,20 +1357,20 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
         <div className="rounded-lg border overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead>Mã</TableHead>
-                <TableHead>Sản phẩm</TableHead>
-                <TableHead>Chất liệu</TableHead>
-                <TableHead>Người yêu cầu</TableHead>
-                {canViewCost && <TableHead className="text-right">Giá vốn</TableHead>}
-                <TableHead className="text-right">Giá bán</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="text-right">Thao tác</TableHead>
+              <TableRow className="bg-[#F8F9FA] border-b border-slate-200">
+                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Mã</TableHead>
+                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Sản phẩm</TableHead>
+                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Chất liệu</TableHead>
+                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Người yêu cầu</TableHead>
+                {canViewCost && <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider text-right h-11">Giá vốn</TableHead>}
+                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider text-right h-11">Giá bán</TableHead>
+                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Trạng thái</TableHead>
+                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider text-right h-11">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <AnimatePresence>
-                {filtered.map((q, i) => {
+                {paginated.map((q, i) => {
                   const sc = STATUS_CONFIG[q.status] ?? { label: q.status, color: 'border-gray-400/60 text-gray-600 bg-gray-50', dot: 'bg-gray-400' }
                   return (
                     <motion.tr key={q._id}
@@ -1456,35 +1465,100 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
             </TableBody>
           </Table>
         </div>
+
+        {/* Phân trang (Pagination) */}
+        {totalPages > 1 && (
+          <div className="pt-4 flex items-center justify-between border-t border-border/60">
+            <span className="text-xs text-[#9E8E7A] font-medium">
+              Hiển thị {Math.min(filtered.length, (page - 1) * perPage + paginated.length)} / {filtered.length} yêu cầu
+            </span>
+            <div className="flex gap-1 items-center">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="w-8 h-8 p-0 rounded-lg border-[#E6DFD0] hover:bg-[#FBF6E9] hover:text-[#C9981A] transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                <Button
+                  key={p}
+                  variant={p === page ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setPage(p)}
+                  className={`w-8 h-8 p-0 rounded-lg text-xs font-bold transition-all ${
+                    p === page
+                      ? 'bg-[#C9981A] hover:bg-[#735A19] text-white shadow-sm border-transparent'
+                      : 'border-[#E6DFD0] hover:bg-[#FBF6E9] hover:text-[#C9981A] text-[#6B5E4C]'
+                  }`}
+                >
+                  {p}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="w-8 h-8 p-0 rounded-lg border-[#E6DFD0] hover:bg-[#FBF6E9] hover:text-[#C9981A] transition-colors"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
 
 
       {/* ── Detail Dialog ── */}
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent className={`${dialogMode === 'pricing' ? 'max-w-5xl w-[96vw]' : 'max-w-lg'} p-0 gap-0 overflow-hidden`}>
-
-          {/* ── Decorative header stripe ── */}
-          <div className="h-1 w-full bg-gradient-to-r from-amber-400 via-primary to-amber-600" />
+        <DialogContent
+          className={`${dialogMode === 'pricing' ? 'max-w-5xl w-[96vw]' : 'max-w-4xl w-[92vw]'} p-0 gap-0 overflow-hidden border-[#E6DFD0] rounded-[20px] shadow-2xl`}
+          style={{ fontFamily: "'DM Sans', sans-serif" }}
+        >
 
           {/* Header */}
-          <div className="flex items-start justify-between px-6 pt-4 pb-3 border-b bg-gradient-to-b from-muted/30 to-transparent">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-mono text-xs bg-muted/80 px-2 py-0.5 rounded-md text-muted-foreground border border-border/60">
+          <div style={{
+            padding: '20px 28px',
+            background: 'linear-gradient(120deg, #FBF6E9 0%, #FFFDF7 55%, white 100%)',
+            borderBottom: '1px solid #EDE8DE',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '14px',
+            position: 'relative' as const,
+          }}>
+            {/* Icon */}
+            <div style={{
+              width: '42px', height: '42px', borderRadius: '13px', flexShrink: 0,
+              background: 'linear-gradient(135deg, #E8C44A, #C9981A)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(201, 152, 26, 0.25)',
+            }}>
+              <FileText style={{ width: '18px', height: '18px', color: 'white' }} />
+            </div>
+
+            {/* Title */}
+            <div className="flex-1 min-w-0 pr-6">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="font-mono text-[10px] bg-white border border-[#E6DFD0] px-2 py-0.5 rounded text-[#6B5E4C] font-semibold">
                   {selected?.quoteCode}
                 </span>
                 {selected && (
-                  <Badge variant="outline" className={`${STATUS_CONFIG[selected.status]?.color} gap-1.5 pl-2`}>
+                  <Badge variant="outline" className={`${STATUS_CONFIG[selected.status]?.color} gap-1.5 pl-2 py-0 h-5 font-bold text-[10px]`}>
                     <span className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_CONFIG[selected.status]?.dot}`} />
                     {STATUS_CONFIG[selected.status]?.label}
                   </Badge>
                 )}
               </div>
-              <DialogTitle className="text-lg font-bold">{selected?.productName ?? 'Chi tiết báo giá'}</DialogTitle>
-              <DialogDescription className="text-xs text-muted-foreground">
-                {dialogMode === 'review' ? '🔍 Kiểm tra thông tin yêu cầu từ Sale'
-                  : dialogMode === 'pricing' ? '💰 Xem thông tin yêu cầu và nhập chi phí để tính giá vốn'
-                  : '📋 Chi tiết báo giá'}
+              <DialogTitle className="text-lg font-semibold text-[#1A1814] tracking-tight" style={{ fontFamily: 'Lora, serif', margin: 0 }}>
+                {selected?.productName ?? 'Chi tiết báo giá'}
+              </DialogTitle>
+              <DialogDescription className="text-xs text-[#9E8E7A] mt-0.5">
+                {dialogMode === 'review' ? 'Kiểm tra thông tin yêu cầu từ Sale'
+                  : dialogMode === 'pricing' ? 'Xem thông tin yêu cầu và nhập chi phí để tính giá vốn'
+                  : 'Chi tiết báo giá'}
               </DialogDescription>
             </div>
           </div>
@@ -1856,59 +1930,64 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                   </div>
 
                   {/* Form fields */}
-                  <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Kích thước / Trọng lượng</Label>
-                      <Input
-                        value={editForm.dimensions}
-                        onChange={(e) => setEditForm(f => ({ ...f, dimensions: e.target.value }))}
-                        placeholder="VD: Size 12, khoảng 3 chỉ, dài 45cm..."
-                        className="h-10"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Yêu cầu đá / phụ kiện</Label>
-                      <Input
-                        value={editForm.stoneRequirements}
-                        onChange={(e) => setEditForm(f => ({ ...f, stoneRequirements: e.target.value }))}
-                        placeholder="VD: 1 viên kim cương 0.3ct, đá CZ trắng..."
-                        className="h-10"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Mô tả sản phẩm</Label>
-                      <Textarea
-                        value={editForm.productDescription}
-                        onChange={(e) => setEditForm(f => ({ ...f, productDescription: e.target.value }))}
-                        placeholder="Mô tả chi tiết kiểu dáng, yêu cầu đặc biệt..."
-                        rows={3}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Ghi chú thêm cho NV báo giá</Label>
-                      <Textarea
-                        value={editForm.notes}
-                        onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))}
-                        placeholder="Thông tin bổ sung, yêu cầu đặc biệt khác..."
-                        rows={2}
-                      />
+                  <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2 col-span-1">
+                        <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Kích thước / Trọng lượng</Label>
+                        <Input
+                          value={editForm.dimensions}
+                          onChange={(e) => setEditForm(f => ({ ...f, dimensions: e.target.value }))}
+                          placeholder="VD: Size 12, khoảng 3 chỉ, dài 45cm..."
+                          className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2 col-span-1">
+                        <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Yêu cầu đá / phụ kiện</Label>
+                        <Input
+                          value={editForm.stoneRequirements}
+                          onChange={(e) => setEditForm(f => ({ ...f, stoneRequirements: e.target.value }))}
+                          placeholder="VD: 1 viên kim cương 0.3ct, đá CZ trắng..."
+                          className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2 col-span-1">
+                        <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Mô tả sản phẩm</Label>
+                        <Textarea
+                          value={editForm.productDescription}
+                          onChange={(e) => setEditForm(f => ({ ...f, productDescription: e.target.value }))}
+                          placeholder="Mô tả chi tiết kiểu dáng, yêu cầu đặc biệt..."
+                          rows={3}
+                          className="border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl resize-none"
+                        />
+                      </div>
+                      <div className="space-y-2 col-span-1">
+                        <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Ghi chú thêm cho NV báo giá</Label>
+                        <Textarea
+                          value={editForm.notes}
+                          onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                          placeholder="Thông tin bổ sung, yêu cầu đặc biệt khác..."
+                          rows={3}
+                          className="border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl resize-none"
+                        />
+                      </div>
                     </div>
 
                     {/* Ảnh sản phẩm */}
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Hình ảnh sản phẩm</Label>
+                    <div className="space-y-3 pt-3 border-t border-[#EDE8DE]">
+                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Hình ảnh sản phẩm</Label>
 
                       {/* Ảnh cũ — có thể xoá từng cái */}
                       {keepImages.length > 0 && (
                         <div>
-                          <p className="text-xs text-muted-foreground mb-2">Ảnh hiện tại (bỏ tích để xoá)</p>
+                          <p className="text-xs text-muted-foreground mb-2">Ảnh hiện tại (bấm vào ảnh để xoá)</p>
                           <div className="flex flex-wrap gap-2">
                             {keepImages.map((img, i) => (
-                              <div key={img} className="relative h-16 w-16 rounded-lg border overflow-hidden group">
-                                <img src={`http://localhost:3001${img}`} alt="" className="h-full w-full object-cover" />
+                              <div key={img} className="relative h-16 w-16 rounded-xl border border-[#EDE8DE] overflow-hidden group p-0.5 bg-white">
+                                <img src={`http://localhost:3001${img}`} alt="" className="h-full w-full object-cover rounded-lg" />
                                 <button
+                                  type="button"
                                   onClick={() => setKeepImages(prev => prev.filter((_, idx) => idx !== i))}
-                                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg"
                                 >
                                   <X className="h-4 w-4 text-white" />
                                 </button>
@@ -1923,14 +2002,15 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         <p className="text-xs text-muted-foreground mb-2">Thêm ảnh mới (tối đa {5 - keepImages.length} ảnh)</p>
                         <div className="flex flex-wrap gap-2">
                           {editImages.map((img, i) => (
-                            <div key={img.url} className="relative h-16 w-16 rounded-lg border overflow-hidden group">
-                              <img src={img.url} alt="" className="h-full w-full object-cover" />
+                            <div key={img.url} className="relative h-16 w-16 rounded-xl border border-[#EDE8DE] overflow-hidden group p-0.5 bg-white">
+                              <img src={img.url} alt="" className="h-full w-full object-cover rounded-lg" />
                               <button
+                                type="button"
                                 onClick={() => {
                                   URL.revokeObjectURL(img.url)
                                   setEditImages(prev => prev.filter((_, idx) => idx !== i))
                                 }}
-                                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg"
                               >
                                 <X className="h-4 w-4 text-white" />
                               </button>
@@ -1938,11 +2018,12 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           ))}
                           {keepImages.length + editImages.length < 5 && (
                             <button
+                              type="button"
                               onClick={() => editFileRef.current?.click()}
-                              className="flex h-16 w-16 flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 text-muted-foreground hover:border-primary/50 hover:text-primary transition-colors"
+                              className="flex h-16 w-16 flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#C9981A]/40 text-[#A07810] hover:border-[#C9981A] hover:bg-[#FBF6E9] hover:text-[#C9981A] transition-all"
                             >
                               <ImageIcon className="h-5 w-5" />
-                              <span className="mt-0.5 text-xs">Thêm</span>
+                              <span className="mt-0.5 text-[10px] font-medium">Thêm</span>
                             </button>
                           )}
                         </div>
@@ -1981,220 +2062,364 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                 </div>
 
               ) : (
-              <div className="overflow-y-auto" style={{ maxHeight: 'calc(80vh - 160px)' }}>
+              <div className="flex flex-col overflow-hidden bg-background animate-in fade-in zoom-in-95 duration-200" style={{ height: '78vh' }}>
+                <div className="flex-1 flex overflow-hidden">
+                  
+                  {/* LEFT COLUMN: Yêu cầu & Thông số sản phẩm */}
+                  <div className="flex flex-col w-[52%] shrink-0 border-r border-[#EDE8DE] overflow-hidden bg-[#FCFAF6]">
+                    {/* Sub-header */}
+                    <div className="px-5 py-3 border-b border-[#EDE8DE] bg-[#FBF6E9] shrink-0 flex items-center gap-2">
+                      <Package className="h-4 w-4 text-[#C9981A]" />
+                      <span className="text-xs font-bold text-[#6B5E4C] uppercase tracking-wider font-lora">Yêu cầu & Thông số</span>
+                    </div>
 
-                {/* ── HERO: Giá bán nổi bật ── */}
-                {selected.status !== 'PENDING' && selected.status !== 'QUOTING' && selected.sellingPrice > 0 && (
-                  <div className="relative overflow-hidden bg-gradient-to-br from-primary to-amber-600 px-6 py-5 text-white">
-                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, white 0%, transparent 60%)' }} />
-                    <div className="relative">
-                      {canViewCost ? (
-                        <div className="flex items-end justify-between">
-                          <div>
-                            <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Giá bán đề xuất</p>
-                            <p className="text-3xl font-bold tracking-tight">{formatCurrency(selected.sellingPrice)}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xs text-white/70 mb-1">Giá vốn (có VAT)</p>
-                            <p className="text-base font-semibold text-white/90">{formatCurrency(selected.costPrice)}</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <p className="text-xs font-medium text-white/70 uppercase tracking-wider mb-1">Giá bán đề xuất</p>
-                          <p className="text-4xl font-bold tracking-tight">{formatCurrency(selected.sellingPrice)}</p>
+                    {/* Left content scrollable */}
+                    <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                      
+                      {/* Lý do trả lại từ NV báo giá (nếu có) */}
+                      {selected.status === 'NEED_MORE_INFO' && selected.rejectReason && (
+                        <div className="rounded-xl border border-orange-200 bg-orange-50/60 p-3.5 shadow-sm">
+                          <p className="text-xs font-bold text-orange-700 mb-1 flex items-center gap-1.5">
+                            <AlertCircle className="h-3.5 w-3.5" /> Lý do NV báo giá trả lại
+                          </p>
+                          <p className="text-sm text-orange-950 leading-relaxed font-medium">{selected.rejectReason}</p>
+                          {!isPricer && (
+                            <p className="text-[11px] text-orange-700/80 mt-2 font-medium">
+                              💡 Vui lòng bấm nút <strong>Chỉnh sửa & Gửi lại</strong> ở góc dưới bên phải để cập nhật thông tin.
+                            </p>
+                          )}
                         </div>
                       )}
-                      <div className="mt-3 flex items-center gap-2">
-                        {(() => { const cfg = STATUS_CONFIG[selected.status]; return cfg ? (
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold bg-white/20 text-white`}>
-                            <span className={`h-1.5 w-1.5 rounded-full bg-white`} />
-                            {cfg.label}
-                          </span>
-                        ) : null })()}
-                        <span className="text-xs text-white/60">{selected.quoteCode}</span>
+
+                      {/* Metadata grid (3 columns) */}
+                      <div className="grid grid-cols-3 gap-2.5">
+                        {[
+                          { label: 'Người yêu cầu', value: selected.requestedBy, icon: '👤' },
+                          { label: 'Số lượng', value: `${(selected as any).quantity || 1} cái`, icon: '📦' },
+                          { label: 'Deadline', value: (selected as any).deadline, icon: '📅' },
+                        ].map(({ label, value, icon }) => (
+                          <div key={label} className="rounded-xl border border-[#EDE8DE] bg-white px-3 py-2.5 shadow-sm transition-all duration-200 hover:shadow-md">
+                            <span className="text-[9px] text-[#9E8E7A] font-bold tracking-wider uppercase block">{icon} {label}</span>
+                            <p className="font-bold mt-1 text-xs text-[#3A352E] truncate">{value || '—'}</p>
+                          </div>
+                        ))}
                       </div>
+
+                      {/* Chất liệu yêu cầu */}
+                      {(() => {
+                        const parsed = parseMaterialsFromQuote({
+                          materialType: selected.materialType,
+                          dimensions: (selected as any).dimensions,
+                          notes: selected.notes,
+                        })
+                        return (
+                          <div className="rounded-xl border border-[#EDE8DE] bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:shadow-md">
+                            <span className="text-[9px] text-[#9E8E7A] font-bold tracking-wider uppercase flex items-center gap-1.5 mb-2">⚙️ Chất liệu yêu cầu</span>
+                            <div className="flex flex-wrap gap-1.5">
+                              {parsed.map((row, i) => (
+                                <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[#FBF6E9] border border-[#E6DFD0] text-[#8C6D1F] text-xs font-semibold px-3 py-1">
+                                  <Layers className="h-3 w-3" />
+                                  {row.label}
+                                  {row.weightChi && <span className="opacity-75 font-normal">· {row.weightChi} chỉ</span>}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {/* Thông số chi tiết */}
+                      <div className="space-y-3">
+                        {[
+                          { label: 'Kích thước / Trọng lượng dự kiến', value: (selected as any).dimensions, icon: '📐' },
+                          { label: 'Yêu cầu đá / Phụ kiện', value: (selected as any).stoneRequirements, icon: '💎' },
+                          { label: 'Mô tả chi tiết sản phẩm', value: selected.productDescription, icon: '📝' },
+                        ].filter(x => x.value).map(({ label, value, icon }) => (
+                          <div key={label} className="rounded-xl border border-[#EDE8DE] bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:shadow-md">
+                            <span className="text-[9px] text-[#9E8E7A] font-bold tracking-wider uppercase flex items-center gap-1.5 mb-1.5">{icon} {label}</span>
+                            <p className="text-xs text-[#3A352E] font-medium leading-relaxed whitespace-pre-wrap">{value}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Ghi chú thêm cho NV báo giá */}
+                      {selected.notes && (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/40 px-4 py-3 shadow-sm">
+                          <p className="text-[9px] font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5 mb-1.5">
+                            <AlertCircle className="h-3 w-3" /> Ghi chú cho NV báo giá
+                          </p>
+                          <p className="text-xs text-amber-900 leading-relaxed font-medium">{selected.notes}</p>
+                        </div>
+                      )}
+
                     </div>
                   </div>
-                )}
 
-                <div className="px-6 py-4 space-y-4">
+                  {/* RIGHT COLUMN: Giá bán, Chi phí & Hình ảnh */}
+                  <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                    {/* Sub-header */}
+                    <div className="px-5 py-3 border-b border-[#EDE8DE] bg-[#FBF6E9] shrink-0 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-[#C9981A]" />
+                      <span className="text-xs font-bold text-[#6B5E4C] uppercase tracking-wider font-lora">Giá bán & Tiến trình</span>
+                    </div>
 
-                {/* Banner lý do trả lại */}
-                {selected.status === 'NEED_MORE_INFO' && selected.rejectReason && (
-                  <div className="rounded-xl border-2 border-orange-400/60 bg-orange-50 dark:bg-orange-950/20 px-4 py-3">
-                    <p className="text-xs font-bold text-orange-600 dark:text-orange-400 mb-1 flex items-center gap-1.5">
-                      <AlertCircle className="h-3.5 w-3.5" /> Lý do NV báo giá trả lại
-                    </p>
-                    <p className="text-sm text-orange-800 dark:text-orange-300 leading-relaxed font-medium">{selected.rejectReason}</p>
-                    {!isPricer && (
-                      <p className="text-xs text-orange-600/80 dark:text-orange-400/80 mt-2">
-                        👆 Vui lòng cập nhật thông tin bên dưới rồi bấm <strong>Gửi lại</strong>
-                      </p>
-                    )}
-                  </div>
-                )}
+                    {/* Right content scrollable */}
+                    <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 bg-[#FFFDF9]">
 
-                {/* Thông tin sản phẩm */}
-                <div>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Thông tin sản phẩm</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    {[
-                      { label: 'Người yêu cầu', value: selected.requestedBy, icon: '👤' },
-                      { label: 'Số lượng', value: `${(selected as any).quantity || 1} cái`, icon: '📦' },
-                      { label: 'Deadline', value: (selected as any).deadline, icon: '📅' },
-                    ].map(({ label, value, icon }) => (
-                      <div key={label} className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5">
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">{icon} {label}</span>
-                        <p className="font-semibold mt-0.5 text-sm">{value || '—'}</p>
-                      </div>
-                    ))}
-                    {/* Chất liệu — multi-row */}
-                    {(() => {
-                      const parsed = parseMaterialsFromQuote({
-                        materialType: selected.materialType,
-                        dimensions: (selected as any).dimensions,
-                        notes: selected.notes,
-                      })
-                      return (
-                        <div className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 col-span-2">
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">⚙️ Chất liệu</span>
-                          <div className="flex flex-wrap gap-1.5 mt-1.5">
-                            {parsed.map((row, i) => (
-                              <span key={i} className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-300/60 dark:border-amber-700/60 text-amber-700 dark:text-amber-300 text-xs font-semibold px-2.5 py-0.5">
-                                <Layers className="h-3 w-3" />
-                                {row.label}
-                                {row.weightChi && <span className="opacity-60 font-normal">· {row.weightChi} chỉ</span>}
-                              </span>
+                      {/* Tiến trình trạng thái (Stepper) */}
+                      {(() => {
+                        const steps = [
+                          { key: 'PENDING', label: 'Chờ duyệt' },
+                          { key: 'QUOTING', label: 'Đang định giá' },
+                          { key: 'QUOTED', label: 'Đã báo giá' },
+                          { key: 'SENT_TO_CUSTOMER', label: 'Chờ phản hồi' },
+                          { key: 'CONFIRMED', label: 'Chốt đơn' },
+                        ]
+                        const currentIndex = steps.findIndex(s => s.key === selected.status)
+                        
+                        if (selected.status === 'NEED_MORE_INFO') {
+                          return (
+                            <div className="rounded-xl bg-orange-50 border border-orange-100 px-4 py-3 flex items-center gap-2">
+                              <span className="h-2 w-2 rounded-full bg-orange-500 animate-ping" />
+                              <span className="text-xs font-bold text-orange-800">Trạng thái: Trả lại yêu cầu thông tin</span>
+                            </div>
+                          )
+                        }
+                        if (selected.status === 'CANCELLED') {
+                          return (
+                            <div className="rounded-xl bg-red-50 border border-red-100 px-4 py-3 flex items-center gap-2">
+                              <span className="h-2 w-2 rounded-full bg-red-500" />
+                              <span className="text-xs font-bold text-red-800">Trạng thái: Khách từ chối / Đã hủy</span>
+                            </div>
+                          )
+                        }
+                        
+                        return (
+                          <div className="rounded-xl border border-[#EDE8DE] bg-white p-4 shadow-sm">
+                            <span className="text-[9px] text-[#9E8E7A] font-bold tracking-wider uppercase block mb-3">Tiến trình yêu cầu</span>
+                            <div className="flex items-center justify-between relative pt-1">
+                              <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-0.5 bg-muted z-0" />
+                              <div className="absolute left-0 top-1/2 -translate-y-1/2 h-0.5 bg-[#C9981A] transition-all duration-300 z-0"
+                                style={{ width: `${(Math.max(0, currentIndex) / (steps.length - 1)) * 100}%` }} />
+                              
+                              {steps.map((s, idx) => {
+                                const isActive = idx <= currentIndex
+                                const isCurrent = idx === currentIndex
+                                return (
+                                  <div key={s.key} className="flex flex-col items-center relative z-10">
+                                    <div className={`h-5 w-5 rounded-full flex items-center justify-center text-[9px] font-bold transition-all duration-300 border ${
+                                      isCurrent ? 'bg-[#C9981A] text-white border-[#C9981A] scale-110 shadow-sm shadow-[#C9981A]/30'
+                                        : isActive ? 'bg-[#FBF6E9] text-[#8C6D1F] border-[#C9981A]'
+                                        : 'bg-white text-muted-foreground border-[#EDE8DE]'
+                                    }`}>
+                                      {idx + 1}
+                                    </div>
+                                    <span className={`text-[8px] mt-1 font-semibold ${
+                                      isCurrent ? 'text-[#8C6D1F] font-bold'
+                                        : isActive ? 'text-[#6B5E4C]'
+                                        : 'text-muted-foreground'
+                                    }`}>
+                                      {s.label}
+                                    </span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {/* Khối giá bán nổi bật (nếu đã có báo giá) */}
+                      {selected.status !== 'PENDING' && selected.status !== 'QUOTING' && selected.sellingPrice > 0 ? (
+                        <div className="space-y-4">
+                          
+                          {/* Premium Price Card */}
+                          <div className="relative overflow-hidden bg-gradient-to-br from-[#D9A723] to-[#A67C15] rounded-[16px] p-5 text-white shadow-md">
+                            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, white 0%, transparent 60%)' }} />
+                            <div className="relative">
+                              {canViewCost ? (
+                                <div className="flex items-end justify-between">
+                                  <div>
+                                    <p className="text-[9px] font-bold text-white/80 uppercase tracking-wider mb-1">Giá bán đề xuất</p>
+                                    <p className="text-3xl font-extrabold tracking-tight font-lora">{formatCurrency(selected.sellingPrice)}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-[9px] text-white/80 mb-1 uppercase tracking-wider font-bold">Giá vốn (có VAT)</p>
+                                    <p className="text-base font-bold text-white/90">{formatCurrency(selected.costPrice)}</p>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div>
+                                  <p className="text-[9px] font-bold text-white/80 uppercase tracking-wider mb-1">Giá bán đề xuất</p>
+                                  <p className="text-4xl font-extrabold tracking-tight font-lora">{formatCurrency(selected.sellingPrice)}</p>
+                                </div>
+                              )}
+                              <div className="mt-3.5 flex items-center justify-between border-t border-white/20 pt-2.5 text-xs text-white/85">
+                                <span>Mã yêu cầu: <strong className="font-mono">{selected.quoteCode}</strong></span>
+                                <span className="bg-white/20 px-2 py-0.5 rounded-full font-bold text-[9px]">
+                                  {STATUS_CONFIG[selected.status]?.label}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Chi tiết chi phí cấu thành (chỉ cho NV Order/Admin và khi báo giá đã hoàn thành) */}
+                          {canViewCost && (
+                            <div className="rounded-xl border border-[#EDE8DE] bg-white p-4 space-y-3.5 shadow-sm">
+                              <p className="text-xs font-bold text-[#8C6D1F] uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
+                                <Calculator className="h-4 w-4" /> Chi tiết cấu thành giá vốn
+                              </p>
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
+                                <div className="space-y-0.5">
+                                  <span className="text-[#9E8E7A] font-medium">Giá vàng 24K:</span>
+                                  <p className="font-bold text-[#3A352E]">
+                                    {(selected as any).goldPrice24K ? `${formatCurrency((selected as any).goldPrice24K)} / chỉ` : '—'}
+                                  </p>
+                                </div>
+                                <div className="space-y-0.5">
+                                  <span className="text-[#9E8E7A] font-medium">Tiền công chế tác:</span>
+                                  <p className="font-bold text-[#3A352E]">{formatCurrency(selected.laborCost || 0)}</p>
+                                </div>
+                                <div className="space-y-0.5">
+                                  <span className="text-[#9E8E7A] font-medium">Tiền nguyên liệu:</span>
+                                  <p className="font-bold text-[#3A352E]">{formatCurrency((selected as any).materialCost || 0)}</p>
+                                </div>
+                                <div className="space-y-0.5">
+                                  <span className="text-[#9E8E7A] font-medium">Tiền đá / Phụ kiện:</span>
+                                  <p className="font-bold text-[#3A352E]">{formatCurrency((selected as any).stoneCost || 0)}</p>
+                                </div>
+                              </div>
+
+                              {/* Hiển thị chi tiết danh sách đá nếu có */}
+                              {(selected as any).stones && (selected as any).stones.length > 0 && (
+                                <div className="border-t border-[#EDE8DE] pt-3 mt-1 space-y-2">
+                                  <span className="text-[9px] font-bold text-[#9E8E7A] uppercase tracking-wider block">Bảng tính đá chi tiết:</span>
+                                  <div className="space-y-1.5">
+                                    {(selected as any).stones.map((stone: any, idx: number) => (
+                                      <div key={idx} className="flex justify-between text-xs bg-[#FDFBF7] px-2.5 py-2 rounded-lg border border-[#EDE8DE]">
+                                        <span className="font-medium text-[#3A352E]">
+                                          {STONE_TYPE_LABELS[stone.type] || stone.type} ({stone.quantity} viên {stone.sizeOrCarat ? `· ${stone.sizeOrCarat}` : ''})
+                                        </span>
+                                        <span className="font-bold text-[#8C6D1F]">
+                                          {stone.priceMethod === 'per_carat'
+                                            ? `${stone.quantity} viên × ${stone.sizeOrCarat} ct × ${formatCurrency(parseFloat(stone.unitPrice) || 0)}`
+                                            : `${stone.quantity} viên × ${formatCurrency(parseFloat(stone.unitPrice) || 0)}`}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                        </div>
+                      ) : (
+                        /* Đang định giá / Đang chờ */
+                        <div className="rounded-xl border border-amber-200 bg-amber-50/30 p-4 text-center space-y-2">
+                          <span className="inline-block p-2 bg-amber-100 text-amber-700 rounded-full animate-bounce">⏳</span>
+                          <p className="text-xs font-bold text-amber-800 uppercase tracking-wider">Đang chờ xử lý định giá</p>
+                          <p className="text-xs text-amber-700/80 leading-relaxed">
+                            Yêu cầu này đang được nhân viên định giá xử lý. Bảng giá chi tiết sẽ tự động xuất hiện tại đây sau khi hoàn tất.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Biểu mẫu trả lại yêu cầu (Rejection Form) của Pricer hiển thị trực tiếp ở đây */}
+                      {isPricer && dialogMode === 'review' && showRejectForm && (
+                        <div className="rounded-xl border-2 border-red-200 bg-red-50/50 p-4 space-y-3.5 shadow-sm">
+                          <p className="text-xs font-bold text-red-700 flex items-center gap-1.5 uppercase tracking-wider">
+                            <Ban className="h-4 w-4" /> Trả lại yêu cầu cho Sale
+                          </p>
+                          <div className="space-y-2">
+                            <Label className="text-[10px] font-bold text-red-800 uppercase tracking-wide">Lý do yêu cầu bổ sung thông tin</Label>
+                            <Textarea 
+                              placeholder="VD: Thiếu hình ảnh góc nghiêng, chưa rõ size đá chính, hạn chót quá gấp..."
+                              rows={3} 
+                              value={rejectReason} 
+                              onChange={(e) => setRejectReason(e.target.value)} 
+                              className="text-xs border-red-200 focus-visible:ring-red-500/20 focus-visible:border-red-500 rounded-xl resize-none p-3 bg-white text-red-950 font-medium" 
+                            />
+                          </div>
+                          <div className="flex gap-2 pt-1">
+                            <Button variant="outline" className="flex-1 border-red-200 text-red-700 hover:bg-red-100 rounded-xl font-semibold text-xs h-9" onClick={() => setShowRejectForm(false)}>
+                              Huỷ
+                            </Button>
+                            <Button variant="destructive" className="flex-1 gap-1.5 rounded-xl font-semibold text-xs shadow-sm h-9"
+                              onClick={handleReject} disabled={!rejectReason.trim() || saving}>
+                              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
+                              Xác nhận trả lại
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Gallery hình ảnh sản phẩm */}
+                      {selected.images?.length > 0 && (
+                        <div className="rounded-xl border border-[#EDE8DE] bg-white p-4 shadow-sm space-y-2.5">
+                          <span className="text-[9px] text-[#9E8E7A] font-bold tracking-wider uppercase block">Hình ảnh sản phẩm ({selected.images.length})</span>
+                          <div className="grid grid-cols-4 gap-2">
+                            {selected.images.map((img, i) => (
+                              <a key={i} href={`http://localhost:3001${img}`} target="_blank" rel="noreferrer"
+                                className="relative block rounded-lg overflow-hidden border border-[#EDE8DE] hover:border-[#C9981A] hover:scale-[1.03] transition-all duration-200 shadow-sm group">
+                                <img src={`http://localhost:3001${img}`} alt={`Ảnh ${i + 1}`}
+                                  className="h-16 w-full object-cover" />
+                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <Eye className="h-4 w-4 text-white" />
+                                </div>
+                              </a>
                             ))}
                           </div>
                         </div>
-                      )
-                    })()}
+                      )}
+
+                      {/* Tip quy trình của Sale */}
+                      {!isPricer && selected.status === 'QUOTED' && (
+                        <div className="rounded-xl bg-violet-50 border border-violet-100 p-4 space-y-1.5">
+                          <p className="text-xs text-violet-700 font-bold flex items-center gap-1.5 uppercase tracking-wider">💡 Hướng dẫn tiếp theo</p>
+                          <p className="text-[11px] text-violet-800 leading-relaxed">
+                            Liên hệ trao đổi với khách hàng về mức giá bán đề xuất. Khi đã gửi giá và chờ phản hồi, vui lòng nhấn nút <strong>Gửi giá cho khách</strong> bên dưới.
+                          </p>
+                        </div>
+                      )}
+
+                      {!isPricer && selected.status === 'SENT_TO_CUSTOMER' && (
+                        <div className="rounded-xl bg-amber-50 border border-amber-100 p-4 space-y-1.5">
+                          <p className="text-xs text-amber-700 font-bold flex items-center gap-1.5 uppercase tracking-wider">⏳ Chờ khách phản hồi</p>
+                          <p className="text-[11px] text-amber-800 leading-relaxed">
+                            Báo giá đang được gửi tới khách hàng. Khi nhận được kết quả, hãy chọn <strong>Khách chốt đơn</strong> hoặc <strong>Khách từ chối</strong>.
+                          </p>
+                        </div>
+                      )}
+
+                    </div>
                   </div>
-                  <div className="mt-2 space-y-2">
-                    {[
-                      { label: 'Kích thước / Trọng lượng dự kiến', value: (selected as any).dimensions, icon: '📐' },
-                      { label: 'Yêu cầu đá / phụ kiện', value: (selected as any).stoneRequirements, icon: '💎' },
-                      { label: 'Mô tả sản phẩm', value: selected.productDescription, icon: '📝' },
-                    ].filter(x => x.value).map(({ label, value, icon }) => (
-                      <div key={label} className="rounded-xl border border-border/60 bg-muted/30 px-3 py-2.5 text-sm">
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">{icon} {label}</span>
-                        <p className="font-medium mt-0.5 leading-relaxed">{value}</p>
-                      </div>
-                    ))}
-                  </div>
+
                 </div>
 
-                {selected.notes && (
-                  <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
-                    <p className="text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5 mb-1">
-                      <AlertCircle className="h-3 w-3" /> Ghi chú cho NV báo giá
-                    </p>
-                    <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">{selected.notes}</p>
-                  </div>
-                )}
+                {/* UNIFIED STICKY FOOTER */}
+                <div className="border-t border-[#EDE8DE] px-6 py-4 flex items-center justify-between gap-3 shrink-0 bg-[#FBF6E9]">
+                  
+                  {/* Nút đóng ở góc trái */}
+                  <Button variant="outline" onClick={() => setSelected(null)} className="border-[#E6DFD0] hover:bg-[#F5EFE0] text-[#6B5E4C] font-semibold px-6 rounded-xl h-10 transition-colors">
+                    Đóng
+                  </Button>
 
-                {selected.images?.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Hình ảnh sản phẩm</p>
-                    <div className="flex flex-wrap gap-2">
-                      {selected.images.map((img, i) => (
-                        <a key={i} href={`http://localhost:3001${img}`} target="_blank" rel="noreferrer"
-                          className="block rounded-xl overflow-hidden border-2 border-border/40 hover:border-primary/40 hover:scale-105 transition-all shadow-sm">
-                          <img src={`http://localhost:3001${img}`} alt={`Ảnh ${i + 1}`}
-                            className="h-24 w-24 object-cover" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  {/* Nút hành động ở góc phải */}
+                  <div className="flex gap-2">
 
-                {/* Chi tiết chi phí cấu thành (chỉ cho NV Order/Admin và khi báo giá đã hoàn thành) */}
-                {canViewCost && selected.status !== 'PENDING' && selected.status !== 'QUOTING' && (
-                  <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 space-y-3">
-                    <p className="text-xs font-semibold text-primary uppercase tracking-wider flex items-center gap-1.5 border-b pb-1.5">
-                      <Calculator className="h-3.5 w-3.5" /> Chi tiết cấu thành giá vốn
-                    </p>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
-                      <div className="space-y-0.5">
-                        <span className="text-muted-foreground font-medium">Giá vàng 24K:</span>
-                        <p className="font-semibold text-foreground">
-                          {selected.goldPrice24K ? `${formatCurrency(selected.goldPrice24K)} / chỉ` : '—'}
-                        </p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <span className="text-muted-foreground font-medium">Tiền công chế tác:</span>
-                        <p className="font-semibold text-foreground">{formatCurrency(selected.laborCost || 0)}</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <span className="text-muted-foreground font-medium">Tiền nguyên liệu vàng/bạc:</span>
-                        <p className="font-semibold text-foreground">{formatCurrency((selected as any).materialCost || 0)}</p>
-                      </div>
-                      <div className="space-y-0.5">
-                        <span className="text-muted-foreground font-medium">Tiền đá / phụ kiện:</span>
-                        <p className="font-semibold text-foreground">{formatCurrency((selected as any).stoneCost || 0)}</p>
-                      </div>
-                    </div>
-
-                    {/* Hiển thị chi tiết danh sách đá nếu có */}
-                    {(selected as any).stones && (selected as any).stones.length > 0 && (
-                      <div className="border-t border-primary/10 pt-2 mt-2 space-y-1.5">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase">Bảng tính đá chi tiết:</span>
-                        <div className="space-y-1">
-                          {(selected as any).stones.map((stone: any, idx: number) => (
-                            <div key={idx} className="flex justify-between text-xs text-muted-foreground bg-background/60 dark:bg-muted/30 px-2.5 py-1.5 rounded-lg border border-border/40">
-                              <span className="font-medium text-foreground">
-                                {STONE_TYPE_LABELS[stone.type] || stone.type} ({stone.quantity} viên {stone.sizeOrCarat ? `· ${stone.sizeOrCarat}` : ''})
-                              </span>
-                              <span className="font-semibold text-primary">
-                                {stone.priceMethod === 'per_carat'
-                                  ? `${stone.quantity} viên × ${stone.sizeOrCarat} ct × ${formatCurrency(parseFloat(stone.unitPrice) || 0)}`
-                                  : `${stone.quantity} viên × ${formatCurrency(parseFloat(stone.unitPrice) || 0)}`}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                    {/* Trả lại của Pricer */}
+                    {isPricer && dialogMode === 'review' && !showRejectForm && (
+                      <Button variant="outline" className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50 font-semibold px-4 rounded-xl h-10 transition-all"
+                        onClick={() => setShowRejectForm(true)}>
+                        <Ban className="h-4 w-4" /> Trả lại Sale bổ sung
+                      </Button>
                     )}
-                  </div>
-                )}
 
-                </div>
-
-                <div className="border-t pt-3">
-                  {isPricer && dialogMode === 'review' && (
-                    !showRejectForm ? (
-                      <div className="flex gap-2">
-                        <Button variant="outline" className="flex-1" onClick={() => setSelected(null)}>Đóng</Button>
-                        <Button variant="outline" className="flex-1 gap-1 border-red-300 text-red-600 hover:bg-red-50"
-                          onClick={() => setShowRejectForm(true)}>
-                          <Ban className="h-4 w-4" /> Trả lại Sale bổ sung
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Lý do trả lại cho Sale</Label>
-                        <Textarea placeholder="VD: Thiếu ảnh sản phẩm, chưa rõ kích thước..."
-                          rows={2} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
-                        <div className="flex gap-2">
-                          <Button variant="outline" className="flex-1" onClick={() => setShowRejectForm(false)}>Huỷ</Button>
-                          <Button variant="destructive" className="flex-1 gap-1"
-                            onClick={handleReject} disabled={!rejectReason.trim() || saving}>
-                            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}
-                            Xác nhận trả lại
-                          </Button>
-                        </div>
-                      </div>
-                    )
-                  )}
-
-                  {/* Cần bổ sung: nút mở form edit */}
-                  {!isPricer && selected.status === 'NEED_MORE_INFO' && !showEditForm && (
-                    <div className="flex gap-2">
-                      <Button variant="outline" className="flex-1" onClick={() => setSelected(null)}>Đóng</Button>
+                    {/* Sửa đổi gửi lại của Sale */}
+                    {!isPricer && selected.status === 'NEED_MORE_INFO' && !showEditForm && (
                       <Button
-                        className="flex-1 gap-2 bg-orange-500 hover:bg-orange-600"
+                        className="gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-5 rounded-xl h-10 shadow-md shadow-orange-500/10 transition-all"
                         onClick={() => {
                           setEditForm({
                             dimensions: (selected as any).dimensions || '',
@@ -2209,58 +2434,42 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                       >
                         ✏️ Chỉnh sửa & Gửi lại
                       </Button>
-                    </div>
-                  )}
+                    )}
 
-                  {!isPricer && selected.status === 'QUOTED' && (
-                    <div className="space-y-3">
-                      <div className="rounded-xl bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-800 px-4 py-3">
-                        <p className="text-xs text-violet-600 dark:text-violet-400 font-semibold mb-1">💡 Bước tiếp theo</p>
-                        <p className="text-sm text-violet-800 dark:text-violet-300">Xem lại giá bán bên trên, tư vấn với khách, rồi bấm <strong>Gửi giá cho khách</strong> để chuyển sang trạng thái chờ phản hồi.</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" className="flex-1" onClick={() => setSelected(null)}>Đóng</Button>
-                        <Button
-                          className="flex-1 gap-2 bg-violet-600 hover:bg-violet-700"
-                          disabled={saving}
-                          onClick={async () => {
-                            setSaving(true)
-                            await handleSentToCustomer(selected._id)
-                            setSaving(false)
-                            setSelected(null)
-                          }}
-                        >
-                          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                          Gửi giá cho khách
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                    {/* Gửi giá khách của Sale */}
+                    {!isPricer && selected.status === 'QUOTED' && (
+                      <Button
+                        className="gap-2 bg-[#8C6D1F] hover:bg-[#735A19] text-white font-semibold px-5 rounded-xl h-10 shadow-md shadow-primary/10 transition-all"
+                        disabled={saving}
+                        onClick={async () => {
+                          setSaving(true)
+                          await handleSentToCustomer(selected._id)
+                          setSaving(false)
+                          setSelected(null)
+                        }}
+                      >
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Gửi giá cho khách
+                      </Button>
+                    )}
 
-                  {/* Bước 6: Khách chốt đơn */}
-                  {!isPricer && selected.status === 'SENT_TO_CUSTOMER' && (
-                    <div className="space-y-3">
-                      <div className="rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 px-4 py-3">
-                        <p className="text-xs text-amber-600 dark:text-amber-400 font-semibold mb-1">⏳ Đang chờ khách phản hồi</p>
-                        <p className="text-sm text-amber-800 dark:text-amber-300">Khi khách đồng ý đặt hàng, bấm <strong>Khách chốt đơn</strong>. Nếu khách từ chối, bấm <strong>Khách từ chối</strong>.</p>
-                      </div>
+                    {/* Khách chốt/từ chối */}
+                    {!isPricer && selected.status === 'SENT_TO_CUSTOMER' && (
                       <div className="flex gap-2">
-                        <Button variant="destructive" className="flex-1 gap-2"
+                        <Button variant="destructive" className="gap-1.5 px-4 rounded-xl font-semibold h-10 shadow-sm transition-all"
                           onClick={() => { handleCancel(selected._id); setSelected(null) }}>
                           <Ban className="h-4 w-4" /> Khách từ chối
                         </Button>
-                        <Button className="flex-1 gap-2"
+                        <Button className="gap-1.5 bg-[#8C6D1F] hover:bg-[#735A19] text-white px-5 rounded-xl font-semibold h-10 shadow-md shadow-primary/10 transition-all"
                           onClick={() => { handleConfirm(selected._id); setSelected(null) }}>
                           <ShoppingCart className="h-4 w-4" /> Khách chốt đơn
                         </Button>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {dialogMode === 'view' && selected.status !== 'QUOTED' && selected.status !== 'SENT_TO_CUSTOMER' && selected.status !== 'NEED_MORE_INFO' && (
-                    <Button variant="outline" className="w-full" onClick={() => setSelected(null)}>Đóng</Button>
-                  )}
+                  </div>
                 </div>
+
               </div>
               ) /* end !showEditForm ternary */
             )

@@ -70,7 +70,7 @@ export function Header({ currentRole, onRoleChange }: HeaderProps) {
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.5, ease: 'easeOut' as const }}
     >
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[95%] px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <motion.div className="flex items-center gap-3" whileHover="hover" variants={logoVariants}>

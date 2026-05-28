@@ -22,12 +22,14 @@ interface RecentQuotesProps {
 }
 
 const STATUS_MAP: Record<QuoteStatus, { label: string; color: string }> = {
-  PENDING:       { label: 'Chờ báo giá',   color: 'border-warning text-warning' },
-  QUOTING:       { label: 'Đang báo giá',  color: 'bg-info/20 text-info border-info/30' },
-  QUOTED:        { label: 'Đã báo giá',    color: 'bg-success/20 text-success border-success/30' },
-  CONFIRMED:     { label: 'Đã đặt hàng',   color: 'bg-primary/20 text-primary border-primary/30' },
-  CANCELLED:     { label: 'Đã huỷ',        color: 'bg-destructive/20 text-destructive border-destructive/30' },
-  IN_PRODUCTION: { label: 'Đang sản xuất', color: 'bg-purple-100 text-purple-700 border-purple-300' },
+  PENDING:          { label: 'Chờ báo giá',   color: 'border-amber-400 text-amber-600 bg-amber-50' },
+  NEED_MORE_INFO:   { label: 'Cần bổ sung',   color: 'border-rose-400 text-rose-600 bg-rose-50' },
+  QUOTING:          { label: 'Đang báo giá',  color: 'border-violet-400 text-violet-600 bg-violet-50' },
+  QUOTED:           { label: 'Đã báo giá',    color: 'border-blue-400 text-blue-600 bg-blue-50' },
+  SENT_TO_CUSTOMER: { label: 'Đã gửi khách',  color: 'border-teal-400 text-teal-600 bg-teal-50' },
+  CONFIRMED:        { label: 'Đã đặt hàng',   color: 'border-emerald-400 text-emerald-600 bg-emerald-50' },
+  CANCELLED:        { label: 'Đã huỷ',        color: 'border-slate-300 text-slate-500 bg-slate-50' },
+  IN_PRODUCTION:    { label: 'Đang sản xuất', color: 'border-orange-400 text-orange-600 bg-orange-50' },
 }
 
 const tableRowVariants = {
@@ -104,15 +106,15 @@ export function RecentQuotes({ currentRole }: RecentQuotesProps) {
             <div className="rounded-lg border overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Mã báo giá</TableHead>
-                    <TableHead>Sản phẩm</TableHead>
-                    <TableHead>Chất liệu</TableHead>
-                    {canViewCost && <TableHead className="text-right">Giá vốn</TableHead>}
-                    <TableHead className="text-right">Giá bán</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                    <TableHead>Ngày tạo</TableHead>
-                    <TableHead className="w-10" />
+                  <TableRow className="bg-[#F8F9FA] border-b border-slate-200">
+                    <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Mã báo giá</TableHead>
+                    <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Sản phẩm</TableHead>
+                    <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Chất liệu</TableHead>
+                    {canViewCost && <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider text-right h-11">Giá vốn</TableHead>}
+                    <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider text-right h-11">Giá bán</TableHead>
+                    <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Trạng thái</TableHead>
+                    <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Ngày tạo</TableHead>
+                    <TableHead className="w-10 h-11" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>

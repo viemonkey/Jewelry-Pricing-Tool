@@ -91,16 +91,16 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       <Header currentRole={currentRole} onRoleChange={setCurrentRole} />
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-[95%] px-4 py-4 sm:px-6 lg:px-8">
         {/* Page Title */}
         <motion.div
-          className="mb-8"
+          className="mb-4"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
         >
           <motion.h1
-            className="text-2xl font-bold text-foreground sm:text-3xl"
+            className="text-xl font-bold text-foreground sm:text-2xl"
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
@@ -108,7 +108,7 @@ export default function Home() {
             Hệ thống báo giá trang sức
           </motion.h1>
           <motion.p
-            className="mt-1 text-muted-foreground"
+            className="mt-0.5 text-xs text-muted-foreground"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.4 }}
@@ -118,7 +118,7 @@ export default function Home() {
         </motion.div>
 
         {/* Main Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -175,24 +175,28 @@ export default function Home() {
           </AnimatePresence>
 
           {/* Quotes Tab — GĐ1: Luồng báo giá */}
-          <TabsContent value="quotes" className="space-y-6">
+          <TabsContent value="quotes" className="space-y-4">
             <motion.div
               key="quotes"
               variants={tabContentVariants}
               initial="hidden"
               animate="visible"
               exit="exit"
-              className="space-y-4"
+              className="space-y-2"
             >
-              {currentRole === 'sale' && (
-                <div className="flex justify-end">
-                  <QuoteRequestModal
-                    requesterName={currentUserName}
-                    onSuccess={(q) => setLatestQuote(q)}
-                  />
-                </div>
-              )}
-              <QuoteListPricer currentRole={currentRole} currentUserName={currentUserName} newQuote={latestQuote} />
+              <QuoteListPricer
+                currentRole={currentRole}
+                currentUserName={currentUserName}
+                newQuote={latestQuote}
+                action={
+                  currentRole === 'sale' && (
+                    <QuoteRequestModal
+                      requesterName={currentUserName}
+                      onSuccess={(q) => setLatestQuote(q)}
+                    />
+                  )
+                }
+              />
             </motion.div>
           </TabsContent>
 
@@ -522,7 +526,7 @@ export default function Home() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5, delay: 1 }}
       >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[95%] px-4 sm:px-6 lg:px-8">
           <motion.p
             className="text-center text-sm text-muted-foreground"
             whileHover={{ scale: 1.02 }}

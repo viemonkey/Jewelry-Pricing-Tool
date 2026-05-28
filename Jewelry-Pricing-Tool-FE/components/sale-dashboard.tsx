@@ -6,19 +6,17 @@ import { quotesApi, statsApi, type QuoteStats } from '@/lib/api'
 import type { Quote, QuoteStatus } from '@/lib/types'
 import { QuoteRequestModal } from '@/components/quote-request-modal'
 import { formatCurrency } from '@/lib/pricing'
+import { useNotifications } from '@/lib/notifications'
 import {
   LayoutDashboard,
   Hourglass,
   BadgeDollarSign,
   Eye,
-  MoreVertical,
   Search,
-  Bell,
-  Plus,
   ChevronLeft,
   ChevronRight,
-  TrendingUp,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react'
 
 // ─── types ──────────────────────────────────────────────────────────
@@ -27,83 +25,124 @@ interface SaleDashboardProps {
   onCreateSuccess?: (q: Quote) => void
 }
 
-const STATUS_MAP: Record<QuoteStatus, { label: string; gold: boolean }> = {
-  PENDING:          { label: 'CHỜ BÁO GIÁ',   gold: false },
-  NEED_MORE_INFO:   { label: 'CẦN BỔ SUNG',    gold: false },
-  QUOTING:          { label: 'ĐANG XỬ LÝ',     gold: false },
-  QUOTED:           { label: 'ĐÃ BÁO GIÁ',     gold: true  },
-  SENT_TO_CUSTOMER: { label: 'ĐÃ GỬI KH',      gold: true  },
-  CONFIRMED:        { label: 'ĐÃ DUYỆT',       gold: true  },
-  CANCELLED:        { label: 'ĐÃ HUỶ',         gold: false },
-  IN_PRODUCTION:    { label: 'SẢN XUẤT',       gold: true  },
+const STATUS_MAP: Record<QuoteStatus, { label: string; dotClass: string; badgeClass: string; isGlow?: boolean }> = {
+  PENDING: {
+    label: 'CHỜ BÁO GIÁ',
+    dotClass: 'bg-black/40',
+    badgeClass: 'bg-[#F1C40F] text-black border-transparent shadow-sm whitespace-nowrap font-semibold',
+  },
+  NEED_MORE_INFO: {
+    label: 'CẦN BỔ SUNG',
+    dotClass: 'bg-white/80',
+    badgeClass: 'bg-[#E74C3C] text-white border-transparent shadow-sm whitespace-nowrap font-semibold animate-pulse',
+    isGlow: true,
+  },
+  QUOTING: {
+    label: 'ĐANG XỬ LÝ',
+    dotClass: 'bg-white/80',
+    badgeClass: 'bg-[#9B59B6] text-white border-transparent shadow-sm whitespace-nowrap font-semibold',
+  },
+  QUOTED: {
+    label: 'ĐÃ BÁO GIÁ',
+    dotClass: 'bg-white/80',
+    badgeClass: 'bg-[#2ECC71] text-white border-transparent shadow-sm whitespace-nowrap font-semibold',
+  },
+  SENT_TO_CUSTOMER: {
+    label: 'ĐÃ GỬI KH',
+    dotClass: 'bg-white/80',
+    badgeClass: 'bg-[#1ABC9C] text-white border-transparent shadow-sm whitespace-nowrap font-semibold',
+  },
+  CONFIRMED: {
+    label: 'ĐÃ DUYỆT',
+    dotClass: 'bg-white/80',
+    badgeClass: 'bg-[#E67E22] text-white border-transparent shadow-sm whitespace-nowrap font-semibold',
+    isGlow: true,
+  },
+  CANCELLED: {
+    label: 'ĐÃ HUỶ',
+    dotClass: 'bg-white/80',
+    badgeClass: 'bg-[#95A5A6] text-white border-transparent shadow-sm whitespace-nowrap font-semibold',
+  },
+  IN_PRODUCTION: {
+    label: 'SẢN XUẤT',
+    dotClass: 'bg-white/80',
+    badgeClass: 'bg-[#34495E] text-white border-transparent shadow-sm whitespace-nowrap font-semibold',
+    isGlow: true,
+  },
 }
 
-// weekly bar chart data (last 7 days static for display)
-const WEEK_BARS = [
-  { day: 'T2', h: 40 },
-  { day: 'T3', h: 55 },
-  { day: 'T4', h: 75 },
-  { day: 'T5', h: 35 },
-  { day: 'T6', h: 100 },
-  { day: 'T7', h: 25 },
-  { day: 'CN', h: 15 },
-]
-
 // ─── helpers ────────────────────────────────────────────────────────
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('vi-VN')
+function formatMaterialType(type: string) {
+  const map: Record<string, string> = {
+    GOLD_24K: 'Vàng 24K',
+    GOLD_18K: 'Vàng 18K',
+    GOLD_14K: 'Vàng 14K',
+    GOLD_610: 'Vàng 610',
+    GOLD_10K: 'Vàng 10K',
+    SILVER: 'Bạc 925',
+  }
+  return map[type] || type.replace(/_/g, ' ')
 }
 
 // ─── sub-components ─────────────────────────────────────────────────
-
 function GlassCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
     <div
-      className={`relative rounded-xl border border-white/10 bg-white/70 backdrop-blur-2xl shadow-[0_4px_24px_-1px_rgba(0,0,0,0.05)] ${className}`}
+      className={`relative rounded-xl border border-white/40 bg-white/60 backdrop-blur-xl shadow-[0_4px_16px_0_rgba(0,0,0,0.02)] transition-all duration-300 ${className}`}
     >
-      {/* Gold rim top-left */}
       <div className="pointer-events-none absolute inset-0 rounded-xl"
-        style={{ background: 'linear-gradient(135deg, rgba(115,92,0,0.12) 0%, transparent 50%)', borderRadius: 'inherit' }} />
+        style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.04) 0%, transparent 60%)', borderRadius: 'inherit' }} />
       {children}
     </div>
   )
 }
 
-function StatCard({
-  icon, label, value, badge, children, delay = 0,
+function MiniStat({
+  icon, label, value, badge, theme = 'gold',
 }: {
   icon: React.ReactNode
   label: string
   value: string | number
   badge?: React.ReactNode
-  children?: React.ReactNode
-  delay?: number
+  theme?: 'gold' | 'ruby' | 'emerald'
 }) {
+  const themeStyles = {
+    gold: {
+      iconBg: 'bg-amber-500/10 text-amber-600',
+      badgeClass: 'text-amber-700 bg-amber-500/10 border border-amber-500/20',
+      hoverGlow: 'hover:shadow-[0_10px_20px_-8px_rgba(245,158,11,0.12)] hover:border-amber-500/25 hover:bg-white/80',
+    },
+    ruby: {
+      iconBg: 'bg-rose-500/10 text-rose-600',
+      badgeClass: 'text-rose-700 bg-rose-500/10 border border-rose-500/20',
+      hoverGlow: 'hover:shadow-[0_10px_20px_-8px_rgba(244,63,94,0.12)] hover:border-rose-500/25 hover:bg-white/80',
+    },
+    emerald: {
+      iconBg: 'bg-emerald-500/10 text-emerald-600',
+      badgeClass: 'text-emerald-700 bg-emerald-500/10 border border-emerald-500/20',
+      hoverGlow: 'hover:shadow-[0_10px_20px_-8px_rgba(16,185,129,0.12)] hover:border-emerald-500/25 hover:bg-white/80',
+    },
+  }[theme]
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, delay, ease: 'easeOut' }}
-      whileHover={{ scale: 1.025, transition: { duration: 0.25 } }}
-    >
-      <GlassCard className="p-6 cursor-default">
-        <div className="flex items-start justify-between mb-4">
-          <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-[#735c00]/10 text-[#735c00]">
-            {icon}
-          </span>
-          {badge && (
-            <span className="text-[10px] font-bold uppercase tracking-widest text-[#735c00] bg-[#735c00]/5 px-2 py-1 rounded">
-              {badge}
-            </span>
-          )}
+    <GlassCard className={`p-4 cursor-default transition-all duration-300 flex items-center justify-between gap-4 ${themeStyles.hoverGlow}`}>
+      <div className="flex items-center gap-3">
+        <span className={`inline-flex items-center justify-center w-9 h-9 rounded-xl ${themeStyles.iconBg}`}>
+          {icon}
+        </span>
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+          <h3 className="text-2xl font-bold text-slate-800" style={{ fontFamily: 'EB Garamond, Georgia, serif' }}>
+            {value}
+          </h3>
         </div>
-        <p className="text-[11px] font-bold uppercase tracking-widest text-[#4d4635]">{label}</p>
-        <h3 className="text-4xl font-light tracking-tight text-[#1a1c1a] mt-1" style={{ fontFamily: 'EB Garamond, Georgia, serif' }}>
-          {value}
-        </h3>
-        {children}
-      </GlassCard>
-    </motion.div>
+      </div>
+      {badge && (
+        <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${themeStyles.badgeClass}`}>
+          {badge}
+        </span>
+      )}
+    </GlassCard>
   )
 }
 
@@ -115,7 +154,9 @@ export function SaleDashboard({ currentUserName, onCreateSuccess }: SaleDashboar
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<'all' | 'approved' | 'new'>('all')
   const [page, setPage] = useState(1)
-  const perPage = 6
+  const perPage = 8
+
+  const { addNotification } = useNotifications()
 
   const fetchData = () => {
     setLoading(true)
@@ -152,363 +193,344 @@ export function SaleDashboard({ currentUserName, onCreateSuccess }: SaleDashboar
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   })
 
-  // category breakdown
-  const confirmed = quotes.filter(q => q.status === 'CONFIRMED').length
-  const pending = quotes.filter(q => q.status === 'PENDING').length
-  const other = quotes.length - confirmed - pending
+  // ─── action handlers ────────────────────────────────────────────────
+  const handleSentToCustomer = async (id: string, name: string) => {
+    try {
+      await quotesApi.sentToCustomer(id)
+      addNotification({ type: 'success', title: '📤 Đã gửi giá cho khách', message: `"${name}" đang chờ khách phản hồi.` })
+      fetchData()
+    } catch {
+      addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể cập nhật trạng thái.' })
+    }
+  }
+
+  const handleConfirm = async (id: string, name: string) => {
+    try {
+      await quotesApi.confirm(id)
+      addNotification({ type: 'success', title: '🎉 Khách chốt đơn!', message: `"${name}" đã được đặt hàng thành công.` })
+      fetchData()
+    } catch {
+      addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể xác nhận đơn.' })
+    }
+  }
+
+  const handleCancel = async (id: string, name: string) => {
+    if (confirm(`Bạn có chắc chắn muốn huỷ báo giá "${name}"?`)) {
+      try {
+        await quotesApi.cancel(id)
+        addNotification({ type: 'warning', title: 'Báo giá đã huỷ', message: `Yêu cầu "${name}" đã bị huỷ.` })
+        fetchData()
+      } catch {
+        addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể huỷ báo giá.' })
+      }
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-[#faf9f6] font-sans">
-      {/* Inject Google Fonts */}
+    <div className="bg-[#faf9f6] font-sans relative overflow-hidden pb-4">
+      {/* Inject Google Fonts & Custom CSS */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Hanken+Grotesk:wght@300;400;500;600;700;800&display=swap');
-        @keyframes pulse-gold {
-          0%,100%{opacity:1;transform:scale(1);box-shadow:0 0 0 0 rgba(115,92,0,.2)}
-          50%{opacity:.7;transform:scale(1.1);box-shadow:0 0 10px 2px rgba(115,92,0,.1)}
+        @keyframes blob-drift-1 {
+          0%, 100% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(30px, 40px) scale(1.05); }
+          66% { transform: translate(-20px, 20px) scale(0.98); }
         }
-        .status-pulse-gold{animation:pulse-gold 3s infinite ease-in-out}
+        @keyframes blob-drift-2 {
+          0%, 100% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(-30px, -30px) scale(0.95); }
+          66% { transform: translate(30px, -40px) scale(1.05); }
+        }
+        .animate-blob-drift-1 { animation: blob-drift-1 25s infinite ease-in-out; }
+        .animate-blob-drift-2 { animation: blob-drift-2 30s infinite ease-in-out; }
       `}</style>
 
-      {/* ── header ──────────────────────────────────────────── */}
-      <header className="flex justify-between items-end mb-8">
-        <div>
-          <motion.h2
-            initial={{ opacity: 0, y: -12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="text-[32px] font-normal text-[#1a1c1a]"
-            style={{ fontFamily: 'EB Garamond, Georgia, serif' }}
-          >
-            Bảng điều khiển báo giá
-          </motion.h2>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="text-sm text-[#4d4635] mt-1"
-          >
-            Hôm nay: {today}
-          </motion.p>
-        </div>
+      {/* Dynamic Background Aura Blobs */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
+        <div className="absolute top-[-20%] left-[-20%] w-[45%] h-[45%] rounded-full bg-amber-200/15 blur-[120px] animate-blob-drift-1" />
+        <div className="absolute bottom-[-20%] right-[-20%] w-[50%] h-[50%] rounded-full bg-blue-200/20 blur-[140px] animate-blob-drift-2" />
+      </div>
 
-        <div className="flex gap-3 items-center">
-          {/* search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#7f7663]" />
-            <input
-              value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1) }}
-              placeholder="Tìm kiếm báo giá..."
-              className="bg-[#efeeeb] border border-black/5 rounded-lg pl-10 pr-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#735c00] w-60 transition-all"
-            />
+      <div className="relative z-10 max-w-[95%] mx-auto px-4 py-4 sm:px-6 lg:px-8">
+        
+        {/* ── Header ── */}
+        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 border-b border-slate-100 pb-3">
+          <div>
+            <h2
+              className="text-2xl font-normal text-slate-800 tracking-tight flex items-center gap-1.5"
+              style={{ fontFamily: 'EB Garamond, Georgia, serif' }}
+            >
+              Lịch sử yêu cầu báo giá
+              <Sparkles className="w-4 h-4 text-amber-500" />
+            </h2>
+            <p className="text-xs text-slate-400">Hôm nay: {today}</p>
           </div>
-          {/* bell */}
-          <button className="bg-[#e9e8e5] p-2 rounded-lg text-[#4d4635] hover:text-[#735c00] transition-colors border border-black/[0.03]">
-            <Bell className="w-5 h-5" />
-          </button>
-          {/* refresh */}
-          <button
-            onClick={fetchData}
-            className="bg-[#e9e8e5] p-2 rounded-lg text-[#4d4635] hover:text-[#735c00] transition-colors border border-black/[0.03]"
-          >
-            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
-      </header>
 
-      {/* ── stat cards ──────────────────────────────────────── */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard
-          icon={<LayoutDashboard className="w-5 h-5" />}
-          label="Báo giá hôm nay"
-          value={stats?.total ?? '—'}
-          badge="+12% vs tuần trước"
-          delay={0.05}
-        >
-          <div className="mt-4 h-1 w-full bg-black/5 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-[#735c00] shadow-[0_0_10px_rgba(115,92,0,0.15)]"
-              initial={{ width: 0 }}
-              animate={{ width: '66%' }}
-              transition={{ duration: 1, delay: 0.4 }}
-            />
-          </div>
-        </StatCard>
-
-        <StatCard
-          icon={<Hourglass className="w-5 h-5 text-[#4d4635]" />}
-          label="Đang chờ duyệt"
-          value={stats?.pending ?? '—'}
-          badge="Cần xử lý"
-          delay={0.15}
-        >
-          <div className="mt-4 flex gap-1">
-            <span className="w-2 h-2 rounded-full bg-[#735c00] status-pulse-gold inline-block" />
-            <span className="w-2 h-2 rounded-full bg-black/10 inline-block" />
-            <span className="w-2 h-2 rounded-full bg-black/10 inline-block" />
-          </div>
-        </StatCard>
-
-        <StatCard
-          icon={<BadgeDollarSign className="w-5 h-5" />}
-          label="Đã xác nhận"
-          value={stats?.confirmed ?? '—'}
-          badge="Tháng này"
-          delay={0.25}
-        >
-          <div className="mt-4 flex items-end gap-[3px] h-8 overflow-hidden">
-            {[20, 40, 60, 100].map((h, i) => (
-              <motion.div
-                key={i}
-                className="flex-1 rounded-t-sm"
-                style={{ backgroundColor: `rgba(115,92,0,${0.2 + i * 0.2})` }}
-                initial={{ height: '0%' }}
-                animate={{ height: `${h}%` }}
-                transition={{ duration: 0.6, delay: 0.3 + i * 0.08 }}
-              />
-            ))}
-          </div>
-        </StatCard>
-      </section>
-
-      {/* ── quote table ─────────────────────────────────────── */}
-      <section className="mb-12">
-        <GlassCard className="overflow-hidden">
-          {/* table header */}
-          <div className="px-6 py-4 border-b border-black/5 flex items-center justify-between">
-            <h3 className="text-2xl font-normal text-[#1a1c1a]" style={{ fontFamily: 'EB Garamond, Georgia, serif' }}>
-              Danh sách yêu cầu báo giá
-            </h3>
-            <div className="flex items-center gap-2">
-              {(['all', 'approved', 'new'] as const).map(f => (
-                <button
-                  key={f}
-                  onClick={() => { setFilter(f); setPage(1) }}
-                  className={`px-4 py-1.5 text-xs font-bold uppercase tracking-widest rounded-lg border transition-colors ${
-                    filter === f
-                      ? 'border-[#735c00]/50 bg-[#735c00]/10 text-[#735c00]'
-                      : 'border-black/5 hover:bg-black/[0.02] text-[#1a1c1a]'
-                  }`}
-                >
-                  {f === 'all' ? 'Tất cả' : f === 'approved' ? 'Đã duyệt' : 'Mới'}
-                </button>
-              ))}
-              {/* create new */}
-              <QuoteRequestModal
-                requesterName={currentUserName}
-                onSuccess={(q) => { fetchData(); onCreateSuccess?.(q) }}
+          <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
+            {/* search */}
+            <div className="relative flex-1 sm:flex-initial">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <input
+                value={search}
+                onChange={e => { setSearch(e.target.value); setPage(1) }}
+                placeholder="Tìm mã hoặc sản phẩm..."
+                className="bg-white/50 backdrop-blur-md border border-slate-200/60 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-amber-300 focus:bg-white/90 w-full sm:w-48 transition-all shadow-sm"
               />
             </div>
-          </div>
-
-          {/* table */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-black/[0.01]">
-                  {['ID BÁO GIÁ','SẢN PHẨM','CHẤT LIỆU','NGƯỜI YÊU CẦU','GIÁ DỰ KIẾN','TRẠNG THÁI','THAO TÁC'].map(h => (
-                    <th key={h} className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-[#4d4635] last:text-right">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <tr key={i} className="border-b border-black/5">
-                      {Array.from({ length: 7 }).map((__, j) => (
-                        <td key={j} className="px-6 py-4">
-                          <div className="h-4 rounded bg-black/5 animate-pulse" style={{ width: `${60 + (j * 15) % 40}%` }} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : paginated.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-sm text-[#7f7663]">
-                      Không tìm thấy yêu cầu báo giá nào
-                    </td>
-                  </tr>
-                ) : (
-                  paginated.map((q, i) => {
-                    const st = STATUS_MAP[q.status] ?? { label: q.status, gold: false }
-                    return (
-                      <motion.tr
-                        key={q._id}
-                        initial={{ opacity: 0, x: -8 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: i * 0.06, duration: 0.35 }}
-                        whileHover={{ x: 8 }}
-                        className="border-b border-black/[0.05] hover:bg-black/[0.01] transition-colors group cursor-pointer"
-                      >
-                        <td className="px-6 py-4 text-xs font-bold text-[#1a1c1a] tracking-widest">{q.quoteCode}</td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm font-semibold text-[#1a1c1a] group-hover:text-[#735c00] transition-colors">
-                            {q.productName}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-[#4d4635]">{q.materialType.replace(/_/g, ' ')}</td>
-                        <td className="px-6 py-4 text-sm text-[#1a1c1a]">{q.requestedBy}</td>
-                        <td className={`px-6 py-4 text-sm font-semibold ${st.gold ? 'text-[#735c00]' : 'text-[#1a1c1a]'}`}>
-                          {q.sellingPrice ? formatCurrency(q.sellingPrice) : '—'}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${st.gold ? 'bg-[#735c00] status-pulse-gold' : 'bg-[#4d4635]/40'}`} />
-                            <span className={`text-[10px] font-bold ${st.gold ? 'text-[#735c00]' : 'text-[#4d4635]'}`}>
-                              {st.label}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button className="p-2 text-[#7f7663] hover:text-[#735c00] transition-colors">
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button className="p-2 text-[#7f7663] hover:text-[#735c00] transition-colors">
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </motion.tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* pagination */}
-          <div className="px-6 py-4 border-t border-black/5 bg-black/[0.01] flex items-center justify-between">
-            <span className="text-xs text-[#7f7663]">
-              Hiển thị {Math.min(filtered.length, (page - 1) * perPage + paginated.length)} / {filtered.length} yêu cầu
-            </span>
-            <div className="flex gap-1 items-center">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="w-8 h-8 flex items-center justify-center rounded border border-black/5 hover:bg-black/[0.03] transition-colors text-[#4d4635] disabled:opacity-30"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={`w-8 h-8 flex items-center justify-center rounded text-xs font-bold border transition-colors ${
-                    p === page
-                      ? 'border-[#735c00]/50 bg-[#735c00]/10 text-[#735c00]'
-                      : 'border-black/5 hover:bg-black/[0.03] text-[#4d4635]'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="w-8 h-8 flex items-center justify-center rounded border border-black/5 hover:bg-black/[0.03] transition-colors text-[#4d4635] disabled:opacity-30"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </GlassCard>
-      </section>
-
-      {/* ── insights bento ──────────────────────────────────── */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* weekly chart */}
-        <motion.div
-          className="md:col-span-2"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-        >
-          <GlassCard className="p-6 h-full">
-            <h4 className="font-semibold mb-6 text-[#1a1c1a]">Xu hướng báo giá 7 ngày qua</h4>
-            <div className="h-48 flex items-end justify-between gap-4 px-4 overflow-hidden">
-              {WEEK_BARS.map(({ day, h }, i) => {
-                const isToday = i === 4
+            {/* filter pills */}
+            <div className="flex items-center gap-1">
+              {(['all', 'approved', 'new'] as const).map(f => {
+                const isActive = filter === f
                 return (
-                  <div key={day} className="w-full flex flex-col items-center gap-2">
-                    <motion.div
-                      className={`w-full rounded-t-lg cursor-pointer transition-colors group relative ${
-                        isToday
-                          ? 'bg-[#735c00] shadow-[0_0_20px_rgba(115,92,0,0.15)] hover:brightness-110'
-                          : 'bg-black/[0.04] hover:bg-[#735c00]/15'
-                      }`}
-                      initial={{ height: '0%' }}
-                      animate={{ height: `${h}%` }}
-                      transition={{ duration: 0.7, delay: 0.2 + i * 0.07, ease: 'easeOut' }}
-                      whileHover={{ scale: 1.05 }}
-                    />
-                    <span className={`text-[10px] font-bold uppercase tracking-widest ${isToday ? 'text-[#735c00]' : 'text-[#7f7663]'}`}>
-                      {day}
-                    </span>
-                  </div>
+                  <button
+                    key={f}
+                    onClick={() => { setFilter(f); setPage(1) }}
+                    className={`px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-all duration-300 ${
+                      isActive
+                        ? 'border-amber-500 bg-amber-500 text-white'
+                        : 'border-slate-200/60 bg-white/40 hover:bg-white/80 text-slate-600'
+                    }`}
+                  >
+                    {f === 'all' ? 'Tất cả' : f === 'approved' ? 'Đã duyệt' : 'Mới'}
+                  </button>
                 )
               })}
             </div>
+            {/* refresh button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={fetchData}
+              className="bg-white/40 p-1.5 rounded-lg text-slate-600 hover:text-amber-600 hover:bg-white hover:border-amber-500/50 transition-all border border-slate-200/60 shadow-sm"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </motion.button>
+            {/* create new button */}
+            <QuoteRequestModal
+              requesterName={currentUserName}
+              onSuccess={(q) => { fetchData(); onCreateSuccess?.(q) }}
+            />
+          </div>
+        </header>
+
+        {/* ── Mini Stats row ── */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <MiniStat
+            icon={<LayoutDashboard className="w-4 h-4" />}
+            label="Báo giá hôm nay"
+            value={stats?.total ?? '—'}
+            badge="+12%"
+            theme="gold"
+          />
+          <MiniStat
+            icon={<Hourglass className="w-4 h-4" />}
+            label="Đang chờ duyệt"
+            value={stats?.pending ?? '—'}
+            badge="Cần xử lý"
+            theme="ruby"
+          />
+          <MiniStat
+            icon={<BadgeDollarSign className="w-4 h-4" />}
+            label="Đã xác nhận"
+            value={stats?.confirmed ?? '—'}
+            badge="Tháng này"
+            theme="emerald"
+          />
+        </section>
+
+        {/* ── Table Area ── */}
+        <section className="mb-4">
+          <GlassCard className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#FBF6E9] border-b border-[#EDE8DE]">
+                    {['ID BÁO GIÁ','SẢN PHẨM','CHẤT LIỆU','NGƯỜI YÊU CẦU','GIÁ BÁN','TRẠNG THÁI','THAO TÁC'].map(h => (
+                      <th key={h} className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-[#6B5E4C] last:text-right">
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <tr key={i} className="border-b border-slate-100">
+                        {Array.from({ length: 7 }).map((__, j) => (
+                          <td key={j} className="px-4 py-2.5">
+                            <div className="h-3 rounded bg-slate-100 animate-pulse" style={{ width: `${60 + (j * 15) % 40}%` }} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : paginated.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-400">
+                        Không tìm thấy yêu cầu báo giá nào
+                      </td>
+                    </tr>
+                  ) : (
+                    paginated.map((q, i) => {
+                      const st = STATUS_MAP[q.status] ?? { label: q.status, dotClass: 'bg-slate-400', badgeClass: 'bg-slate-100 text-slate-600', isGlow: false }
+                      return (
+                        <motion.tr
+                          key={q._id}
+                          onClick={() => onCreateSuccess?.(q)}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: i * 0.02, duration: 0.2 }}
+                          whileHover={{ backgroundColor: 'rgba(245, 158, 11, 0.015)' }}
+                          className="border-b border-slate-100 hover:bg-slate-50/20 transition-all duration-200 group cursor-pointer"
+                        >
+                          <td className="px-4 py-2.5 text-xs font-bold text-slate-600 tracking-wider">{q.quoteCode}</td>
+                          <td className="px-4 py-2.5">
+                            <span className="text-xs font-semibold text-slate-700 group-hover:text-amber-600 transition-colors">
+                              {q.productName}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-slate-500">
+                            {formatMaterialType(q.materialType)}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-slate-600">{q.requestedBy}</td>
+                          <td className={`px-4 py-2.5 text-xs font-semibold ${st.isGlow ? 'text-amber-600' : 'text-slate-700'}`}>
+                            {q.sellingPrice ? formatCurrency(q.sellingPrice) : (
+                              <span className="text-slate-400 font-normal text-[11px]">Chờ tính giá</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border ${st.badgeClass}`}>
+                              <span className={`relative flex h-1 w-1`}>
+                                {st.isGlow && (
+                                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${st.dotClass}`} />
+                                )}
+                                <span className={`relative inline-flex rounded-full h-1 w-1 ${st.dotClass}`} />
+                              </span>
+                              {st.label}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* NEED_MORE_INFO: Bổ sung */}
+                              {q.status === 'NEED_MORE_INFO' && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    onCreateSuccess?.(q)
+                                  }}
+                                  className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-orange-500 hover:bg-orange-600 rounded-md transition-colors"
+                                >
+                                  Bổ sung
+                                </button>
+                              )}
+
+                              {/* QUOTED: Xem giá + Gửi khách */}
+                              {q.status === 'QUOTED' && (
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      onCreateSuccess?.(q)
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-md transition-colors border border-slate-200"
+                                  >
+                                    Xem giá
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleSentToCustomer(q._id, q.productName)
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-violet-600 hover:bg-violet-700 rounded-md transition-colors"
+                                  >
+                                    Gửi khách
+                                  </button>
+                                </>
+                              )}
+
+                              {/* SENT_TO_CUSTOMER: Khách chốt + Huỷ */}
+                              {q.status === 'SENT_TO_CUSTOMER' && (
+                                <>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleConfirm(q._id, q.productName)
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors"
+                                  >
+                                    Khách chốt
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleCancel(q._id, q.productName)
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-rose-600 hover:bg-rose-700 rounded-md transition-colors"
+                                  >
+                                    Huỷ
+                                  </button>
+                                </>
+                              )}
+
+                              {/* Other statuses: Xem */}
+                              {!['NEED_MORE_INFO', 'QUOTED', 'SENT_TO_CUSTOMER'].includes(q.status) && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    onCreateSuccess?.(q)
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors"
+                                >
+                                  <Eye className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </motion.tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* pagination */}
+            <div className="px-4 py-3 border-t border-slate-100 bg-slate-50/30 flex items-center justify-between">
+              <span className="text-[11px] text-slate-400">
+                Hiển thị {Math.min(filtered.length, (page - 1) * perPage + paginated.length)} / {filtered.length} yêu cầu
+              </span>
+              <div className="flex gap-1 items-center">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors text-slate-500 disabled:opacity-20 shadow-sm"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p)}
+                    className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold border transition-all ${
+                      p === page
+                        ? 'border-amber-500 bg-amber-500 text-white shadow-sm'
+                        : 'border-slate-200/60 bg-white hover:bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors text-slate-500 disabled:opacity-20 shadow-sm"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </GlassCard>
-        </motion.div>
-
-        {/* category breakdown */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.5 }}
-        >
-          <GlassCard className="p-6 h-full flex flex-col justify-between">
-            <div>
-              <h4 className="font-semibold mb-1 text-[#1a1c1a]">Loại yêu cầu</h4>
-              <p className="text-xs text-[#7f7663]">Phân bổ theo trạng thái</p>
-            </div>
-
-            <div className="space-y-4 mt-6">
-              {[
-                {
-                  label: 'Đã xác nhận',
-                  count: confirmed,
-                  pct: quotes.length ? Math.round((confirmed / quotes.length) * 100) : 0,
-                  gold: true,
-                },
-                {
-                  label: 'Đang chờ',
-                  count: pending,
-                  pct: quotes.length ? Math.round((pending / quotes.length) * 100) : 0,
-                  gold: false,
-                },
-                {
-                  label: 'Khác',
-                  count: other,
-                  pct: quotes.length ? Math.round((other / quotes.length) * 100) : 0,
-                  gold: false,
-                },
-              ].map(({ label, pct, gold }) => (
-                <div key={label}>
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-[#1a1c1a]">{label}</span>
-                    <span className={`text-xs font-bold ${gold ? 'text-[#735c00]' : 'text-[#1a1c1a]'}`}>{pct}%</span>
-                  </div>
-                  <div className="h-1 w-full bg-black/5 rounded-full overflow-hidden">
-                    <motion.div
-                      className={`h-full rounded-full ${gold ? 'bg-[#735c00]' : 'bg-[#1a1c1a]/25'}`}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${pct}%` }}
-                      transition={{ duration: 0.8, delay: 0.6 }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-6 pt-4 border-t border-black/5 flex items-center gap-2 text-xs text-[#7f7663]">
-              <TrendingUp className="w-4 h-4 text-[#735c00]" />
-              <span>Tổng <strong className="text-[#1a1c1a]">{quotes.length}</strong> yêu cầu</span>
-            </div>
-          </GlassCard>
-        </motion.div>
-      </section>
+        </section>
+      </div>
     </div>
   )
 }
