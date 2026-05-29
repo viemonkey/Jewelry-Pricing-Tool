@@ -439,7 +439,7 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
 
       <Dialog open={open} onOpenChange={(o) => { if (!loading) { setOpen(o); if (!o) resetForm() } }}>
         <DialogTrigger asChild>
-          <Button className="gap-2">
+          <Button className="gap-1.5 bg-[#c5a356] hover:bg-[#b4904c] text-white font-medium px-4 py-2 h-10 rounded-lg shadow-sm transition-all duration-200 text-sm">
             <Plus className="h-4 w-4" />
             Tạo yêu cầu báo giá
           </Button>

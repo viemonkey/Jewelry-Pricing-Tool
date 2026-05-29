@@ -78,7 +78,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
   const goldPriceInput = useCurrencyInput()
   const laborCostInput = useCurrencyInput()
 
-  const canViewCost = currentRole === 'order' || currentRole === 'admin'
+  const canViewCost = currentRole === 'order'
 
   useEffect(() => {
     pricingConfigApi.get()

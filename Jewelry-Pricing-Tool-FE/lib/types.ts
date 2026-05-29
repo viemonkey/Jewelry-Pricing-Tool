@@ -2,7 +2,7 @@
 // Shared TypeScript types cho toàn bộ ứng dụng
 // ============================================================
 
-export type UserRole = 'sale' | 'order' | 'admin' | 'workshop'
+export type UserRole = 'sale' | 'order'
 
 export type QuoteStatus =
   | 'PENDING'           // Chờ báo giá

@@ -49,7 +49,7 @@ export function RecentQuotes({ currentRole }: RecentQuotesProps) {
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(true)
 
-  const canViewCost = currentRole === 'order' || currentRole === 'admin'
+  const canViewCost = currentRole === 'order'
 
   const fetchQuotes = () => {
     setLoading(true)

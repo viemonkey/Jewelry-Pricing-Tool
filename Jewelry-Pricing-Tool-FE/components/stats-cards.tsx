@@ -126,15 +126,15 @@ export function StatsCards() {
           <motion.div key={stat.title} variants={itemVariants}>
             <Card
               className={cn(
-                'group cursor-pointer transition-all duration-300',
-                'hover:shadow-lg hover:-translate-y-1',
+                'group cursor-pointer transition-all-smooth relative overflow-hidden border-luxury shadow-sm',
+                'hover:shadow-md hover:border-primary/30',
                 stat.borderColor
               )}
             >
-              <CardContent className="p-6">
+              <CardContent className="p-6 relative z-10">
                 <div className="flex items-center justify-between">
                   <motion.div
-                    className={cn('rounded-lg p-2', stat.bgColor)}
+                    className={cn('rounded-lg p-2 transition-all duration-300', stat.bgColor)}
                     whileHover={{ scale: 1.1, rotate: 5 }}
                     transition={{ type: 'spring', stiffness: 400, damping: 10 }}
                   >
@@ -142,13 +142,13 @@ export function StatsCards() {
                   </motion.div>
                 </div>
                 <div className="mt-4">
-                  <p className="text-2xl font-bold">
+                  <p className="text-3xl font-serif font-semibold text-foreground tracking-wide">
                     <AnimatedNumber value={stat.value} duration={1.5} />
                   </p>
-                  <p className="text-sm text-muted-foreground">{stat.title}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mt-1">{stat.title}</p>
                 </div>
                 <motion.div
-                  className={cn('mt-3 h-1 rounded-full', stat.bgColor)}
+                  className={cn('mt-3 h-0.5 rounded-full', stat.bgColor)}
                   initial={{ width: 0 }}
                   whileHover={{ width: '100%' }}
                   transition={{ duration: 0.3 }}

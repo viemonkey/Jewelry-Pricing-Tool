@@ -1027,7 +1027,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     pricingConfigApi.get().then(setPricingConfig).catch(() => {})
   }, [])
 
-  const canViewCost = currentRole === 'order' || currentRole === 'admin'
+  const canViewCost = currentRole === 'order'
   const isPricer = canViewCost
   const { addNotification } = useNotifications()
 

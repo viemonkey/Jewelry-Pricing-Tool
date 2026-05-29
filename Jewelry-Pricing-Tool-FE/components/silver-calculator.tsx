@@ -49,7 +49,7 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
   const costPriceInput = useCurrencyInput()
   const sellingPriceInput = useCurrencyInput()
 
-  const canViewCost = currentRole === 'order' || currentRole === 'admin'
+  const canViewCost = currentRole === 'order'
 
   useEffect(() => {
     pricingConfigApi.get()

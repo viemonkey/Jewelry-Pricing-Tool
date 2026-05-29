@@ -1,11 +1,20 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Cormorant_Garamond, Outfit } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { NotificationProvider } from '@/lib/notifications'
 import './globals.css'
 
-const _geist = Geist({ subsets: ["latin"] });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const cormorant = Cormorant_Garamond({
+  subsets: ['latin', 'vietnamese'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-serif',
+})
+
+const outfit = Outfit({
+  subsets: ['latin', 'latin-ext'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-sans',
+})
 
 export const metadata: Metadata = {
   title: 'Jewelry Quote - Hệ thống báo giá trang sức',
@@ -37,7 +46,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi" className="bg-background" suppressHydrationWarning>
-      <body className="font-sans antialiased" suppressHydrationWarning>
+      <body className={`${outfit.variable} ${cormorant.variable} font-sans antialiased`} suppressHydrationWarning>
         <NotificationProvider>
           {children}
         </NotificationProvider>
