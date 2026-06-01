@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Cormorant_Garamond, Outfit } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { NotificationProvider } from '@/lib/notifications'
+import { ThemeProvider } from '@/components/theme-provider'
 import './globals.css'
 
 const cormorant = Cormorant_Garamond({
@@ -47,9 +48,11 @@ export default function RootLayout({
   return (
     <html lang="vi" className="bg-background" suppressHydrationWarning>
       <body className={`${outfit.variable} ${cormorant.variable} font-sans antialiased`} suppressHydrationWarning>
-        <NotificationProvider>
-          {children}
-        </NotificationProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" forcedTheme="light">
+          <NotificationProvider>
+            {children}
+          </NotificationProvider>
+        </ThemeProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

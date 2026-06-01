@@ -85,7 +85,7 @@ export function StatsCards() {
       icon: FileText,
       color: 'text-primary',
       bgColor: 'bg-primary/10',
-      borderColor: 'hover:border-primary/50',
+      borderColor: 'hover:border-primary/50 hover:shadow-primary/10',
     },
     {
       title: 'Chờ xử lý',
@@ -93,7 +93,7 @@ export function StatsCards() {
       icon: Clock,
       color: 'text-warning',
       bgColor: 'bg-warning/10',
-      borderColor: 'hover:border-warning/50',
+      borderColor: 'hover:border-warning/50 hover:shadow-warning/10',
     },
     {
       title: 'Đã báo giá',
@@ -101,7 +101,7 @@ export function StatsCards() {
       icon: CheckCircle,
       color: 'text-success',
       bgColor: 'bg-success/10',
-      borderColor: 'hover:border-success/50',
+      borderColor: 'hover:border-success/50 hover:shadow-success/10',
     },
     {
       title: 'Đã đặt hàng',
@@ -109,7 +109,7 @@ export function StatsCards() {
       icon: ShoppingCart,
       color: 'text-info',
       bgColor: 'bg-info/10',
-      borderColor: 'hover:border-info/50',
+      borderColor: 'hover:border-info/50 hover:shadow-info/10',
     },
   ]
 
@@ -126,8 +126,8 @@ export function StatsCards() {
           <motion.div key={stat.title} variants={itemVariants}>
             <Card
               className={cn(
-                'group cursor-pointer transition-all-smooth relative overflow-hidden border-luxury shadow-sm',
-                'hover:shadow-md hover:border-primary/30',
+                'group cursor-pointer transition-all-smooth relative overflow-hidden border-luxury luxury-card shadow-sm',
+                'hover:shadow-lg hover:-translate-y-1',
                 stat.borderColor
               )}
             >

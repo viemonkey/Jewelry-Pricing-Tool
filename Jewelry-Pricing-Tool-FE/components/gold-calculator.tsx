@@ -167,7 +167,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.35 }}
       >
-        <Card className="hover:shadow-lg transition-shadow duration-300">
+        <Card className="luxury-card border-luxury hover:shadow-lg transition-shadow duration-300">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5 text-primary" />
@@ -333,7 +333,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.35, delay: 0.1 }}
       >
-        <Card className="border-primary/20 bg-card hover:shadow-lg transition-shadow duration-300">
+        <Card className="luxury-card border-primary/30 hover:shadow-lg transition-shadow duration-300">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Info className="h-5 w-5 text-primary" />
@@ -400,10 +400,13 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                   )}
 
                   {/* Suggested Price */}
-                  <div className="rounded-lg border-2 border-primary bg-primary/5 p-6 text-center">
-                    <p className="mb-1 text-sm text-muted-foreground">GIÁ BÁN ĐỀ XUẤT</p>
+                  <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/15 via-amber-500/5 to-transparent p-6 text-center shadow-inner relative overflow-hidden group">
+                    {/* Spotlight glow effect */}
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(212,175,55,0.15),transparent_70%)] pointer-events-none" />
+
+                    <p className="mb-1 text-[11px] font-bold text-primary uppercase tracking-widest leading-none drop-shadow-xs">GIÁ BÁN ĐỀ XUẤT</p>
                     <motion.p
-                      className="text-3xl font-bold text-primary tabular-nums"
+                      className="text-4xl font-serif font-bold text-primary tabular-nums tracking-wide my-2 drop-shadow-[0_2px_12px_rgba(212,175,55,0.25)]"
                       key={result.suggestedPrice}
                       initial={{ scale: 1.05, opacity: 0.7 }}
                       animate={{ scale: 1, opacity: 1 }}
@@ -411,7 +414,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                     >
                       {formatCurrency(result.suggestedPrice)}
                     </motion.p>
-                    <Badge variant="secondary" className="mt-2">
+                    <Badge variant="outline" className="mt-1 bg-primary/10 border-primary/20 text-primary">
                       Biên lợi nhuận: {result.profitMargin}
                     </Badge>
                   </div>
@@ -419,8 +422,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                   {/* Actions */}
                   <div className="flex gap-2">
                     <Button
-                      className="flex-1 gap-2"
-                      variant="default"
+                      className="flex-1 gap-2 bg-gold-gradient hover:opacity-95 shadow-md active:scale-98 transition-all hover-gold-glow"
                       onClick={handleSave}
                       disabled={isSaving || !productName.trim()}
                     >

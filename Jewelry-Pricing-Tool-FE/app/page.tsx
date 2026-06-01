@@ -92,27 +92,27 @@ export default function Home() {
   return (
     <div className="flex min-h-screen bg-background tactile-noise">
       {/* Sidebar trái */}
-      <aside className="w-64 border-r bg-card/60 backdrop-blur-xl shrink-0 flex flex-col justify-between h-screen sticky top-0 z-35">
+      <aside className="w-64 border-r border-sidebar-border bg-sidebar text-sidebar-foreground shrink-0 flex flex-col justify-between h-screen sticky top-0 z-30 shadow-lg">
         <div className="flex flex-col">
           {/* Logo Area */}
-          <div className="p-6 flex items-center gap-3 border-b">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#c5a356] shadow-sm select-none shrink-0">
-              <span className="text-sm font-bold text-white tracking-wider font-serif">JQ</span>
+          <div className="p-6 flex items-center gap-3 border-b border-sidebar-border">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-sidebar-primary text-sidebar-primary-foreground shadow-md select-none shrink-0">
+              <span className="text-sm font-bold tracking-wider font-serif">JQ</span>
             </div>
             <div>
-              <h2 className="text-sm font-serif font-bold text-foreground leading-none">Jewelry Quote</h2>
-              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest mt-1">Luxury Management</p>
+              <h2 className="text-sm font-serif font-bold text-sidebar-foreground leading-none">Jewelry Quote</h2>
+              <p className="text-[9px] font-bold text-sidebar-primary uppercase tracking-widest mt-1">Luxury Management</p>
             </div>
           </div>
 
           {/* Navigation Items */}
           <nav className="p-4 space-y-1.5 flex-1">
             {[
-              { value: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', show: true },
-              { value: 'quotes', icon: ClipboardList, label: 'Quotes', show: true },
-              { value: 'calculator', icon: Calculator, label: 'Inventory', show: canViewCalculator },
-              { value: 'production', icon: Hammer, label: 'Production', show: canViewProduction },
-              { value: 'settings', icon: Settings, label: 'Settings', show: canViewSettings },
+              { value: 'dashboard', icon: LayoutDashboard, label: 'Bảng điều khiển', show: true },
+              { value: 'quotes', icon: ClipboardList, label: 'Danh sách báo giá', show: true },
+              { value: 'calculator', icon: Calculator, label: 'Máy tính giá', show: canViewCalculator },
+              { value: 'production', icon: Hammer, label: 'Theo dõi xưởng', show: canViewProduction },
+              { value: 'settings', icon: Settings, label: 'Cấu hình & Cài đặt', show: canViewSettings },
             ].filter(item => item.show).map((item) => {
               const isActive = activeTab === item.value
               const Icon = item.icon
@@ -121,10 +121,10 @@ export default function Home() {
                   key={item.value}
                   onClick={() => setActiveTab(item.value)}
                   className={cn(
-                    'w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-semibold tracking-wider transition-all duration-200 uppercase',
+                    'w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-200',
                     isActive
-                      ? 'bg-[#c5a356] text-white shadow-sm font-bold'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                      ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-md font-semibold'
+                      : 'text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent'
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -136,14 +136,14 @@ export default function Home() {
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t space-y-1.5">
-          <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-semibold tracking-wider text-muted-foreground hover:text-foreground hover:bg-muted/50 uppercase">
+        <div className="p-4 border-t border-sidebar-border space-y-1.5">
+          <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-[13px] font-medium text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent">
             <HelpCircle className="h-4 w-4" />
-            <span>Support</span>
+            <span>Hỗ trợ</span>
           </button>
-          <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-xs font-semibold tracking-wider text-destructive hover:bg-destructive/10 uppercase">
+          <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-[13px] font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10">
             <LogOut className="h-4 w-4" />
-            <span>Log Out</span>
+            <span>Đăng xuất</span>
           </button>
         </div>
       </aside>
@@ -182,7 +182,7 @@ export default function Home() {
                   ) : (
                     <div className="space-y-6">
                       <div>
-                        <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-foreground tracking-wide">
+                        <h1 className="text-2xl sm:text-3xl font-serif font-semibold bg-gradient-to-r from-primary via-amber-600 to-primary bg-clip-text text-transparent tracking-wide">
                           Bảng điều khiển quản trị
                         </h1>
                         <p className="text-xs text-muted-foreground sm:text-sm font-medium mt-1">
@@ -236,7 +236,7 @@ export default function Home() {
                   className="space-y-6"
                 >
                   <div>
-                    <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-foreground tracking-wide">
+                    <h1 className="text-2xl sm:text-3xl font-serif font-semibold bg-gradient-to-r from-primary via-amber-600 to-primary bg-clip-text text-transparent tracking-wide">
                       Theo dõi sản xuất tại xưởng
                     </h1>
                     <p className="text-xs text-muted-foreground sm:text-sm font-medium mt-1">
@@ -260,7 +260,7 @@ export default function Home() {
                   className="space-y-6"
                 >
                   <div>
-                    <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-foreground tracking-wide">
+                    <h1 className="text-2xl sm:text-3xl font-serif font-semibold bg-gradient-to-r from-primary via-amber-600 to-primary bg-clip-text text-transparent tracking-wide">
                       Máy tính giá trang sức
                     </h1>
                     <p className="text-xs text-muted-foreground sm:text-sm font-medium mt-1">
@@ -274,7 +274,7 @@ export default function Home() {
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.4 }}
                   >
-                    <Card className="bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 relative overflow-hidden shimmer-gold border-luxury shadow-sm">
+                    <Card className="bg-gradient-to-r from-primary/10 via-amber-500/10 to-primary/5 border border-primary/20 relative overflow-hidden shimmer-gold shadow-md">
                       <CardContent className="flex flex-wrap items-center justify-between gap-4 p-4 relative z-10">
                         <div className="flex items-center gap-3">
                           <motion.div
@@ -393,7 +393,7 @@ export default function Home() {
                   className="space-y-6"
                 >
                   <div>
-                    <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-foreground tracking-wide">
+                    <h1 className="text-2xl sm:text-3xl font-serif font-semibold bg-gradient-to-r from-primary via-amber-600 to-primary bg-clip-text text-transparent tracking-wide">
                       Cấu hình & Cài đặt hệ thống
                     </h1>
                     <p className="text-xs text-muted-foreground sm:text-sm font-medium mt-1">

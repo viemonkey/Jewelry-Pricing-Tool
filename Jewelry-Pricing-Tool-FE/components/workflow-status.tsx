@@ -137,7 +137,7 @@ export function WorkflowStatus({ currentStep, className }: WorkflowStatusProps) 
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.3 }}
     >
-      <Card className={className}>
+      <Card className={cn('luxury-card border-luxury', className)}>
         <CardHeader>
           <CardTitle className="text-lg">Quy trình báo giá</CardTitle>
           <CardDescription>
@@ -168,11 +168,11 @@ export function WorkflowStatus({ currentStep, className }: WorkflowStatusProps) 
                     <motion.div
                       className={cn(
                         'flex flex-1 flex-col items-center rounded-lg border p-3 text-center transition-all',
-                        isActive && 'border-primary bg-primary/5 shadow-sm',
-                        isCompleted && 'border-success/30 bg-success/5',
-                        isPending && 'border-border bg-muted/30 opacity-60'
+                        isActive && 'border-primary bg-primary/10 shadow-[0_0_20px_rgba(212,175,55,0.12)] ring-1 ring-primary/30',
+                        isCompleted && 'border-success/30 bg-success/5 text-success/90',
+                        isPending && 'border-border/60 bg-muted/20 opacity-50'
                       )}
-                      whileHover={{ scale: 1.02, y: -2 }}
+                      whileHover={{ scale: 1.04, y: -4 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                     >
                       <motion.div
@@ -249,11 +249,11 @@ export function WorkflowStatus({ currentStep, className }: WorkflowStatusProps) 
                     variants={stepVariants}
                     className={cn(
                       'flex items-center gap-4 rounded-lg border p-4 transition-all',
-                      isActive && 'border-primary bg-primary/5',
+                      isActive && 'border-primary bg-primary/10 shadow-[0_0_20px_rgba(212,175,55,0.12)] ring-1 ring-primary/20',
                       isCompleted && 'border-success/30 bg-success/5',
-                      isPending && 'border-border bg-muted/30 opacity-60'
+                      isPending && 'border-border/60 bg-muted/20 opacity-50'
                     )}
-                    whileHover={{ scale: 1.01, x: 4 }}
+                    whileHover={{ scale: 1.02, x: 6 }}
                     transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                   >
                     <motion.div

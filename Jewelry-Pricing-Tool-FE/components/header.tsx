@@ -113,7 +113,7 @@ export function Header({ currentRole, onRoleChange, search = '', onSearchChange 
         </div>
 
         {/* Right: Notifications & Profile */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 shrink-0" >
           
           {/* Notification bell */}
           <DropdownMenu onOpenChange={(open) => { if (open) markAllRead() }}>

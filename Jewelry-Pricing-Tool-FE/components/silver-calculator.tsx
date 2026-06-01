@@ -100,7 +100,7 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35 }}
     >
-      <Card className="hover:shadow-lg transition-shadow duration-300 overflow-hidden">
+      <Card className="luxury-card border-luxury hover:shadow-lg transition-shadow duration-300 overflow-hidden">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-foreground">
@@ -216,25 +216,28 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.25 }}
               >
-                <div className="flex items-center justify-center gap-4 rounded-lg bg-muted/50 p-6">
+                <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/10 via-amber-500/5 to-transparent p-6 shadow-inner relative overflow-hidden flex items-center justify-center gap-6">
+                  {/* Spotlight glow effect */}
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(212,175,55,0.12),transparent_70%)] pointer-events-none" />
+
                   {canViewCost && (
                     <>
-                      <div className="text-center">
-                        <p className="text-xs text-muted-foreground">GIÁ VỐN</p>
-                        <p className="text-lg font-semibold tabular-nums">
+                      <div className="text-center relative z-10">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">GIÁ VỐN</p>
+                        <p className="text-lg font-semibold tabular-nums mt-1">
                           {formatCurrency(result.costPrice)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-1 text-muted-foreground">
-                        <span className="text-xs font-bold">×{silverMultiplier}</span>
-                        <ArrowRight className="h-4 w-4" />
+                      <div className="flex items-center gap-1.5 text-muted-foreground relative z-10">
+                        <span className="text-[11px] font-bold bg-muted px-1.5 py-0.5 rounded border">×{silverMultiplier}</span>
+                        <ArrowRight className="h-4 w-4 text-primary" />
                       </div>
                     </>
                   )}
-                  <div className="text-center">
-                    <p className="text-xs text-muted-foreground">GIÁ BÁN</p>
+                  <div className="text-center relative z-10">
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-widest">GIÁ BÁN ĐỀ XUẤT</p>
                     <motion.p
-                      className="text-2xl font-bold text-primary tabular-nums"
+                      className="text-3xl font-serif font-bold text-primary tabular-nums tracking-wide mt-1 drop-shadow-[0_2px_10px_rgba(212,175,55,0.25)]"
                       key={result.sellingPrice}
                       initial={{ scale: 1.05, opacity: 0.7 }}
                       animate={{ scale: 1, opacity: 1 }}
@@ -252,7 +255,7 @@ export function SilverCalculator({ currentRole }: SilverCalculatorProps) {
 
                 {/* Actions */}
                 <div className="flex gap-2">
-                  <Button className="flex-1 gap-2" variant="default" onClick={handleSave} disabled={isSaving}>
+                  <Button className="flex-1 gap-2 bg-gold-gradient hover:opacity-95 shadow-md active:scale-98 transition-all hover-gold-glow" onClick={handleSave} disabled={isSaving}>
                     {isSaving
                       ? <><CheckCircle2 className="h-4 w-4" />Đã lưu!</>
                       : <><Save className="h-4 w-4" />Lưu báo giá</>

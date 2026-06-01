@@ -4,91 +4,94 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Warm Alabaster & Luxury Gold theme for Light Mode */
-  --background: oklch(0.99 0.003 75);
-  --foreground: oklch(0.18 0.015 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.015 250);
+  /* Warm Alabaster & Premium Gold theme for Light Mode with High Contrast */
+  --background: oklch(0.975 0.003 75); /* Luxury light ivory background */
+  --foreground: oklch(0.12 0.01 250); /* Darker slate-black for high text contrast */
+  --card: oklch(1 0 0); /* Crisp white cards */
+  --card-foreground: oklch(0.12 0.01 250);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.015 250);
-  --primary: oklch(0.60 0.14 65); /* Elegant gold */
-  --primary-foreground: oklch(0.99 0.003 75);
-  --secondary: oklch(0.96 0.005 75);
-  --secondary-foreground: oklch(0.25 0.015 250);
-  --muted: oklch(0.95 0.004 75);
-  --muted-foreground: oklch(0.48 0.01 250);
-  --accent: oklch(0.65 0.12 60);
+  --popover-foreground: oklch(0.12 0.01 250);
+  --primary: oklch(0.52 0.12 75); /* Richer gold/brass with superior contrast on light background */
+  --primary-foreground: oklch(0.99 0.002 75);
+  --secondary: oklch(0.94 0.005 75);
+  --secondary-foreground: oklch(0.20 0.015 250);
+  --muted: oklch(0.94 0.005 75);
+  --muted-foreground: oklch(0.40 0.01 250); /* Darker gray for readable subtext */
+  --accent: oklch(0.58 0.12 70);
   --accent-foreground: oklch(1 0 0);
   --destructive: oklch(0.55 0.22 25);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.91 0.004 75); /* Very thin, soft border */
-  --input: oklch(0.94 0.004 75);
-  --ring: oklch(0.60 0.14 65);
-  --chart-1: oklch(0.60 0.14 65);
+  --border: oklch(0.91 0.005 75); /* Soft, elegant warm border lines */
+  --input: oklch(0.92 0.005 75); /* Defined inputs */
+  --ring: oklch(0.52 0.12 75);
+  --chart-1: oklch(0.52 0.12 75);
   --chart-2: oklch(0.50 0.12 250);
   --chart-3: oklch(0.60 0.15 145);
   --chart-4: oklch(0.65 0.12 60);
   --chart-5: oklch(0.45 0.10 25);
-  --radius: 0.75rem; /* Smoother card rounding */
-  --sidebar: oklch(0.15 0.01 250);
-  --sidebar-foreground: oklch(0.95 0.005 75);
-  --sidebar-primary: oklch(0.60 0.14 65);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.25 0.015 250);
-  --sidebar-accent-foreground: oklch(0.95 0.005 75);
-  --sidebar-border: oklch(0.25 0.015 250);
-  --sidebar-ring: oklch(0.60 0.14 65);
+  --radius: 0.75rem;
+  
+  /* Sidebar design: Elegant Light Ivory with Champagne Gold accents */
+  --sidebar: oklch(0.985 0.003 75);
+  --sidebar-foreground: oklch(0.12 0.01 250);
+  --sidebar-primary: oklch(0.52 0.12 75);
+  --sidebar-primary-foreground: oklch(0.99 0.002 75);
+  --sidebar-accent: oklch(0.94 0.005 75);
+  --sidebar-accent-foreground: oklch(0.12 0.01 250);
+  --sidebar-border: oklch(0.91 0.005 75);
+  --sidebar-ring: oklch(0.52 0.12 75);
   
   /* Custom tokens for jewelry app */
   --gold: oklch(0.75 0.12 85);
   --gold-dark: oklch(0.58 0.13 65);
   --silver: oklch(0.78 0.01 250);
-  --success: oklch(0.60 0.15 145);
-  --warning: oklch(0.75 0.15 85);
-  --info: oklch(0.55 0.12 245);
+  --success: oklch(0.55 0.15 145);
+  --warning: oklch(0.70 0.15 85);
+  --info: oklch(0.50 0.12 245);
 }
 
 .dark {
-  /* Deep Slate & Brass Gold theme for Dark Mode */
-  --background: oklch(0.13 0.006 250);
-  --foreground: oklch(0.96 0.004 75);
-  --card: oklch(0.16 0.008 250);
-  --card-foreground: oklch(0.96 0.004 75);
-  --popover: oklch(0.16 0.008 250);
-  --popover-foreground: oklch(0.96 0.004 75);
-  --primary: oklch(0.72 0.12 75); /* Soft brass gold */
-  --primary-foreground: oklch(0.13 0.006 250);
-  --secondary: oklch(0.20 0.008 250);
-  --secondary-foreground: oklch(0.96 0.004 75);
-  --muted: oklch(0.20 0.008 250);
-  --muted-foreground: oklch(0.68 0.006 75);
-  --accent: oklch(0.72 0.12 75);
-  --accent-foreground: oklch(0.96 0.004 75);
-  --destructive: oklch(0.48 0.18 25);
-  --destructive-foreground: oklch(0.96 0.004 75);
-  --border: oklch(0.24 0.008 250);
-  --input: oklch(0.20 0.008 250);
-  --ring: oklch(0.72 0.12 75);
-  --chart-1: oklch(0.72 0.12 75);
-  --chart-2: oklch(0.58 0.12 250);
-  --chart-3: oklch(0.55 0.15 145);
-  --chart-4: oklch(0.75 0.12 85);
-  --chart-5: oklch(0.55 0.15 25);
-  --sidebar: oklch(0.10 0.006 250);
-  --sidebar-foreground: oklch(0.96 0.004 75);
-  --sidebar-primary: oklch(0.72 0.12 75);
-  --sidebar-primary-foreground: oklch(0.13 0.006 250);
-  --sidebar-accent: oklch(0.20 0.008 250);
-  --sidebar-accent-foreground: oklch(0.96 0.004 75);
-  --sidebar-border: oklch(0.20 0.008 250);
-  --sidebar-ring: oklch(0.72 0.12 75);
+  /* Keep Dark Mode identical to Light Mode variables to maintain pure light aesthetic */
+  --background: oklch(0.975 0.003 75);
+  --foreground: oklch(0.12 0.01 250);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.12 0.01 250);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.12 0.01 250);
+  --primary: oklch(0.52 0.12 75);
+  --primary-foreground: oklch(0.99 0.002 75);
+  --secondary: oklch(0.94 0.005 75);
+  --secondary-foreground: oklch(0.20 0.015 250);
+  --muted: oklch(0.94 0.005 75);
+  --muted-foreground: oklch(0.40 0.01 250);
+  --accent: oklch(0.58 0.12 70);
+  --accent-foreground: oklch(1 0 0);
+  --destructive: oklch(0.55 0.22 25);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.91 0.005 75);
+  --input: oklch(0.92 0.005 75);
+  --ring: oklch(0.52 0.12 75);
+  --chart-1: oklch(0.52 0.12 75);
+  --chart-2: oklch(0.50 0.12 250);
+  --chart-3: oklch(0.60 0.15 145);
+  --chart-4: oklch(0.65 0.12 60);
+  --chart-5: oklch(0.45 0.10 25);
   
-  --gold: oklch(0.72 0.12 75);
-  --gold-dark: oklch(0.68 0.12 65);
-  --silver: oklch(0.72 0.01 250);
-  --success: oklch(0.58 0.15 145);
-  --warning: oklch(0.72 0.15 85);
-  --info: oklch(0.52 0.12 245);
+  --sidebar: oklch(0.985 0.003 75);
+  --sidebar-foreground: oklch(0.12 0.01 250);
+  --sidebar-primary: oklch(0.52 0.12 75);
+  --sidebar-primary-foreground: oklch(0.99 0.002 75);
+  --sidebar-accent: oklch(0.94 0.005 75);
+  --sidebar-accent-foreground: oklch(0.12 0.01 250);
+  --sidebar-border: oklch(0.91 0.005 75);
+  --sidebar-ring: oklch(0.52 0.12 75);
+  
+  --gold: oklch(0.75 0.12 85);
+  --gold-dark: oklch(0.58 0.13 65);
+  --silver: oklch(0.78 0.01 250);
+  --success: oklch(0.55 0.15 145);
+  --warning: oklch(0.70 0.15 85);
+  --info: oklch(0.50 0.12 245);
 }
 
 @theme inline {
@@ -219,6 +222,7 @@ html {
 /* Luxury visual enhancements */
 .tactile-noise {
   position: relative;
+  isolation: isolate;
 }
 
 .tactile-noise::before {
@@ -227,15 +231,15 @@ html {
   inset: 0;
   width: 100%;
   height: 100%;
-  opacity: 0.025;
+  opacity: 0.012; /* Reduced opacity for ultra-fine high-end feel */
   pointer-events: none;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
-  z-index: 1;
+  z-index: -1; /* Placed behind all content */
   border-radius: inherit;
 }
 
 .dark .tactile-noise::before {
-  opacity: 0.035;
+  opacity: 0.018;
 }
 
 .shimmer-gold {
@@ -264,10 +268,50 @@ html {
 
 .border-luxury {
   border: 1px solid var(--border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 2px 8px -1px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 
 .dark .border-luxury {
   border: 1px solid var(--border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+/* Luxury card with top-left golden spotlight reflecting effect */
+.luxury-card {
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--card);
+}
+
+.luxury-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 8% 8%, rgba(212, 175, 55, 0.045), transparent 45%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.dark .luxury-card::after {
+  background: radial-gradient(circle at 8% 8%, rgba(212, 175, 55, 0.08), transparent 50%);
+}
+
+.bg-gold-gradient {
+  background: linear-gradient(135deg, oklch(0.78 0.11 75) 0%, oklch(0.60 0.12 70) 50%, oklch(0.50 0.10 65) 100%);
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
