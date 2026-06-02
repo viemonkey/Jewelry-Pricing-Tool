@@ -20,7 +20,7 @@ export interface SseNotificationEvent {
   timestamp: string
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
 
 /**
  * Hook kết nối SSE với backend, tự reconnect khi mất mạng.

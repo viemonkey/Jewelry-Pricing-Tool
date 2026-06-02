@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Dialog, DialogContent, DialogTrigger,
+  Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import {
@@ -15,7 +15,7 @@ import { format, addYears } from 'date-fns'
 import { vi } from 'date-fns/locale'
 import {
   Plus, Upload, X, ImageIcon, Loader2, FileText,
-  CalendarIcon, Minus, Layers, Sparkles,
+  CalendarIcon, Minus, Layers, Sparkles, ChevronDown, Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { quotesApi } from '@/lib/api'
@@ -52,9 +52,11 @@ const ANKLET_SIZES   = ['21cm', '22cm', '23cm', '24cm']
 const NECKLACE_SIZES = ['40cm', '42cm', '45cm']
 
 const STONE_OPTIONS = [
-  { value: 'kim-cuong-lab',         label: 'Kim cương lab' },
-  { value: 'kim-cuong-thien-nhien', label: 'Kim cương thiên nhiên' },
-  { value: 'da-mau',                label: 'Đá màu' },
+  { value: 'kim-cuong-lab',         label: 'Kim cương lab',         color: 'linear-gradient(135deg, #e2f1ff 0%, #a5d3ff 100%)', border: '#a5d3ff88' },
+  { value: 'kim-cuong-thien-nhien', label: 'Kim cương thiên nhiên', color: 'linear-gradient(135deg, #ffffff 0%, #d4e8fc 100%)', border: '#d4e8fc88' },
+  { value: 'da-moissanite',         label: 'Đá Moissanite',         color: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)', border: '#fcb69f88' },
+  { value: 'da-cz',                 label: 'Đá CZ',                 color: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', border: '#c3cfe288' },
+  { value: 'da-mau',                label: 'Đá màu',                color: 'linear-gradient(135deg, #f857a6 0%, #ff5858 100%)', border: '#ff585888' },
 ]
 
 const MAX_DEADLINE = addYears(new Date(), 1)
@@ -111,6 +113,7 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
   const [ankletSize,   setAnkletSize]   = useState('')
   const [ankletSizeCustom,   setAnkletSizeCustom]   = useState('')
   const [stoneType, setStoneType] = useState('')
+  const [stonePopoverOpen, setStonePopoverOpen] = useState(false)
   const [stoneNote, setStoneNote] = useState('')
   const [materialRows, setMaterialRows] = useState<MaterialRow[]>([newRow()])
 
@@ -276,14 +279,14 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
   )
 
   const Chip = ({
-    label, selected, onClick,
-  }: { label: string; selected: boolean; onClick: () => void }) => (
+    label, selected, onClick, style,
+  }: { label: string; selected: boolean; onClick: () => void; style?: React.CSSProperties }) => (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={selected}
       style={{
-        padding: '5px 13px',
+        padding: '6px 14px',
         borderRadius: '8px',
         border: selected ? `1.5px solid ${GOLD}` : `1.5px solid ${BORDER}`,
         background: selected ? GOLD_LIGHT : 'white',
@@ -293,6 +296,8 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
         cursor: 'pointer',
         transition: 'all 0.15s ease',
         whiteSpace: 'nowrap' as const,
+        boxSizing: 'border-box' as const,
+        ...style,
       }}
     >
       {label}
@@ -469,7 +474,7 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
 
               {/* Title */}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <h2 style={{
+                <DialogTitle style={{
                   margin: 0,
                   fontSize: '18px',
                   fontWeight: 600,
@@ -479,10 +484,10 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
                   lineHeight: 1.2,
                 }}>
                   Tạo yêu cầu báo giá
-                </h2>
-                <p style={{ margin: '3px 0 0', fontSize: '12.5px', color: TEXT_MUTED }}>
+                </DialogTitle>
+                <DialogDescription style={{ margin: '3px 0 0', fontSize: '12.5px', color: TEXT_MUTED }}>
                   Điền đầy đủ để NV xử lý nhanh nhất
-                </p>
+                </DialogDescription>
               </div>
 
               {/* Requester badge */}
@@ -846,11 +851,174 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
                   {/* Yêu cầu đá */}
                   <div>
                     <FieldLabel>Yêu cầu đá / phụ kiện</FieldLabel>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '10px' }} role="group" aria-label="Loại đá">
-                      {STONE_OPTIONS.map((s) => (
-                        <Chip key={s.value} label={s.label} selected={stoneType === s.value}
-                          onClick={() => setStoneType(stoneType === s.value ? '' : s.value)} />
-                      ))}
+                    <div style={{ marginBottom: '10px', position: 'relative' }}>
+                      <Popover open={stonePopoverOpen} onOpenChange={setStonePopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              width: '100%',
+                              height: '40px',
+                              padding: '0 12px',
+                              borderRadius: '10px',
+                              border: `1.5px solid ${BORDER}`,
+                              background: 'white',
+                              cursor: 'pointer',
+                              fontFamily: 'inherit',
+                              fontSize: '13px',
+                              color: TEXT_PRI,
+                              outline: 'none',
+                              boxSizing: 'border-box',
+                              transition: 'border-color 0.15s, box-shadow 0.15s',
+                            }}
+                            className="qrm-input"
+                          >
+                            {(() => {
+                              const activeOption = STONE_OPTIONS.find((s) => s.value === stoneType)
+                              return (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  {activeOption ? (
+                                    <>
+                                      {/* Hạt đá mô phỏng */}
+                                      <div style={{
+                                        width: '18px',
+                                        height: '18px',
+                                        borderRadius: '50%',
+                                        background: activeOption.color,
+                                        border: `1px solid ${activeOption.border}`,
+                                        flexShrink: 0,
+                                      }} />
+                                      <span style={{ fontWeight: 500 }}>{activeOption.label}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      {/* Không đính đá / Placeholder */}
+                                      <div style={{
+                                        width: '18px',
+                                        height: '18px',
+                                        borderRadius: '50%',
+                                        background: 'linear-gradient(135deg, #f0f0f0, #e0e0e0)',
+                                        border: `1px solid ${BORDER}`,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0,
+                                      }}>
+                                        <span style={{ fontSize: '9px', color: '#999', fontWeight: 'bold' }}>✕</span>
+                                      </div>
+                                      <span style={{ color: TEXT_MUTED }}>Không đính đá (Trang sức trơn)</span>
+                                    </>
+                                  )}
+                                </div>
+                              )
+                            })()}
+                            <ChevronDown className="h-4 w-4 text-[#8e8270] transition-transform duration-200" style={{ transform: stonePopoverOpen ? 'rotate(180deg)' : 'none' }} />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          style={{
+                            width: 'var(--radix-popover-trigger-width)',
+                            padding: '4px',
+                            borderRadius: '12px',
+                            background: 'white',
+                            border: `1px solid ${BORDER}`,
+                            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '2px',
+                            zIndex: 100,
+                          }}
+                          align="start"
+                        >
+                          {/* Option: None */}
+                          <button
+                            type="button"
+                            onClick={() => { setStoneType(''); setStonePopoverOpen(false) }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              width: '100%',
+                              padding: '8px 10px',
+                              borderRadius: '8px',
+                              background: !stoneType ? GOLD_LIGHT : 'transparent',
+                              border: 'none',
+                              cursor: 'pointer',
+                              textAlign: 'left',
+                              color: !stoneType ? GOLD_DARK : TEXT_SEC,
+                              fontSize: '12.5px',
+                              fontWeight: !stoneType ? 600 : 400,
+                              transition: 'all 0.15s ease',
+                              boxSizing: 'border-box',
+                            }}
+                            className="hover:bg-[#FBF6E9] hover:text-[#A07810]"
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{
+                                width: '18px',
+                                height: '18px',
+                                borderRadius: '50%',
+                                background: 'linear-gradient(135deg, #f0f0f0, #e0e0e0)',
+                                border: `1px solid ${BORDER}`,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}>
+                                <span style={{ fontSize: '9px', color: '#999', fontWeight: 'bold' }}>✕</span>
+                              </div>
+                              <span>Không đính đá (Trang sức trơn)</span>
+                            </div>
+                            {!stoneType && <Check className="h-3.5 w-3.5 text-[#C9981A]" />}
+                          </button>
+
+                          {/* Options: Gemstones */}
+                          {STONE_OPTIONS.map((s) => {
+                            const isSelected = stoneType === s.value
+                            return (
+                              <button
+                                key={s.value}
+                                type="button"
+                                onClick={() => { setStoneType(s.value); setStonePopoverOpen(false) }}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  width: '100%',
+                                  padding: '8px 10px',
+                                  borderRadius: '8px',
+                                  background: isSelected ? GOLD_LIGHT : 'transparent',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  textAlign: 'left',
+                                  color: isSelected ? GOLD_DARK : TEXT_SEC,
+                                  fontSize: '12.5px',
+                                  fontWeight: isSelected ? 600 : 400,
+                                  transition: 'all 0.15s ease',
+                                  boxSizing: 'border-box',
+                                }}
+                                className="hover:bg-[#FBF6E9] hover:text-[#A07810]"
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{
+                                    width: '18px',
+                                    height: '18px',
+                                    borderRadius: '50%',
+                                    background: s.color,
+                                    border: `1px solid ${s.border}`,
+                                    flexShrink: 0,
+                                  }} />
+                                  <span>{s.label}</span>
+                                </div>
+                                {isSelected && <Check className="h-3.5 w-3.5 text-[#C9981A]" />}
+                              </button>
+                            )
+                          })}
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <input
                       className="qrm-input"

@@ -13,7 +13,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule)
 
   app.enableCors({
-    origin: process.env.FE_URL || 'http://localhost:3000',
+    origin: process.env.FE_URL || 'http://localhost:3001',
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
@@ -21,7 +21,7 @@ async function bootstrap() {
   // Bỏ whitelist:true để không strip FormData fields
   app.useGlobalPipes(new ValidationPipe({ transform: true }))
 
-  const port = process.env.PORT || 3001
+  const port = process.env.PORT || 3000
   await app.listen(port)
   console.log(`🚀 Backend đang chạy tại: http://localhost:${port}`)
 }

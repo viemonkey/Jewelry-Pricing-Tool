@@ -147,7 +147,7 @@ const STATUS_CONFIG: Record<QuoteStatus, { label: string; color: string; dot: st
 
 export interface StoneEntry {
   id: string
-  type: 'lab_diamond' | 'natural_diamond' | 'colored_stone'
+  type: 'lab_diamond' | 'natural_diamond' | 'moissanite' | 'cz' | 'colored_stone'
   quantity: number
   sizeOrCarat: string
   unitPrice: string
@@ -186,6 +186,136 @@ interface QuoteListPricerProps {
   currentUserName?: string
   newQuote?: Quote | null
   action?: React.ReactNode
+}
+
+interface PricingSummaryProps {
+  priceForm: PriceFormState
+  stoneEntries: StoneEntry[]
+  pricingConfig: { goldRatios: any[]; profitMargins: any[]; silverMultiplier: number; goldPrice24K?: number } | null
+  setPriceForm: React.Dispatch<React.SetStateAction<PriceFormState>>
+  fmt: (v: number | string) => string
+  margin: number | null
+  profit: number | null
+  marginGood: boolean
+}
+
+function PricingSummary({
+  priceForm,
+  stoneEntries,
+  pricingConfig,
+  setPriceForm,
+  fmt,
+  margin,
+  profit,
+  marginGood,
+}: PricingSummaryProps) {
+  const n = (v: string) => parseFloat(v) || 0
+  const cost = n(priceForm.costWithVAT) || n(priceForm.costPrice) || 0
+
+  return (
+    <div className="space-y-4">
+      {/* Tổng giá vốn */}
+      <div className="rounded-xl border-2 border-primary/25 bg-gradient-to-br from-primary/5 to-amber-50/60 dark:from-primary/10 dark:to-amber-950/20 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-4 mb-1">
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Giá vốn chưa VAT</p>
+                <p className="text-base font-semibold text-foreground tabular-nums">
+                  {priceForm.costBeforeVAT ? fmt(parseFloat(priceForm.costBeforeVAT)) : '0 đ'}
+                </p>
+              </div>
+              <span className="text-muted-foreground text-xs">+10% →</span>
+              <div>
+                <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Giá vốn có VAT</p>
+                <p className="text-xl font-bold text-primary tabular-nums">{fmt(cost)}</p>
+              </div>
+            </div>
+          </div>
+          <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+            <Calculator className="h-5 w-5 text-primary" />
+          </div>
+        </div>
+        {cost > 0 && (
+          <div className="mt-3 space-y-1.5">
+            {[
+              { label: 'Nguyên vật liệu', value: parseFloat(priceForm.materialCost) || 0, color: 'bg-amber-400' },
+              { label: 'Đá quý',           value: parseFloat(priceForm.stoneCost) || 0,    color: 'bg-blue-400' },
+              { label: 'Tiền công',         value: parseFloat(priceForm.laborCost) || 0, color: 'bg-emerald-400' },
+            ].filter(s => s.value > 0).map(s => (
+              <div key={s.label} className="flex items-center gap-3">
+                <span className="text-xs text-muted-foreground w-28 shrink-0">{s.label}</span>
+                <div className="flex-1 h-2 bg-muted/50 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-500 ${s.color}`}
+                    style={{ width: `${Math.min(100, (s.value / cost) * 100)}%` }} />
+                </div>
+                <span className="text-xs font-semibold text-muted-foreground tabular-nums w-8 text-right shrink-0">
+                  {Math.round((s.value / cost) * 100)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Giá bán */}
+      <div className="space-y-3">
+        {/* Thông tin biên lợi nhuận tự động */}
+        {cost > 0 && pricingConfig?.profitMargins && (() => {
+          const { divisor, margin: tier } = getProfitDivisor(cost, pricingConfig.profitMargins)
+          return (
+            <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+              📊 Áp dụng biên <strong>{tier}</strong> (÷{divisor}) → Giá bán tự tính bên dưới
+            </div>
+          )
+        })()}
+        <div className="relative">
+          <Input type="text" inputMode="numeric" placeholder="0"
+            value={formatInputNumber(priceForm.sellingPrice)}
+            className="h-12 pr-7 text-lg font-bold border-2 border-primary/30 bg-primary/5 focus-visible:ring-primary/30 text-primary tabular-nums"
+            onChange={(e) => setPriceForm((f) => ({ ...f, sellingPrice: parseInputNumber(e.target.value) }))} />
+          <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-primary/50 pointer-events-none font-bold">đ</span>
+        </div>
+
+        {margin !== null && (
+          <div
+            className={`rounded-xl p-3.5 border-2 flex items-center justify-between gap-4 ${
+              marginGood
+                ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-700/60'
+                : 'bg-orange-50 border-orange-200 dark:bg-orange-950/20 dark:border-orange-700/60'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`h-10 w-10 rounded-full flex items-center justify-center text-base font-bold shrink-0 ${
+                marginGood ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50' : 'bg-orange-100 text-orange-600 dark:bg-orange-900/50'
+              }`}>
+                {marginGood ? '✓' : '!'}
+              </div>
+              <div>
+                <p className={`text-xs font-bold uppercase tracking-wide mb-0.5 ${
+                  marginGood ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'
+                }`}>
+                  {marginGood ? 'Biên lợi nhuận tốt' : 'Biên lợi nhuận thấp'}
+                </p>
+                <p className={`text-base font-bold tabular-nums ${
+                  marginGood ? 'text-emerald-700 dark:text-emerald-300' : 'text-orange-700 dark:text-orange-300'
+                }`}>
+                  {margin}% · Lãi {fmt(profit!)}
+                </p>
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="w-16 h-2 bg-muted/50 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full transition-all duration-500 ${marginGood ? 'bg-emerald-400' : 'bg-orange-400'}`}
+                  style={{ width: `${Math.min(100, margin)}%` }} />
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">Mục tiêu ≥ 20%</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 // ─── Pricing Dialog Tabs component ─────────────────────────
@@ -314,9 +444,9 @@ function PricingDialogTabs({
                 <p className="text-xs text-muted-foreground mb-2">🖼 Hình ảnh sản phẩm</p>
                 <div className="flex flex-wrap gap-2">
                   {selected.images.map((img, i) => (
-                    <a key={i} href={`http://localhost:3001${img}`} target="_blank" rel="noreferrer"
+                    <a key={i} href={`http://localhost:3000${img}`} target="_blank" rel="noreferrer"
                       className="block rounded-xl border overflow-hidden hover:opacity-80 hover:scale-105 transition-all duration-200 shadow-sm">
-                      <img src={`http://localhost:3001${img}`} alt={`Ảnh ${i + 1}`} className="h-20 w-20 object-cover" />
+                      <img src={`http://localhost:3000${img}`} alt={`Ảnh ${i + 1}`} className="h-20 w-20 object-cover" />
                     </a>
                   ))}
                 </div>
@@ -540,6 +670,8 @@ function SectionDivider({ label, icon }: { label: string; icon?: React.ReactNode
 const STONE_TYPE_LABELS: Record<string, string> = {
   lab_diamond: 'Kim cương lab',
   natural_diamond: 'Kim cương thiên nhiên',
+  moissanite: 'Đá Moissanite',
+  cz: 'Đá CZ',
   colored_stone: 'Đá màu / phụ kiện',
 }
 
@@ -606,6 +738,8 @@ function StoneTable({
               >
                 <option value="lab_diamond">Kim cương lab</option>
                 <option value="natural_diamond">Kim cương thiên nhiên</option>
+                <option value="moissanite">Đá Moissanite</option>
+                <option value="cz">Đá CZ</option>
                 <option value="colored_stone">Đá màu / phụ kiện</option>
               </select>
               {total > 0 && (
@@ -895,6 +1029,11 @@ function MultiMaterialPricingRows({
   )
 }
 
+function formatDate(iso: string) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('vi-VN')
+}
+
 export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá', newQuote, action }: QuoteListPricerProps) {
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(false)
@@ -918,6 +1057,11 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   const [stoneEntries, setStoneEntriesRaw] = useState<StoneEntry[]>([])
   const [goldRows, setGoldRows] = useState<GoldRow[]>([])
   const [stoneInputMethod, setStoneInputMethod] = useState<'direct' | 'table'>('direct')
+
+  const fmt = (v: number | string) => {
+    const num = typeof v === 'string' ? parseFloat(v) || 0 : v
+    return formatCurrency(num)
+  }
 
   const calculateQuotePrices = (
     currentForm: PriceFormState,
@@ -1200,7 +1344,17 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
         materialCost: parseFloat(priceForm.materialCost) || 0,
         stoneCost: parseFloat(priceForm.stoneCost) || 0,
         costBeforeVAT: parseFloat(priceForm.costBeforeVAT) || 0,
-        stones: stoneInputMethod === 'table' ? stoneEntries : [],
+        stones: stoneInputMethod === 'table' ? stoneEntries.map(e => {
+          const unitPriceVal = parseFloat(e.unitPrice) || 0
+          const sizeVal = parseFloat(e.sizeOrCarat) || 0
+          const totalVal = e.priceMethod === 'per_piece' ? e.quantity * unitPriceVal : e.quantity * sizeVal * unitPriceVal
+          return {
+            name: `${STONE_TYPE_LABELS[e.type] || e.type}${e.sizeOrCarat ? ` (${e.sizeOrCarat})` : ''}`,
+            quantity: e.quantity,
+            pricePerUnit: unitPriceVal,
+            totalPrice: Math.round(totalVal),
+          }
+        }) : [],
         costPrice: parseFloat(priceForm.costPrice) || 0,
         sellingPrice: parseFloat(priceForm.sellingPrice) || 0,
         quotedBy: priceForm.quotedBy,
@@ -1364,6 +1518,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                 <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Người yêu cầu</TableHead>
                 {canViewCost && <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider text-right h-11">Giá vốn</TableHead>}
                 <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider text-right h-11">Giá bán</TableHead>
+                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Ngày tạo</TableHead>
                 <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Trạng thái</TableHead>
                 <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider text-right h-11">Thao tác</TableHead>
               </TableRow>
@@ -1389,6 +1544,9 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                       )}
                       <TableCell className="text-right font-bold text-primary">
                         {q.sellingPrice ? formatCurrency(q.sellingPrice) : '—'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {formatDate(q.createdAt)}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className={`${sc.color} gap-1.5 pl-2`}>
@@ -1643,9 +1801,9 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         <p className="text-xs text-muted-foreground mb-2">🖼 Hình ảnh sản phẩm</p>
                         <div className="flex flex-wrap gap-2">
                           {selected.images.map((img, i) => (
-                            <a key={i} href={`http://localhost:3001${img}`} target="_blank" rel="noreferrer"
+                            <a key={i} href={`http://localhost:3000${img}`} target="_blank" rel="noreferrer"
                               className="block rounded-xl border overflow-hidden hover:opacity-80 hover:scale-105 transition-all duration-200 shadow-sm">
-                              <img src={`http://localhost:3001${img}`} alt={`Ảnh ${i + 1}`} className="h-20 w-20 object-cover" />
+                              <img src={`http://localhost:3000${img}`} alt={`Ảnh ${i + 1}`} className="h-20 w-20 object-cover" />
                             </a>
                           ))}
                         </div>
@@ -1729,7 +1887,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           rows={goldRows}
                           onChange={setGoldRows}
                           pricingConfig={pricingConfig}
-                          fmt={formatCurrency}
+                          fmt={fmt}
                           onTotalChange={(total) => {
                             setPriceForm((f) => {
                               const nextForm = { ...f, materialCost: String(total) }
@@ -1776,11 +1934,11 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           />
                         ) : (
                           <>
-                            <StoneTable entries={stoneEntries} onChange={setStoneEntries} fmt={formatCurrency} />
+                            <StoneTable entries={stoneEntries} onChange={setStoneEntries} fmt={fmt} />
                             {parseFloat(priceForm.stoneCost) > 0 && (
                               <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 px-3 py-2 text-xs text-blue-700 dark:text-blue-300 flex justify-between">
                                 <span>Tổng tiền đá / phụ kiện</span>
-                                <strong>{formatCurrency(priceForm.stoneCost)}</strong>
+                                <strong>{fmt(priceForm.stoneCost)}</strong>
                               </div>
                             )}
                           </>
@@ -1983,7 +2141,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           <div className="flex flex-wrap gap-2">
                             {keepImages.map((img, i) => (
                               <div key={img} className="relative h-16 w-16 rounded-xl border border-[#EDE8DE] overflow-hidden group p-0.5 bg-white">
-                                <img src={`http://localhost:3001${img}`} alt="" className="h-full w-full object-cover rounded-lg" />
+                                <img src={`http://localhost:3000${img}`} alt="" className="h-full w-full object-cover rounded-lg" />
                                 <button
                                   type="button"
                                   onClick={() => setKeepImages(prev => prev.filter((_, idx) => idx !== i))}
@@ -2360,9 +2518,9 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           <span className="text-[9px] text-[#9E8E7A] font-bold tracking-wider uppercase block">Hình ảnh sản phẩm ({selected.images.length})</span>
                           <div className="grid grid-cols-4 gap-2">
                             {selected.images.map((img, i) => (
-                              <a key={i} href={`http://localhost:3001${img}`} target="_blank" rel="noreferrer"
+                              <a key={i} href={`http://localhost:3000${img}`} target="_blank" rel="noreferrer"
                                 className="relative block rounded-lg overflow-hidden border border-[#EDE8DE] hover:border-[#C9981A] hover:scale-[1.03] transition-all duration-200 shadow-sm group">
-                                <img src={`http://localhost:3001${img}`} alt={`Ảnh ${i + 1}`}
+                                <img src={`http://localhost:3000${img}`} alt={`Ảnh ${i + 1}`}
                                   className="h-16 w-full object-cover" />
                                 <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                   <Eye className="h-4 w-4 text-white" />

@@ -4,7 +4,7 @@
 // được load từ backend qua pricingConfigApi.get()
 // ============================================================
 
-export type StoneType = 'lab_diamond' | 'natural_diamond' | 'colored_stone'
+export type StoneType = 'lab_diamond' | 'natural_diamond' | 'moissanite' | 'cz' | 'colored_stone'
 
 export interface StoneEntry {
   id: string
@@ -143,7 +143,9 @@ export function formatNumber(value: number): string {
 
 // Stone type labels
 export const STONE_TYPE_LABELS: Record<StoneType, string> = {
-  lab_diamond: 'Kim cuong Lab',
-  natural_diamond: 'Kim cuong thien nhien',
-  colored_stone: 'Da mau',
+  lab_diamond: 'Kim cương Lab',
+  natural_diamond: 'Kim cương thiên nhiên',
+  moissanite: 'Đá Moissanite',
+  cz: 'Đá CZ',
+  colored_stone: 'Đá màu / phụ kiện',
 }
