@@ -74,6 +74,11 @@ function formatMaterialType(type: string) {
   return map[type] || type.replace(/_/g, ' ')
 }
 
+function formatDate(iso: string) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('vi-VN')
+}
+
 // ─── sub-components ─────────────────────────────────────────────────
 function MiniStat({
   icon, label, value, badge, theme = 'gold',
@@ -300,7 +305,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess }:
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#FBF6E9] border-b border-[#EDE8DE]">
-                  {['ID BÁO GIÁ','SẢN PHẨM','CHẤT LIỆU','NGƯỜI YÊU CẦU','GIÁ BÁN','TRẠNG THÁI','THAO TÁC'].map(h => (
+                  {['ID BÁO GIÁ','SẢN PHẨM','CHẤT LIỆU','NGƯỜI YÊU CẦU','NGÀY TẠO','GIÁ BÁN','TRẠNG THÁI','THAO TÁC'].map(h => (
                     <th key={h} className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-[#6B5E4C] h-10">
                       {h}
                     </th>
@@ -311,7 +316,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess }:
                 {loading ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <tr key={i} className="border-b border-slate-100/60">
-                      {Array.from({ length: 7 }).map((__, j) => (
+                      {Array.from({ length: 8 }).map((__, j) => (
                         <td key={j} className="px-5 py-3.5">
                           <div className="h-3 rounded bg-muted animate-pulse" style={{ width: `${60 + (j * 15) % 40}%` }} />
                         </td>
@@ -320,7 +325,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess }:
                   ))
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-xs text-muted-foreground font-medium">
+                    <td colSpan={8} className="px-5 py-12 text-center text-xs text-muted-foreground font-medium">
                       Không tìm thấy yêu cầu báo giá nào
                     </td>
                   </tr>
@@ -347,6 +352,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess }:
                           {formatMaterialType(q.materialType)}
                         </td>
                         <td className="px-5 py-3 text-xs text-muted-foreground">{q.requestedBy}</td>
+                        <td className="px-5 py-3 text-xs text-muted-foreground">{formatDate(q.createdAt)}</td>
                         <td className="px-5 py-3 text-xs font-bold text-[#b4904c] tracking-wide">
                           {q.sellingPrice ? (
                             <span>{formatCurrency(q.sellingPrice)}</span>
