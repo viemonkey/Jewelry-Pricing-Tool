@@ -1,0 +1,132 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.quotesService = exports.QuotesService = void 0;
+const Quote_1 = require("../models/Quote");
+const notifications_service_1 = require("./notifications.service");
+class QuotesService {
+    async findAll(status) {
+        const filter = status ? { status } : {};
+        return Quote_1.Quote.find(filter).sort({ createdAt: -1 }).lean();
+    }
+    async findOne(id) {
+        const quote = await Quote_1.Quote.findById(id).lean();
+        if (!quote) {
+            const err = new Error(`Quote ${id} không tồn tại`);
+            err.statusCode = 404;
+            throw err;
+        }
+        return quote;
+    }
+    async create(dto, imageUrls) {
+        const year = new Date().getFullYear();
+        const count = await Quote_1.Quote.countDocuments();
+        const quoteCode = `QT-${year}-${String(count + 1).padStart(4, '0')}`;
+        const quote = new Quote_1.Quote({
+            ...dto,
+            quoteCode,
+            images: imageUrls,
+            status: Quote_1.QuoteStatus.PENDING,
+        });
+        return quote.save();
+    }
+    async updatePrice(id, dto) {
+        const quote = await Quote_1.Quote.findByIdAndUpdate(id, { ...dto, status: Quote_1.QuoteStatus.QUOTING }, { new: true }).lean();
+        if (!quote) {
+            const err = new Error('Quote not found');
+            err.statusCode = 404;
+            throw err;
+        }
+        return quote;
+    }
+    async startQuoting(id) {
+        return this.updateStatus(id, Quote_1.QuoteStatus.QUOTING);
+    }
+    async rejectQuote(id, reason) {
+        const quote = await Quote_1.Quote.findByIdAndUpdate(id, { status: Quote_1.QuoteStatus.NEED_MORE_INFO, rejectReason: reason }, { new: true }).lean();
+        if (!quote) {
+            const err = new Error('Quote not found');
+            err.statusCode = 404;
+            throw err;
+        }
+        notifications_service_1.notificationsService.notifyQuoteRejected(quote.quoteCode || '', quote.productName, String(quote._id), reason);
+        return quote;
+    }
+    async updateInfo(id, data) {
+        const quote = await Quote_1.Quote.findByIdAndUpdate(id, { ...data }, { new: true }).lean();
+        if (!quote) {
+            const err = new Error('Quote not found');
+            err.statusCode = 404;
+            throw err;
+        }
+        return quote;
+    }
+    async resubmit(id) {
+        const quote = await Quote_1.Quote.findByIdAndUpdate(id, { status: Quote_1.QuoteStatus.PENDING, rejectReason: '' }, { new: true }).lean();
+        if (!quote) {
+            const err = new Error('Quote not found');
+            err.statusCode = 404;
+            throw err;
+        }
+        notifications_service_1.notificationsService.emit({
+            type: 'QUOTE_REJECTED',
+            targetRole: 'order',
+            title: '🔄 Sale đã bổ sung thông tin',
+            message: `"${quote.productName}" (${quote.quoteCode}) đã được Sale cập nhật, sẵn sàng báo giá`,
+            quoteId: String(quote._id),
+            quoteCode: quote.quoteCode,
+            productName: quote.productName,
+        });
+        return quote;
+    }
+    async completeQuoting(id) {
+        const quote = await this.updateStatus(id, Quote_1.QuoteStatus.QUOTED);
+        notifications_service_1.notificationsService.notifyQuoteCompleted(quote.quoteCode || '', quote.productName, String(quote._id), quote.sellingPrice ?? 0);
+        return quote;
+    }
+    async sentToCustomer(id) {
+        const quote = await this.updateStatus(id, Quote_1.QuoteStatus.SENT_TO_CUSTOMER);
+        notifications_service_1.notificationsService.emit({
+            type: 'QUOTE_COMPLETED',
+            targetRole: 'order',
+            title: '📤 Sale đã gửi giá cho khách',
+            message: `"${quote.productName}" (${quote.quoteCode}) đã được gửi báo giá cho khách hàng`,
+            quoteId: String(quote._id),
+            quoteCode: quote.quoteCode,
+            productName: quote.productName,
+        });
+        return quote;
+    }
+    async confirm(id) {
+        const quote = await this.updateStatus(id, Quote_1.QuoteStatus.CONFIRMED);
+        notifications_service_1.notificationsService.notifyQuoteConfirmed(quote.quoteCode || '', quote.productName, String(quote._id));
+        return quote;
+    }
+    async cancel(id) {
+        const quote = await this.updateStatus(id, Quote_1.QuoteStatus.CANCELLED);
+        notifications_service_1.notificationsService.notifyQuoteCancelled(quote.quoteCode || '', quote.productName, String(quote._id));
+        return quote;
+    }
+    async markInProduction(id) {
+        return this.updateStatus(id, Quote_1.QuoteStatus.IN_PRODUCTION);
+    }
+    async updateStatus(id, status) {
+        const quote = await Quote_1.Quote.findByIdAndUpdate(id, { status }, { new: true }).lean();
+        if (!quote) {
+            const err = new Error('Quote not found');
+            err.statusCode = 404;
+            throw err;
+        }
+        return quote;
+    }
+    async getStats() {
+        const [total, pending, quoted, confirmed] = await Promise.all([
+            Quote_1.Quote.countDocuments(),
+            Quote_1.Quote.countDocuments({ status: Quote_1.QuoteStatus.PENDING }),
+            Quote_1.Quote.countDocuments({ status: Quote_1.QuoteStatus.QUOTED }),
+            Quote_1.Quote.countDocuments({ status: Quote_1.QuoteStatus.CONFIRMED }),
+        ]);
+        return { total, pending, quoted, confirmed };
+    }
+}
+exports.QuotesService = QuotesService;
+exports.quotesService = new QuotesService();

@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const production_controller_1 = require("../controllers/production.controller");
+const upload_middleware_1 = require("../middleware/upload.middleware");
+const router = (0, express_1.Router)();
+router.get('/', production_controller_1.productionController.findAll);
+router.get('/:id', production_controller_1.productionController.findOne);
+router.post('/', production_controller_1.productionController.create);
+router.patch('/:id/progress', production_controller_1.productionController.updateProgress);
+router.patch('/:id/complete', upload_middleware_1.uploadProduction, production_controller_1.productionController.complete);
+exports.default = router;

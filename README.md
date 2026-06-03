@@ -8,7 +8,7 @@ Hệ thống quản lý yêu cầu báo giá gia công trang sức luxury và th
 
 ```
 Jewelry-Pricing-Tool/
-├── jewelry-pricing-tool-be/     # NestJS Backend (Chạy tại cổng 3000)
+├── Jewelry-Pricing-Tool-BE-2/   # Express.js Backend (Chạy tại cổng 3000)
 └── Jewelry-Pricing-Tool-FE/     # Next.js Frontend (Chạy tại cổng 3001)
 ```
 
@@ -26,11 +26,11 @@ Jewelry-Pricing-Tool/
                  & File Uploads  │  (Real-time Streams)
                                  ▼
                   ┌──────────────────────────────┐
-                  │      NestJS Backend          │
+                  │     Express.js Backend       │
                   │   http://localhost:3000      │
                   └──────────────┬───────────────┘
                                  │
-                                 ▼
+                                 ▼ 
                   ┌──────────────────────────────┐
                   │         MongoDB              │
                   │  mongodb://localhost:27017   │
@@ -151,11 +151,11 @@ Hỗ trợ 2 phương pháp tính:
 
 ---
 
-### 1. Khởi chạy Backend (NestJS)
+### 1. Khởi chạy Backend (Express.js)
 
-1. Di chuyển vào thư mục backend:
+1. Di chuyển vào thư mục backend mới:
    ```bash
-   cd jewelry-pricing-tool-be
+   cd Jewelry-Pricing-Tool-BE-2
    ```
 2. Cài đặt các gói phụ thuộc (dependencies):
    ```bash
@@ -177,9 +177,9 @@ Hỗ trợ 2 phương pháp tính:
    ```bash
    npm run seed
    ```
-5. Khởi chạy server ở chế độ phát triển (development mode):
+5. Khởi chạy server ở chế độ phát triển (development mode với nodemon & ts-node):
    ```bash
-   npm run start:dev
+   npm run dev
    ```
    *Backend sẽ lắng nghe tại:* `http://localhost:3000`
 
