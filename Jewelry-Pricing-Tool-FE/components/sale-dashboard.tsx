@@ -56,11 +56,8 @@ const STATUS_MAP: Record<QuoteStatus, { label: string; badgeClass: string }> = {
     label: 'ĐÃ HUỶ',
     badgeClass: 'border-slate-200 bg-slate-50 text-slate-500',
   },
-  IN_PRODUCTION: {
-    label: 'SẢN XUẤT',
-    badgeClass: 'border-blue-200 bg-blue-50 text-blue-600',
-  },
 }
+
 
 function formatMaterialType(type: string) {
   const map: Record<string, string> = {

@@ -29,8 +29,8 @@ const STATUS_MAP: Record<QuoteStatus, { label: string; color: string }> = {
   SENT_TO_CUSTOMER: { label: 'Đã gửi khách',  color: 'border-teal-400 text-teal-600 bg-teal-50' },
   CONFIRMED:        { label: 'Đã đặt hàng',   color: 'border-emerald-400 text-emerald-600 bg-emerald-50' },
   CANCELLED:        { label: 'Đã huỷ',        color: 'border-slate-300 text-slate-500 bg-slate-50' },
-  IN_PRODUCTION:    { label: 'Đang sản xuất', color: 'border-orange-400 text-orange-600 bg-orange-50' },
 }
+
 
 const tableRowVariants = {
   hidden: { opacity: 0, x: -20 },

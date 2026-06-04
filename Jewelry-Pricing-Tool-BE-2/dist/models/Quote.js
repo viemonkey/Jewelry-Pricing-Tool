@@ -44,7 +44,6 @@ var QuoteStatus;
     QuoteStatus["SENT_TO_CUSTOMER"] = "SENT_TO_CUSTOMER";
     QuoteStatus["CONFIRMED"] = "CONFIRMED";
     QuoteStatus["CANCELLED"] = "CANCELLED";
-    QuoteStatus["IN_PRODUCTION"] = "IN_PRODUCTION";
 })(QuoteStatus || (exports.QuoteStatus = QuoteStatus = {}));
 var ProductType;
 (function (ProductType) {

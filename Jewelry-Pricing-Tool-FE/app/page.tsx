@@ -18,10 +18,9 @@ import { formatCurrency, formatNumber } from '@/lib/pricing'
 import { pricingConfigApi, type GoldRatioConfig } from '@/lib/api'
 import { useSseNotifications } from '@/lib/use-sse-notifications'
 import { useNotifications } from '@/lib/notifications'
-import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, Hammer, HelpCircle, LogOut } from 'lucide-react'
+import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, HelpCircle, LogOut } from 'lucide-react'
 import { QuoteRequestModal } from '@/components/quote-request-modal'
 import { QuoteListPricer } from '@/components/quote-list-pricer'
-import { ProductionBoard } from '@/components/production-board'
 import { SaleDashboard } from '@/components/sale-dashboard'
 
 const tabContentVariants = {
@@ -85,7 +84,6 @@ export default function Home() {
   })
 
   const canViewSettings = currentRole === 'order'
-  const canViewProduction = currentRole === 'order'
   const canViewCalculator = currentRole === 'order'
   const currentUserName = currentRole === 'sale' ? 'Nguyễn Văn Sale' : 'Báo giá viên'
 
@@ -100,8 +98,8 @@ export default function Home() {
               <span className="text-sm font-bold tracking-wider font-serif">JQ</span>
             </div>
             <div>
-              <h2 className="text-sm font-serif font-bold text-sidebar-foreground leading-none">Jewelry Quote</h2>
-              <p className="text-[9px] font-bold text-sidebar-primary uppercase tracking-widest mt-1">Luxury Management</p>
+              <h2 className="text-sm font-serif font-bold text-sidebar-foreground leading-none">Báo giá Trang sức</h2>
+              <p className="text-[9px] font-bold text-sidebar-primary uppercase tracking-widest mt-1">Quản lý Cao cấp</p>
             </div>
           </div>
 
@@ -111,7 +109,6 @@ export default function Home() {
               { value: 'dashboard', icon: LayoutDashboard, label: 'Bảng điều khiển', show: true },
               { value: 'quotes', icon: ClipboardList, label: 'Danh sách báo giá', show: true },
               { value: 'calculator', icon: Calculator, label: 'Máy tính giá', show: canViewCalculator },
-              { value: 'production', icon: Hammer, label: 'Theo dõi xưởng', show: canViewProduction },
               { value: 'settings', icon: Settings, label: 'Cấu hình & Cài đặt', show: canViewSettings },
             ].filter(item => item.show).map((item) => {
               const isActive = activeTab === item.value
@@ -224,29 +221,6 @@ export default function Home() {
               </motion.div>
             </TabsContent>
 
-            {/* Production Tab */}
-            {canViewProduction && (
-              <TabsContent value="production" className="space-y-6 mt-0">
-                <motion.div
-                  key="production"
-                  variants={tabContentVariants}
-                  initial="hidden"
-                  animate="visible"
-                  exit="exit"
-                  className="space-y-6"
-                >
-                  <div>
-                    <h1 className="text-2xl sm:text-3xl font-serif font-semibold bg-gradient-to-r from-primary via-amber-600 to-primary bg-clip-text text-transparent tracking-wide">
-                      Theo dõi sản xuất tại xưởng
-                    </h1>
-                    <p className="text-xs text-muted-foreground sm:text-sm font-medium mt-1">
-                      Giám sát và cập nhật trạng thái gia công đúc, gắn đá và đánh bóng
-                    </p>
-                  </div>
-                  <ProductionBoard currentUserName={currentUserName} />
-                </motion.div>
-              </TabsContent>
-            )}
 
             {/* Calculator Tab */}
             {canViewCalculator && (
@@ -563,7 +537,7 @@ export default function Home() {
         {/* Footer */}
         <footer className="border-t py-4 px-6 bg-card/60 backdrop-blur-md">
           <p className="text-center text-xs text-muted-foreground">
-            © 2024 Jewelry Quote Management System • Luxury Hub Experience
+            © 2024 Hệ thống Quản lý Báo giá Trang sức • Trải nghiệm Đẳng cấp
           </p>
         </footer>
       </div>

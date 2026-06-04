@@ -147,9 +147,7 @@ export class QuotesService {
     return quote
   }
 
-  async markInProduction(id: string) {
-    return this.updateStatus(id, QuoteStatus.IN_PRODUCTION)
-  }
+
 
   private async updateStatus(id: string, status: QuoteStatus) {
     const quote = await Quote.findByIdAndUpdate(id, { status }, { new: true }).lean()

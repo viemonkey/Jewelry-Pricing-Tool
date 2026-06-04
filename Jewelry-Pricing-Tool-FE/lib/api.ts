@@ -3,7 +3,7 @@
 // Base URL đọc từ env: NEXT_PUBLIC_API_URL
 // ============================================================
 
-import type { Quote, ProductionOrder, CreateQuoteRequest, UpdateQuotePrice } from './types'
+import type { Quote, CreateQuoteRequest, UpdateQuotePrice } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
 
@@ -123,42 +123,6 @@ export const quotesApi = {
   /** Sale: Khách huỷ → CANCELLED */
   cancel: (id: string) =>
     request<Quote>(`/quotes/${id}/cancel`, { method: 'PATCH' }),
-}
-
-// ─── PRODUCTION ORDERS ─────────────────────────────────────
-
-export const productionApi = {
-  /** Lấy danh sách production orders */
-  list: (status?: string) => {
-    const qs = status ? `?status=${status}` : ''
-    return request<ProductionOrder[]>(`/production${qs}`)
-  },
-
-  /** Tạo production order từ quote đã CONFIRMED */
-  create: (data: { quoteId: string; deadline: string; assignedTo?: string }) =>
-    request<ProductionOrder>('/production', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  /** Xưởng cập nhật trạng thái tiến độ */
-  updateProgress: (id: string, data: { progressStatus: string; progressNotes?: string }) =>
-    request<ProductionOrder>(`/production/${id}/progress`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
-
-  /** Xưởng hoàn thành + upload ảnh thành phẩm */
-  complete: async (id: string, images: File[]): Promise<ProductionOrder> => {
-    const form = new FormData()
-    images.forEach((file) => form.append('completedImages', file))
-    const res = await fetch(`${BASE_URL}/production/${id}/complete`, {
-      method: 'PATCH',
-      body: form,
-    })
-    if (!res.ok) throw new Error('Hoàn thành sản xuất thất bại')
-    return res.json()
-  },
 }
 
 // ─── STATS ─────────────────────────────────────────────────

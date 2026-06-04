@@ -25,8 +25,8 @@ interface HeaderProps {
 }
 
 const ROLE_LABELS: Record<UserRole, string> = {
-  sale: 'Luxury Sale Hub',
-  order: 'Luxury Pricing & Mgmt',
+  sale: 'Bộ phận Sale (Kinh doanh)',
+  order: 'Báo giá & Quản trị',
 }
 
 const ROLE_COLORS: Record<UserRole, string> = {

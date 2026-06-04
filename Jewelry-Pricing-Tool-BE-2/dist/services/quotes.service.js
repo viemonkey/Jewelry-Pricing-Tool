@@ -106,9 +106,6 @@ class QuotesService {
         notifications_service_1.notificationsService.notifyQuoteCancelled(quote.quoteCode || '', quote.productName, String(quote._id));
         return quote;
     }
-    async markInProduction(id) {
-        return this.updateStatus(id, Quote_1.QuoteStatus.IN_PRODUCTION);
-    }
     async updateStatus(id, status) {
         const quote = await Quote_1.Quote.findByIdAndUpdate(id, { status }, { new: true }).lean();
         if (!quote) {

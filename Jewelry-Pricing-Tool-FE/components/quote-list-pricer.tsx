@@ -142,8 +142,8 @@ const STATUS_CONFIG: Record<QuoteStatus, { label: string; color: string; dot: st
   SENT_TO_CUSTOMER:   { label: 'Đã gửi khách',        color: 'bg-[#1ABC9C] text-white border-transparent shadow-sm whitespace-nowrap font-semibold', dot: 'bg-white/80' },
   CONFIRMED:          { label: 'Đặt hàng',            color: 'bg-[#E67E22] text-white border-transparent shadow-sm whitespace-nowrap font-semibold', dot: 'bg-white/80' },
   CANCELLED:          { label: 'Đã huỷ',              color: 'bg-[#95A5A6] text-white border-transparent shadow-sm whitespace-nowrap font-semibold', dot: 'bg-white/80' },
-  IN_PRODUCTION:      { label: 'Đang sản xuất',       color: 'bg-[#34495E] text-white border-transparent shadow-sm whitespace-nowrap font-semibold', dot: 'bg-white/80' },
 }
+
 
 export interface StoneEntry {
   id: string
@@ -1573,56 +1573,55 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                               <Calculator className="h-3 w-3" /> Tính giá
                             </Button>
                           )}
-                          {/* Sale: NEED_MORE_INFO → Xem lý do + Gửi lại */}
-                          {!isPricer && q.status === 'NEED_MORE_INFO' && (
-                            <Button size="sm" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs bg-orange-500 hover:bg-orange-600">
-                              <AlertCircle className="h-3 w-3" /> Bổ sung
-                            </Button>
-                          )}
-                          {/* Sale: QUOTED → Xem báo giá + Gửi cho khách */}
-                          {!isPricer && q.status === 'QUOTED' && (
-                            <>
-                              <Button size="sm" variant="outline" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
-                                <Eye className="h-3 w-3" /> Xem giá
-                              </Button>
-                              <Button size="sm" onClick={() => handleSentToCustomer(q._id)} className="gap-1 h-7 text-xs bg-violet-600 hover:bg-violet-700">
-                                <Send className="h-3 w-3" /> Gửi khách
-                              </Button>
-                            </>
-                          )}
-                          {/* Sale: SENT_TO_CUSTOMER → Khách chốt hoặc Huỷ */}
-                          {!isPricer && q.status === 'SENT_TO_CUSTOMER' && (
-                            <>
-                              <Button size="sm" className="gap-1 h-7 text-xs" onClick={() => handleConfirm(q._id)}>
-                                <ShoppingCart className="h-3 w-3" /> Khách chốt
-                              </Button>
-                              <Button size="sm" variant="destructive" className="gap-1 h-7 text-xs" onClick={() => handleCancel(q._id)}>
-                                <Ban className="h-3 w-3" /> Huỷ
-                              </Button>
-                            </>
-                          )}
-                          {/* Xem chi tiết cho các trạng thái còn lại */}
-                          {(q.status === 'CONFIRMED' || q.status === 'CANCELLED' || q.status === 'IN_PRODUCTION') && (
-                            <Button size="sm" variant="ghost" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
-                              <Eye className="h-3 w-3" /> Xem
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </motion.tr>
-                  )
-                })}
-              </AnimatePresence>
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                    Không có yêu cầu nào
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                           {/* Sale: NEED_MORE_INFO → Xem lý do + Gửi lại */}
+                           {!isPricer && q.status === 'NEED_MORE_INFO' && (
+                             <Button size="sm" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs bg-orange-500 hover:bg-orange-600">
+                               <AlertCircle className="h-3 w-3" /> Bổ sung
+                             </Button>
+                           )}
+                           {/* Sale: QUOTED → Xem báo giá + Gửi cho khách */}
+                           {!isPricer && q.status === 'QUOTED' && (
+                             <>
+                               <Button size="sm" variant="outline" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
+                                 <Eye className="h-3 w-3" /> Xem giá
+                               </Button>
+                               <Button size="sm" onClick={() => handleSentToCustomer(q._id)} className="gap-1 h-7 text-xs bg-violet-600 hover:bg-violet-700">
+                                 <Send className="h-3 w-3" /> Gửi khách
+                               </Button>
+                             </>
+                           )}
+                           {/* Sale: SENT_TO_CUSTOMER → Khách chốt hoặc Huỷ */}
+                           {!isPricer && q.status === 'SENT_TO_CUSTOMER' && (
+                             <>
+                               <Button size="sm" className="gap-1 h-7 text-xs" onClick={() => handleConfirm(q._id)}>
+                                 <ShoppingCart className="h-3 w-3" /> Khách chốt
+                               </Button>
+                               <Button size="sm" variant="destructive" className="gap-1 h-7 text-xs" onClick={() => handleCancel(q._id)}>
+                                 <Ban className="h-3 w-3" /> Huỷ
+                               </Button>
+                             </>
+                           )}
+                           {(q.status === 'CONFIRMED' || q.status === 'CANCELLED') && (
+                             <Button size="sm" variant="ghost" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
+                               <Eye className="h-3 w-3" /> Xem
+                             </Button>
+                           )}
+                         </div>
+                       </TableCell>
+                     </motion.tr>
+                   )
+                 })}
+               </AnimatePresence>
+               {filtered.length === 0 && (
+                 <TableRow>
+                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                     Không có yêu cầu nào
+                   </TableCell>
+                 </TableRow>
+               )}
+             </TableBody>
+           </Table>
+         </div>
 
         {/* Phân trang (Pagination) */}
         {totalPages > 1 && (

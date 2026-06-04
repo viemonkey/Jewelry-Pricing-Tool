@@ -12,15 +12,6 @@ export type QuoteStatus =
   | 'SENT_TO_CUSTOMER'  // Sale đã gửi giá cho khách — chờ khách trả lời
   | 'CONFIRMED'         // Khách chốt đơn
   | 'CANCELLED'         // Huỷ
-  | 'IN_PRODUCTION'     // Đang sản xuất
-
-export type ProductionStatus =
-  | 'PENDING_PRODUCTION' // Chờ sản xuất
-  | 'CASTING'            // Đang đúc
-  | 'SETTING_STONES'     // Đang gắn đá
-  | 'POLISHING'          // Đang đánh bóng
-  | 'QUALITY_CHECK'      // Kiểm tra chất lượng
-  | 'COMPLETED'          // Hoàn thành
 
 export interface StoneDetail {
   name: string
@@ -47,19 +38,6 @@ export interface Quote {
   status: QuoteStatus
   requestedBy: string      // Tên Sale
   quotedBy?: string        // Tên NV báo giá
-  createdAt: string
-  updatedAt: string
-}
-
-export interface ProductionOrder {
-  _id: string
-  orderCode: string        // VD: PO-2025-001
-  quote: Quote | string    // Populated hoặc ID
-  deadline: string
-  assignedTo?: string      // Tên thợ
-  progressStatus: ProductionStatus
-  progressNotes?: string
-  completedImages: string[]
   createdAt: string
   updatedAt: string
 }

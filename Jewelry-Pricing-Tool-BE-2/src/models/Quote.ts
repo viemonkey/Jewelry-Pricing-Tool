@@ -8,7 +8,6 @@ export enum QuoteStatus {
   SENT_TO_CUSTOMER = 'SENT_TO_CUSTOMER',
   CONFIRMED        = 'CONFIRMED',
   CANCELLED        = 'CANCELLED',
-  IN_PRODUCTION    = 'IN_PRODUCTION',
 }
 
 export enum ProductType {

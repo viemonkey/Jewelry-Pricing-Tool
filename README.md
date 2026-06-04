@@ -1,16 +1,54 @@
-# 💍 VCB Jewelry Pricing & Production Management Tool
+# 💍 VCB Jewelry Pricing Management Tool
 
-Hệ thống quản lý yêu cầu báo giá gia công trang sức luxury và theo dõi tiến độ sản xuất thời gian thực dành cho **VCB Jewelry**. Dự án tích hợp các công cụ tính giá tự động phức tạp, bảo mật cơ cấu giá vốn theo vai trò người dùng (Data Masking) và thông báo đẩy thời gian thực (SSE).
+Hệ thống quản lý yêu cầu báo giá gia công trang sức luxury dành cho **VCB Jewelry**. Dự án tích hợp các công cụ tính giá tự động phức tạp, bảo mật cơ cấu giá vốn theo vai trò người dùng (Data Masking) và thông báo đẩy thời gian thực (SSE).
 
 ---
 
-## 📂 Cấu trúc thư mục dự án
+## 📂 Cấu trúc chi tiết & Vai trò các tệp tin (Project Architecture)
 
-```
-Jewelry-Pricing-Tool/
-├── Jewelry-Pricing-Tool-BE-2/   # Express.js Backend (Chạy tại cổng 3000)
-└── Jewelry-Pricing-Tool-FE/     # Next.js Frontend (Chạy tại cổng 3001)
-```
+Để dễ dàng quản lý và phát triển, mã nguồn được tổ chức phân lớp rõ ràng cho cả Frontend (Next.js) và Backend (Express.js):
+
+### 1. ⚙️ Express.js Backend (`Jewelry-Pricing-Tool-BE-2`)
+Backend đảm nhận nhiệm vụ lưu trữ cơ sở dữ liệu, quản lý kết nối thời gian thực và cung cấp API RESTful. Chi tiết xem tại [Tài liệu Backend chi tiết](file:///c:/Jewelry-Pricing-Tool/Jewelry-Pricing-Tool-BE-2/README.md).
+
+* **`src/config/db.ts`**: Thiết lập kết nối MongoDB và tự động nạp cấu hình tính giá mẫu ban đầu nếu cơ sở dữ liệu trống.
+* **`src/models/`** (Lớp thực thể dữ liệu):
+  * [Quote.ts](file:///c:/Jewelry-Pricing-Tool/Jewelry-Pricing-Tool-BE-2/src/models/Quote.ts): Định nghĩa Schema và trạng thái của yêu cầu báo giá.
+  * [PricingConfig.ts](file:///c:/Jewelry-Pricing-Tool/Jewelry-Pricing-Tool-BE-2/src/models/PricingConfig.ts): Lưu hệ số chia bậc lợi nhuận, giá vàng 24K hôm nay và hệ số nhân bạc.
+  * [GoldPrice.ts](file:///c:/Jewelry-Pricing-Tool/Jewelry-Pricing-Tool-BE-2/src/models/GoldPrice.ts) / [StonePrice.ts](file:///c:/Jewelry-Pricing-Tool/Jewelry-Pricing-Tool-BE-2/src/models/StonePrice.ts): Lưu lịch sử giá vàng nguyên liệu và bảng giá các loại đá quý.
+  * [QuotationHistory.ts](file:///c:/Jewelry-Pricing-Tool/Jewelry-Pricing-Tool-BE-2/src/models/QuotationHistory.ts): Nhật ký ghi nhận lịch sử thay đổi trạng thái của đơn hàng.
+* **`s ndex.ts`: Gom toàn bộ các route và định cấu hình tiền tố endpoint (`/quotes`, `/pricing-config`, `/notifications`).
+  * `quotes.routes.ts` / `pricingConfig.routes.ts` / `notifications.routes.ts`: Định tuyến chi tiết cho từng nghiệp vụ tương ứng.
+* **`src/controllers/`** (Điều phối HTTP Request/Response):
+  * `quotes.controller.ts` / `pricingConfig.controller.ts`: Bóc tách dữ liệu gửi lên từ client, gọi lớp Service xử lý và trả về JSON. 
+  * `notifications.controller.ts`: Quản lý mở/đóng các luồng SSE stream đẩy thông báo tới Client.
+* **`src/services/`** (Logic nghiệp vụ lõi):
+  * `quotes.service.ts`: Xử lý tạo mã báo giá `QT-xxxx`, cập nhật thông tin và cập nhật trạng thái đơn báo giá.
+  * `notifications.service.ts`: Event Bus trung tâm (RxJS Subject) chịu trách nhiệm gửi thông báo thời gian thực tương ứng theo vai trò người nhận.
+* **`src/middleware/upload.middleware.ts`**: Quản lý upload file bằng Multer (lưu ảnh vào thư mục `uploads/quotes`).
+* **`src/app.ts`** & **`src/server.ts`**: Khởi tạo Express App, thiết lập CORS, xử lý lỗi tập trung và lắng nghe cổng kết nối.
+* **`src/seed.ts`**: Script độc lập để khởi tạo nhanh bộ dữ liệu ban đầu cho database.
+
+### 2. 🎨 Next.js Frontend (`Jewelry-Pricing-Tool-FE`)
+Frontend Next.js cung cấp giao diện người dùng tương tác thời gian thực, thực thi các thuật toán tính giá bán lẻ và bảo mật ẩn thông tin giá vốn theo vai trò.
+
+* **`app/`** (Cấu trúc App Router):
+  * `layout.tsx`: Khung giao diện chung của toàn bộ trang web và tích hợp Notifications Provider.
+  * `page.tsx`: Dashboard trung tâm hiển thị các thành phần màn hình dựa trên vai trò hiện tại (Sale, Order, Admin).
+* **`components/`** (Các thành phần UI & Nghiệp vụ):
+  * `header.tsx`: Thanh điều hướng, bộ chuyển đổi vai trò (Role Switcher) nhanh và danh sách thông báo đẩy nhận qua SSE.
+  * `quote-request-modal.tsx`: Form dành cho **Sale** tạo yêu cầu báo giá mới kèm upload tối đa 5 hình ảnh thiết kế.
+  * `sale-dashboard.tsx`: Giao diện quản lý danh sách báo giá của bộ phận Sale dưới dạng lưới thẻ sản phẩm.
+  * `quote-list-pricer.tsx`: Giao diện trung tâm của bộ phận **Order**, cho phép duyệt danh sách, từ chối yêu cầu, nhập liệu tính toán giá chi tiết.
+  * `gold-calculator.tsx` / `silver-calculator.tsx`: Bảng tính toán giá chi tiết cho sản phẩm vàng (theo trọng lượng chỉ, tiền công, chọn đá) hoặc sản phẩm bạc (áp dụng multiplier).
+  * `stone-calculator.tsx`: Bảng quản lý và tính giá đá quý đi kèm sản phẩm (Lab Diamond, Natural Diamond, CZ, Moissanite...).
+  * `workflow-status.tsx`: Biểu thanh trạng thái (stepper) thể hiện tiến trình hiện tại của báo giá.
+* **`lib/`** (Thư viện tiện ích và gọi API):
+  * `api.ts`: Client Axios cấu hình sẵn các hàm gọi API tương ứng với Backend.
+  * `pricing.ts`: **Lõi tính giá của toàn bộ hệ thống**. Thực hiện công thức tính giá vàng tuổi, giá đá quý, VAT 10% và áp dụng hệ số chia bậc lợi nhuận động.
+  * `use-sse-notifications.ts`: Custom hook kết nối và lắng nghe EventStream từ API SSE của backend.
+  * `notifications.tsx`: Context quản lý lưu trữ trạng thái hiển thị thông báo toast và danh sách thông báo.
+  * `types.ts`: Định nghĩa toàn bộ kiểu dữ liệu TypeScript dùng chung trên Frontend.
 
 ---
 
@@ -54,20 +92,7 @@ stateDiagram-v2
     QUOTED --> SENT_TO_CUSTOMER : Sale gửi giá bán cho khách hàng
     SENT_TO_CUSTOMER --> CONFIRMED : Khách hàng đồng ý mua (Sale xác nhận)
     SENT_TO_CUSTOMER --> CANCELLED : Khách hàng từ chối (Sale hủy yêu cầu)
-    CONFIRMED --> IN_PRODUCTION : Chuyển thông tin sang Xưởng sản xuất
-```
-
-### 2. Luồng Sản Xuất Gia Công (Production Workflow)
-Sau khi Báo giá chuyển sang trạng thái `CONFIRMED`, hệ thống tự động tạo một Đơn sản xuất mới tại Xưởng:
-```mermaid
-stateDiagram-v2
-    [*] --> PENDING_PRODUCTION : Nhận đơn từ báo giá đã chốt
-    PENDING_PRODUCTION --> CASTING : Đúc phôi vàng / bạc
-    CASTING --> SETTING_STONES : Vào đá / đính đá quý
-    SETTING_STONES --> POLISHING : Đánh bóng & làm nguội trang sức
-    POLISHING --> QUALITY_CHECK : Kiểm tra chất lượng thành phẩm (QC)
-    QUALITY_CHECK --> COMPLETED : Hoàn thành + Tải ảnh thực tế sản phẩm
-    COMPLETED --> [*]
+    CONFIRMED --> [*] : Hoàn thành báo giá
 ```
 
 ---
@@ -80,7 +105,6 @@ Hệ thống phân quyền chi tiết cho 4 bộ phận để tối ưu hóa quy
 | :--- | :--- | :--- |
 | **sale** | Dashboard, Báo giá | Tạo yêu cầu báo giá, chỉnh sửa khi bị trả về, gửi giá cho khách, Xác nhận Chốt/Hủy đơn. |
 | **order** (Pricer) | Dashboard, Báo giá, Calculator, Cài đặt | Tính toán chi tiết trọng lượng vàng, tiền công, chọn đá và cấu hình giá bán. |
-| **workshop** (Xưởng) | Dashboard, Sản xuất | Tiếp nhận đơn hàng sản xuất, cập nhật từng trạng thái gia công, tải lên ảnh sản phẩm hoàn thiện. |
 | **admin** | Toàn bộ chức năng | Quản trị người dùng, cấu hình tỷ giá vàng 24K, hệ số bạc, các bậc lợi nhuận kinh doanh. |
 
 ### 🔒 Chính sách bảo mật ẩn giá vốn (Data Masking)
