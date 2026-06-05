@@ -14,11 +14,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { formatCurrency, formatNumber } from '@/lib/pricing'
 import { pricingConfigApi, type GoldRatioConfig } from '@/lib/api'
 import { useSseNotifications } from '@/lib/use-sse-notifications'
 import { useNotifications } from '@/lib/notifications'
-import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, HelpCircle, LogOut } from 'lucide-react'
+import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, HelpCircle, LogOut, Save, Loader2 } from 'lucide-react'
 import { QuoteRequestModal } from '@/components/quote-request-modal'
 import { QuoteListPricer } from '@/components/quote-list-pricer'
 import { SaleDashboard } from '@/components/sale-dashboard'
@@ -54,18 +55,60 @@ export default function Home() {
   const [currentRole, setCurrentRole] = useState<UserRole>('order')
   const [currentStep] = useState<WorkflowStep>(3)
   const [goldPrice24K, setGoldPrice24K] = useState<string>('9000000')
+  const [goldPriceInputDisplay, setGoldPriceInputDisplay] = useState<string>('')
   const [activeTab, setActiveTab] = useState('dashboard')
   const [search, setSearch] = useState('')
   const [latestQuote, setLatestQuote] = useState<any>(null)
   const [goldRatios, setGoldRatios] = useState<GoldRatioConfig[]>([])
+  const [pricingConfig, setPricingConfig] = useState<any>(null)
+  const [isUpdatingGoldPrice, setIsUpdatingGoldPrice] = useState(false)
 
   const { addNotification } = useNotifications()
 
   useEffect(() => {
     pricingConfigApi.get().then((config) => {
-      if (config?.goldRatios) setGoldRatios(config.goldRatios)
+      if (config) {
+        setPricingConfig(config)
+        if (config.goldRatios) setGoldRatios(config.goldRatios)
+        if (config.goldPrice24K) {
+          setGoldPrice24K(String(config.goldPrice24K))
+          setGoldPriceInputDisplay(new Intl.NumberFormat('vi-VN').format(config.goldPrice24K))
+        }
+      }
     }).catch(() => {})
   }, [])
+
+  const handleSaveGoldPrice = async (priceStr: string) => {
+    const priceNum = parseFloat(priceStr.replace(/\D/g, '')) || 0
+    if (priceNum <= 0) {
+      addNotification({
+        type: 'error',
+        title: 'Lỗi nhập liệu',
+        message: 'Giá vàng phải lớn hơn 0.',
+      })
+      return
+    }
+    setIsUpdatingGoldPrice(true)
+    try {
+      const updatedConfig = await pricingConfigApi.update({ goldPrice24K: priceNum })
+      setGoldPrice24K(String(updatedConfig.goldPrice24K))
+      setPricingConfig(updatedConfig)
+      setGoldPriceInputDisplay(new Intl.NumberFormat('vi-VN').format(updatedConfig.goldPrice24K))
+      addNotification({
+        type: 'success',
+        title: 'Cập nhật thành công',
+        message: `Giá vàng 24K hôm nay đã được cập nhật thành ${formatCurrency(priceNum)}/chỉ.`,
+      })
+    } catch (err: any) {
+      addNotification({
+        type: 'error',
+        title: 'Cập nhật thất bại',
+        message: err.message || 'Không thể lưu giá vàng mới.',
+      })
+    } finally {
+      setIsUpdatingGoldPrice(false)
+    }
+  }
 
   // ── SSE: nhận thông báo real-time từ backend ──
   useSseNotifications(currentRole, (event) => {
@@ -175,6 +218,7 @@ export default function Home() {
                       currentUserName={currentUserName}
                       search={search}
                       onCreateSuccess={(q) => { setLatestQuote(q); setActiveTab('quotes') }}
+                      onViewAll={() => setActiveTab('quotes')}
                     />
                   ) : (
                     <div className="space-y-6">
@@ -186,6 +230,72 @@ export default function Home() {
                           Giám sát thống kê kinh doanh và quy trình báo giá của tiệm
                         </p>
                       </div>
+
+                      {/* Gold Price Quick Update Widget for Manager */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.4, delay: 0.05 }}
+                      >
+                        <Card className="border-primary/20 bg-gradient-to-r from-amber-500/10 via-primary/5 to-transparent relative overflow-hidden shadow-sm hover:shadow-md transition-all">
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_-20%,rgba(212,175,55,0.1),transparent_60%)] pointer-events-none" />
+                          <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                            <div className="flex items-center gap-4">
+                              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-lg text-primary-foreground">
+                                <TrendingUp className="h-6 w-6" />
+                              </div>
+                              <div>
+                                <h3 className="font-serif text-lg font-semibold text-foreground tracking-wide flex items-center gap-2">
+                                  Giá vàng 24K nguyên liệu hôm nay
+                                  <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary text-[10px] uppercase font-mono tracking-widest px-2 py-0">
+                                    Hệ thống
+                                  </Badge>
+                                </h3>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Dùng để tự động tính toán giá vốn nguyên liệu vàng cho tất cả các bản báo giá.
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                              <div className="relative">
+                                <Input
+                                  type="text"
+                                  className="w-48 font-medium text-sm transition-all focus:ring-2 focus:ring-primary/50 text-right pr-14"
+                                  value={goldPriceInputDisplay}
+                                  onChange={(e) => {
+                                    const raw = e.target.value.replace(/\D/g, '')
+                                    setGoldPriceInputDisplay(raw ? new Intl.NumberFormat('vi-VN').format(Number(raw)) : '')
+                                  }}
+                                  placeholder="9,000,000"
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground pointer-events-none">
+                                  đ/chỉ
+                                </span>
+                              </div>
+                              
+                              <Button
+                                onClick={() => handleSaveGoldPrice(goldPriceInputDisplay)}
+                                disabled={isUpdatingGoldPrice}
+                                className="bg-gold-gradient hover:opacity-95 text-primary-foreground font-semibold text-xs px-4 shadow active:scale-98 transition-all shrink-0"
+                              >
+                                {isUpdatingGoldPrice ? (
+                                  <>
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                                    Đang lưu...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Save className="h-3.5 w-3.5 mr-1.5" />
+                                    Cập nhật giá
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+
                       <StatsCards />
                       <WorkflowStatus currentStep={currentStep} />
                       <RecentQuotes currentRole={currentRole} />
@@ -285,19 +395,37 @@ export default function Home() {
                             </motion.p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Label htmlFor="globalGoldPrice" className="text-xs font-semibold tracking-wider text-muted-foreground">
+                        <div className="flex items-center gap-3">
+                          <Label htmlFor="globalGoldPrice" className="text-xs font-semibold tracking-wider text-muted-foreground shrink-0">
                             CẬP NHẬT:
                           </Label>
-                          <motion.div whileFocus={{ scale: 1.02 }}>
+                          <div className="relative">
                             <Input
                               id="globalGoldPrice"
-                              type="number"
-                              className="w-40 transition-all focus:ring-2 focus:ring-primary/50 text-sm font-medium"
-                              value={goldPrice24K}
-                              onChange={(e) => setGoldPrice24K(e.target.value)}
+                              type="text"
+                              className="w-44 transition-all focus:ring-2 focus:ring-primary/50 text-sm font-medium text-right pr-14"
+                              value={goldPriceInputDisplay}
+                              onChange={(e) => {
+                                const raw = e.target.value.replace(/\D/g, '')
+                                setGoldPriceInputDisplay(raw ? new Intl.NumberFormat('vi-VN').format(Number(raw)) : '')
+                              }}
                             />
-                          </motion.div>
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground pointer-events-none">
+                              đ/chỉ
+                            </span>
+                          </div>
+                          <Button
+                            size="sm"
+                            onClick={() => handleSaveGoldPrice(goldPriceInputDisplay)}
+                            disabled={isUpdatingGoldPrice}
+                            className="bg-primary hover:bg-primary/95 text-primary-foreground text-xs font-semibold shrink-0"
+                          >
+                            {isUpdatingGoldPrice ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              'Lưu'
+                            )}
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -523,6 +651,70 @@ export default function Home() {
                                 </p>
                               </motion.div>
                             ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+
+                    {/* Gold Price 24K Daily Config */}
+                    <motion.div custom={4} variants={cardVariants} initial="hidden" animate="visible" className="lg:col-span-2">
+                      <Card className="hover:shadow-lg transition-shadow duration-300">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2">
+                            <TrendingUp className="h-5 w-5 text-primary" />
+                            Giá vàng nguyên liệu 24K hàng ngày
+                          </CardTitle>
+                          <CardDescription>
+                            Cập nhật giá vàng 24K nguyên liệu áp dụng cho việc tính toán giá vốn toàn hệ thống.
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-lg border p-4 bg-muted/30">
+                            <div>
+                              <p className="font-semibold text-base text-primary">Giá vàng hiện tại</p>
+                              <p className="text-2xl font-bold font-serif mt-1">
+                                {formatCurrency(parseFloat(goldPrice24K) || 0)} <span className="text-sm font-sans font-normal text-muted-foreground">/ chỉ</span>
+                              </p>
+                              <p className="text-[11px] text-muted-foreground mt-1">
+                                Cập nhật lần cuối: {pricingConfig?.updatedAt ? new Date(pricingConfig.updatedAt).toLocaleString('vi-VN') : 'Vừa xong'}
+                              </p>
+                            </div>
+                            
+                            <div className="flex items-center gap-3 w-full sm:w-auto">
+                              <div className="relative flex-1 sm:flex-initial">
+                                <Input
+                                  type="text"
+                                  className="w-full sm:w-48 font-medium text-sm text-right pr-14"
+                                  value={goldPriceInputDisplay}
+                                  onChange={(e) => {
+                                    const raw = e.target.value.replace(/\D/g, '')
+                                    setGoldPriceInputDisplay(raw ? new Intl.NumberFormat('vi-VN').format(Number(raw)) : '')
+                                  }}
+                                  placeholder="9,000,000"
+                                />
+                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground pointer-events-none">
+                                  đ/chỉ
+                                </span>
+                              </div>
+                              
+                              <Button
+                                onClick={() => handleSaveGoldPrice(goldPriceInputDisplay)}
+                                disabled={isUpdatingGoldPrice}
+                                className="bg-gold-gradient hover:opacity-95 text-primary-foreground text-xs font-semibold shrink-0"
+                              >
+                                {isUpdatingGoldPrice ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                                    Đang lưu...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Save className="h-3 w-3 mr-1" />
+                                    Cập nhật
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           </div>
                         </CardContent>
                       </Card>

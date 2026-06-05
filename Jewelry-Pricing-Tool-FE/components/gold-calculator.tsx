@@ -82,7 +82,12 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
 
   useEffect(() => {
     pricingConfigApi.get()
-      .then(setConfig)
+      .then((cfg) => {
+        setConfig(cfg)
+        if (cfg?.goldPrice24K) {
+          goldPriceInput.setDisplay(new Intl.NumberFormat('vi-VN').format(cfg.goldPrice24K))
+        }
+      })
       .catch(() => setConfig(null))
       .finally(() => setConfigLoading(false))
   }, [])

@@ -20,6 +20,20 @@ export interface StoneDetail {
   totalPrice: number
 }
 
+export interface QuoteOption {
+  materialType: 'GOLD_24K' | 'GOLD_18K' | 'GOLD_14K' | 'GOLD_10K' | 'GOLD_610' | 'SILVER'
+  weightChi?: number
+  weightGram?: number
+  laborCost?: number
+  goldPrice24K?: number | null
+  materialCost?: number
+  stoneCost?: number
+  costBeforeVAT?: number
+  costWithVAT?: number
+  costPrice?: number
+  sellingPrice?: number
+}
+
 export interface Quote {
   _id: string
   quoteCode: string        // VD: QT-2025-001
@@ -38,6 +52,9 @@ export interface Quote {
   status: QuoteStatus
   requestedBy: string      // Tên Sale
   quotedBy?: string        // Tên NV báo giá
+  options?: QuoteOption[]
+  dimensions?: string
+  stoneRequirements?: string
   createdAt: string
   updatedAt: string
 }
@@ -54,6 +71,7 @@ export interface CreateQuoteRequest {
   notes?: string
   images: File[]
   requestedBy: string
+  options?: any[]
 }
 
 // DTO for pricer to update quote
@@ -69,4 +87,5 @@ export interface UpdateQuotePrice {
   costPrice: number        // Giá vốn có VAT
   sellingPrice: number     // Giá bán đề xuất
   quotedBy: string
+  options?: QuoteOption[]
 }

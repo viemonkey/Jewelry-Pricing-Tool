@@ -22,8 +22,16 @@ export class QuotesService {
     const count = await Quote.countDocuments()
     const quoteCode = `QT-${year}-${String(count + 1).padStart(4, '0')}`
 
+    let options = []
+    if (dto.options) {
+      try {
+        options = typeof dto.options === 'string' ? JSON.parse(dto.options) : dto.options
+      } catch (err) {}
+    }
+
     const quote = new Quote({
       ...dto,
+      options,
       quoteCode,
       images: imageUrls,
       status: QuoteStatus.PENDING,
@@ -32,9 +40,26 @@ export class QuotesService {
   }
 
   async updatePrice(id: string, dto: any) {
+    const updateData = { ...dto }
+    
+    // Backwards compatibility: populate top-level fields from the first option
+    if (dto.options && Array.isArray(dto.options) && dto.options.length > 0) {
+      const firstOpt = dto.options[0]
+      updateData.materialType = firstOpt.materialType
+      updateData.weightChi = firstOpt.weightChi
+      updateData.weightGram = firstOpt.weightGram
+      updateData.laborCost = firstOpt.laborCost
+      updateData.goldPrice24K = firstOpt.goldPrice24K
+      updateData.materialCost = firstOpt.materialCost
+      updateData.stoneCost = firstOpt.stoneCost
+      updateData.costBeforeVAT = firstOpt.costBeforeVAT
+      updateData.costPrice = firstOpt.costPrice
+      updateData.sellingPrice = firstOpt.sellingPrice
+    }
+
     const quote = await Quote.findByIdAndUpdate(
       id,
-      { ...dto, status: QuoteStatus.QUOTING },
+      { ...updateData, status: QuoteStatus.QUOTING },
       { new: true }
     ).lean()
     if (!quote) {

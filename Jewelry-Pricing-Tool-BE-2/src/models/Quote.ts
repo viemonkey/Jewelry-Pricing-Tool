@@ -26,6 +26,20 @@ export enum MaterialType {
   SILVER     = 'SILVER',
 }
 
+export interface IQuoteOption {
+  materialType: MaterialType
+  weightChi?: number
+  weightGram?: number
+  laborCost: number
+  goldPrice24K?: number | null
+  materialCost?: number
+  stoneCost?: number
+  costBeforeVAT?: number
+  costWithVAT?: number
+  costPrice: number
+  sellingPrice: number
+}
+
 export interface IQuote extends Document {
   quoteCode?: string
   productName: string
@@ -54,9 +68,24 @@ export interface IQuote extends Document {
   status: QuoteStatus
   requestedBy: string
   quotedBy?: string
+  options?: IQuoteOption[]
   createdAt: Date
   updatedAt: Date
 }
+
+const QuoteOptionSchema = new Schema({
+  materialType: { type: String, enum: Object.values(MaterialType), required: true },
+  weightChi: { type: Number },
+  weightGram: { type: Number },
+  laborCost: { type: Number, default: 0 },
+  goldPrice24K: { type: Number, default: null },
+  materialCost: { type: Number },
+  stoneCost: { type: Number },
+  costBeforeVAT: { type: Number },
+  costWithVAT: { type: Number },
+  costPrice: { type: Number, default: 0 },
+  sellingPrice: { type: Number, default: 0 },
+}, { _id: false })
 
 const QuoteSchema = new Schema<IQuote>(
   {
@@ -87,6 +116,7 @@ const QuoteSchema = new Schema<IQuote>(
     status: { type: String, enum: Object.values(QuoteStatus), default: QuoteStatus.PENDING },
     requestedBy: { type: String, required: true },
     quotedBy: { type: String },
+    options: { type: [QuoteOptionSchema], default: [] },
   },
   { timestamps: true }
 )

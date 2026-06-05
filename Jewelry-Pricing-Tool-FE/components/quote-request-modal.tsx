@@ -219,6 +219,12 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
     const stoneReq   = [stoneLabel, stoneNote].filter(Boolean).join(' – ')
     const dimensionParts = [catLabel && `Loại: ${catLabel}`, sizeStr, weightNotes].filter(Boolean)
 
+    const options = filledRows.map((r) => ({
+      materialType: r.materialType,
+      weightChi: r.unit === 'chi' ? (parseFloat(r.weight) || 0) : undefined,
+      weightGram: r.unit === 'gram' ? (parseFloat(r.weight) || 0) : undefined,
+    }))
+
     try {
       const quote = await quotesApi.create({
         productName:        form.productName,
@@ -231,6 +237,7 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
         notes:              [filledRows.length > 1 ? `Chất liệu: ${materialSummary}` : '', form.notes].filter(Boolean).join('\n'),
         images:             previews.map((p) => p.file),
         requestedBy:        requesterName,
+        options,
       })
       resetForm()
       setOpen(false)

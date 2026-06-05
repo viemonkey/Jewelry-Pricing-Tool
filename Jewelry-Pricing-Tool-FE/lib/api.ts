@@ -46,6 +46,7 @@ export const quotesApi = {
     if (data.quantity) form.append('quantity', String(data.quantity))
     if (data.deadline) form.append('deadline', data.deadline)
     if (data.notes) form.append('notes', data.notes)
+    if (data.options) form.append('options', JSON.stringify(data.options))
     data.images.forEach((file) => form.append('images', file))
 
     const res = await fetch(`${BASE_URL}/quotes`, {
@@ -164,6 +165,12 @@ export interface PricingConfig {
 export const pricingConfigApi = {
   /** Lấy cấu hình giá từ backend (tỷ lệ vàng, biên lợi nhuận, hệ số bạc) */
   get: () => request<PricingConfig>('/pricing-config'),
+  /** Cập nhật cấu hình giá lên backend (ví dụ giá vàng hàng ngày) */
+  update: (data: Partial<PricingConfig>) =>
+    request<PricingConfig>('/pricing-config', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
 }
 
 // ─── UPLOAD (standalone) ───────────────────────────────────

@@ -9,7 +9,7 @@ const app = express()
 app.use(
   cors({
     origin: process.env.FE_URL || 'http://localhost:3001',
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
 )

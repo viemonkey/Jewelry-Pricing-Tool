@@ -17,7 +17,7 @@ Backend đảm nhận nhiệm vụ lưu trữ cơ sở dữ liệu, quản lý k
   * [PricingConfig.ts](file:///c:/Jewelry-Pricing-Tool/Jewelry-Pricing-Tool-BE-2/src/models/PricingConfig.ts): Lưu hệ số chia bậc lợi nhuận, giá vàng 24K hôm nay và hệ số nhân bạc.
   * [GoldPrice.ts](file:///c:/Jewelry-Pricing-Tool/Jewelry-Pricing-Tool-BE-2/src/models/GoldPrice.ts) / [StonePrice.ts](file:///c:/Jewelry-Pricing-Tool/Jewelry-Pricing-Tool-BE-2/src/models/StonePrice.ts): Lưu lịch sử giá vàng nguyên liệu và bảng giá các loại đá quý.
   * [QuotationHistory.ts](file:///c:/Jewelry-Pricing-Tool/Jewelry-Pricing-Tool-BE-2/src/models/QuotationHistory.ts): Nhật ký ghi nhận lịch sử thay đổi trạng thái của đơn hàng.
-* **`s ndex.ts`: Gom toàn bộ các route và định cấu hình tiền tố endpoint (`/quotes`, `/pricing-config`, `/notifications`).
+* **`src/index.ts`: Gom toàn bộ các route và định cấu hình tiền tố endpoint (`/quotes`, `/pricing-config`, `/notifications`).
   * `quotes.routes.ts` / `pricingConfig.routes.ts` / `notifications.routes.ts`: Định tuyến chi tiết cho từng nghiệp vụ tương ứng.
 * **`src/controllers/`** (Điều phối HTTP Request/Response):
   * `quotes.controller.ts` / `pricingConfig.controller.ts`: Bóc tách dữ liệu gửi lên từ client, gọi lớp Service xử lý và trả về JSON. 

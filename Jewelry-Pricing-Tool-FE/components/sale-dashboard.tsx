@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { quotesApi, statsApi, type QuoteStats } from '@/lib/api'
 import type { Quote, QuoteStatus } from '@/lib/types'
@@ -16,15 +16,34 @@ import {
   ChevronRight,
   RefreshCw,
   Sparkles,
+  TrendingUp,
+  AlertCircle,
+  Activity,
+  Layers,
+  Calendar,
+  ArrowUpRight,
+  ClipboardList
 } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip as ChartTooltip,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts'
 
-// ─── types ──────────────────────────────────────────────────────────
 interface SaleDashboardProps {
   currentUserName: string
   search?: string
   onCreateSuccess?: (q: Quote) => void
+  onViewAll?: () => void
 }
 
 const STATUS_MAP: Record<QuoteStatus, { label: string; badgeClass: string }> = {
@@ -58,7 +77,6 @@ const STATUS_MAP: Record<QuoteStatus, { label: string; badgeClass: string }> = {
   },
 }
 
-
 function formatMaterialType(type: string) {
   const map: Record<string, string> = {
     GOLD_24K: 'Vàng 24K',
@@ -76,63 +94,14 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('vi-VN')
 }
 
-// ─── sub-components ─────────────────────────────────────────────────
-function MiniStat({
-  icon, label, value, badge, theme = 'gold',
-}: {
-  icon: React.ReactNode
-  label: string
-  value: string | number
-  badge?: string
-  theme?: 'gold' | 'ruby' | 'emerald'
-}) {
-  const themeStyles = {
-    gold: {
-      iconBg: 'bg-amber-500/10 text-[#b4904c]',
-      badgeClass: 'text-emerald-700 bg-emerald-50 border border-emerald-200/50',
-    },
-    ruby: {
-      iconBg: 'bg-rose-500/10 text-rose-600',
-      badgeClass: 'text-rose-700 bg-rose-50 border border-rose-200/50',
-    },
-    emerald: {
-      iconBg: 'bg-emerald-500/10 text-emerald-600',
-      badgeClass: 'text-blue-700 bg-blue-50 border border-blue-200/50',
-    },
-  }[theme]
+const MATERIAL_COLORS = ['#d4af37', '#b4904c', '#9ca3af', '#78350f', '#f59e0b', '#4b5563']
 
-  return (
-    <Card className="hover:shadow-md transition-all-smooth relative overflow-hidden border-luxury shadow-sm">
-      <CardContent className="p-5 flex items-center justify-between gap-4 relative z-10">
-        <div className="flex items-center gap-3">
-          <span className={cn('inline-flex items-center justify-center w-10 h-10 rounded-xl', themeStyles.iconBg)}>
-            {icon}
-          </span>
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</p>
-            <h3 className="text-3xl font-serif font-semibold text-foreground mt-0.5">
-              {value}
-            </h3>
-          </div>
-        </div>
-        {badge && (
-          <span className={cn('text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full', themeStyles.badgeClass)}>
-            {badge}
-          </span>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-// ─── main ───────────────────────────────────────────────────────────
-export function SaleDashboard({ currentUserName, search = '', onCreateSuccess }: SaleDashboardProps) {
+export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, onViewAll }: SaleDashboardProps) {
   const [stats, setStats] = useState<QuoteStats | null>(null)
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'approved' | 'new'>('all')
-  const [page, setPage] = useState(1)
-  const perPage = 8
+  const [mounted, setMounted] = useState(false)
+  const [activeActionTab, setActiveActionTab] = useState<'urgent' | 'progress'>('urgent')
 
   const { addNotification } = useNotifications()
 
@@ -147,27 +116,95 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess }:
     }).finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchData() }, [])
+  useEffect(() => {
+    fetchData()
+    setMounted(true)
+  }, [])
 
-  // filter + search
-  const filtered = quotes.filter(q => {
-    const matchSearch =
-      search === '' ||
-      q.productName.toLowerCase().includes(search.toLowerCase()) ||
-      q.quoteCode.toLowerCase().includes(search.toLowerCase())
+  // ─── Calculations for Analytics & Charts ───
 
-    const matchFilter =
-      filter === 'all' ? true :
-      filter === 'approved' ? ['CONFIRMED', 'QUOTED', 'SENT_TO_CUSTOMER'].includes(q.status) :
-      /* new */ q.status === 'PENDING'
+  // 1. Pipeline performance metrics
+  const performanceMetrics = useMemo(() => {
+    const confirmedQuotes = quotes.filter((q) => q.status === 'CONFIRMED')
+    const totalSalesVal = confirmedQuotes.reduce((sum, q) => sum + (q.sellingPrice || 0), 0)
+    
+    const urgentCount = quotes.filter((q) => q.status === 'NEED_MORE_INFO').length
+    
+    const completedCount = quotes.filter((q) => ['CONFIRMED', 'CANCELLED'].includes(q.status)).length
+    const confirmedCount = confirmedQuotes.length
+    const conversionRate = completedCount > 0 ? Math.round((confirmedCount / completedCount) * 100) : 0
 
-    return matchSearch && matchFilter
-  })
+    return {
+      totalSalesVal,
+      urgentCount,
+      conversionRate
+    }
+  }, [quotes])
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
-  const paginated = filtered.slice((page - 1) * perPage, page * perPage)
+  // 2. Trend analysis chart data (Last 7 days)
+  const trendChartData = useMemo(() => {
+    const datesMap: Record<string, { date: string; count: number; value: number }> = {}
+    
+    // Initialize last 7 days
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const label = d.toLocaleDateString('vi-VN', { month: 'numeric', day: 'numeric' })
+      const key = d.toISOString().split('T')[0]
+      datesMap[key] = { date: label, count: 0, value: 0 }
+    }
 
-  // ─── action handlers ────────────────────────────────────────────────
+    // Populate from quotes
+    quotes.forEach((q) => {
+      if (!q.createdAt) return
+      const key = q.createdAt.split('T')[0]
+      if (datesMap[key]) {
+        datesMap[key].count += 1
+        datesMap[key].value += (q.sellingPrice || 0)
+      }
+    })
+
+    return Object.values(datesMap)
+  }, [quotes])
+
+  // 3. Materials breakdown pie chart data
+  const materialChartData = useMemo(() => {
+    const counts: Record<string, number> = {}
+    quotes.forEach((q) => {
+      counts[q.materialType] = (counts[q.materialType] || 0) + 1
+    })
+
+    return Object.entries(counts).map(([type, value]) => ({
+      name: formatMaterialType(type),
+      value,
+    }))
+  }, [quotes])
+
+  // 4. Action Center lists (filtered by Search if user searches)
+  const actionQuotes = useMemo(() => {
+    const filteredQuotes = quotes.filter((q) => {
+      return (
+        search === '' ||
+        q.productName.toLowerCase().includes(search.toLowerCase()) ||
+        q.quoteCode.toLowerCase().includes(search.toLowerCase())
+      )
+    })
+
+    const urgent = filteredQuotes.filter((q) =>
+      ['NEED_MORE_INFO', 'QUOTED', 'SENT_TO_CUSTOMER'].includes(q.status)
+    )
+
+    const progress = filteredQuotes.filter((q) =>
+      ['PENDING', 'QUOTING'].includes(q.status)
+    )
+
+    return {
+      urgent,
+      progress
+    }
+  }, [quotes, search])
+
+  // ─── Actions Handlers ───
   const handleSentToCustomer = async (id: string, name: string) => {
     try {
       await quotesApi.sentToCustomer(id)
@@ -203,106 +240,241 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess }:
   return (
     <div className="space-y-6">
       
-      {/* ── Title & Create button ── */}
+      {/* ── Title & Actions header ── */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-foreground tracking-wide">
+          <h1 className="text-2xl sm:text-3xl font-serif font-semibold text-foreground tracking-wide flex items-center gap-2">
             Hệ thống báo giá trang sức
+            <Sparkles className="h-5 w-5 text-primary animate-pulse" />
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 font-medium">
-            Quản lý và tính toán giá sản phẩm vàng, bạc và đá quý
+            Bảng điều khiển hoạt động kinh doanh dành cho bộ phận Sale
           </p>
         </div>
 
-        {/* Nút Tạo yêu cầu báo giá */}
-        <div className="shrink-0">
+        <div className="shrink-0 flex items-center gap-2">
+          {/* Nút Tạo yêu cầu báo giá */}
           <QuoteRequestModal
             requesterName={currentUserName}
             onSuccess={(q) => { fetchData(); onCreateSuccess?.(q) }}
           />
+          {/* Nút reload */}
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={fetchData}
+            className="p-2.5 rounded-lg text-muted-foreground hover:text-[#b4904c] hover:bg-muted transition-all border border-border/60 shadow-sm bg-white"
+          >
+            <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
+          </motion.button>
         </div>
       </div>
 
-      {/* ── Mini Stats row ── */}
+      {/* ── Performance Stats row ── */}
       <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <MiniStat
-          icon={<LayoutDashboard className="w-5 h-5" />}
-          label="Báo giá hôm nay"
-          value={stats?.total ?? '—'}
-          badge="+12%"
-          theme="gold"
-        />
-        <MiniStat
-          icon={<Hourglass className="w-5 h-5" />}
-          label="Đang chờ duyệt"
-          value={stats?.pending ?? '—'}
-          badge="CẦN XỬ LÝ"
-          theme="ruby"
-        />
-        <MiniStat
-          icon={<CheckCircle2 className="w-5 h-5" />}
-          label="Đã xác nhận"
-          value={stats?.confirmed ?? '—'}
-          badge="THÁNG NÀY"
-          theme="emerald"
-        />
+        
+        {/* Doanh số đã chốt */}
+        <Card className="hover:shadow-md transition-all-smooth relative overflow-hidden border-luxury shadow-sm">
+          <div className="absolute top-0 right-0 p-3 opacity-10">
+            <TrendingUp className="w-20 h-20 text-[#b4904c]" />
+          </div>
+          <CardContent className="p-5 flex items-center gap-4 relative z-10">
+            <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-amber-500/10 text-[#b4904c] shrink-0">
+              <TrendingUp className="w-6 h-6" />
+            </span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Doanh số đã chốt</p>
+              <h3 className="text-2xl font-serif font-bold text-foreground mt-0.5">
+                {formatCurrency(performanceMetrics.totalSalesVal)}
+              </h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Cần xử lý gấp */}
+        <Card className="hover:shadow-md transition-all-smooth relative overflow-hidden border-luxury shadow-sm">
+          <div className="absolute top-0 right-0 p-3 opacity-10">
+            <AlertCircle className="w-20 h-20 text-rose-600" />
+          </div>
+          <CardContent className="p-5 flex items-center gap-4 relative z-10">
+            <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-rose-500/10 text-rose-600 shrink-0">
+              <AlertCircle className="w-6 h-6" />
+            </span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Chờ bổ sung thông tin</p>
+              <h3 className="text-2xl font-serif font-bold text-foreground mt-0.5 flex items-center gap-2">
+                {performanceMetrics.urgentCount}
+                {performanceMetrics.urgentCount > 0 && (
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-rose-700 bg-rose-50 border border-rose-200/50 animate-pulse">
+                    Khẩn cấp
+                  </span>
+                )}
+              </h3>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tỷ lệ chốt đơn */}
+        <Card className="hover:shadow-md transition-all-smooth relative overflow-hidden border-luxury shadow-sm">
+          <div className="absolute top-0 right-0 p-3 opacity-10">
+            <CheckCircle2 className="w-20 h-20 text-emerald-600" />
+          </div>
+          <CardContent className="p-5 flex items-center gap-4 relative z-10">
+            <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-600 shrink-0">
+              <CheckCircle2 className="w-6 h-6" />
+            </span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Tỷ lệ chốt thành công</p>
+              <h3 className="text-2xl font-serif font-bold text-foreground mt-0.5">
+                {performanceMetrics.conversionRate}%
+              </h3>
+            </div>
+          </CardContent>
+        </Card>
       </section>
 
-      {/* ── Table Area ── */}
-      <section>
-        <Card className="border-luxury shadow-sm">
-          {/* Card Header với Bộ lọc và Nút reload */}
-          <div className="px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b">
-            <CardContent className="p-0">
-              <h2 className="text-lg font-serif font-semibold text-foreground tracking-wide flex items-center gap-1.5">
-                Lịch sử yêu cầu báo giá
-                <span className="inline-flex items-center gap-0.5 rounded-full bg-[#fbf6e9] border border-[#d4af37]/30 px-2 py-0.5 text-[9px] font-bold text-[#b4904c]">
-                  ✨ Mới
-                </span>
-              </h2>
+      {/* ── Charts / Analytics Section ── */}
+      {mounted && (
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* Chart 1: Request Volume Trend */}
+          <Card className="border-luxury shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-serif font-semibold text-foreground tracking-wide flex items-center gap-2">
+                <Activity className="h-4 w-4 text-primary" />
+                Xu hướng yêu cầu báo giá (7 ngày qua)
+              </CardTitle>
+              <CardDescription>Biểu thị số lượng yêu cầu gửi đi hàng ngày</CardDescription>
+            </CardHeader>
+            <CardContent className="h-64 pt-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trendChartData}>
+                  <defs>
+                    <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#d4af37" stopOpacity={0.4}/>
+                      <stop offset="95%" stopColor="#d4af37" stopOpacity={0.0}/>
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="date" stroke="#888888" fontSize={10} tickLine={false} />
+                  <YAxis stroke="#888888" fontSize={10} tickLine={false} allowDecimals={false} />
+                  <ChartTooltip 
+                    contentStyle={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                    labelClassName="text-xs font-semibold text-zinc-900"
+                  />
+                  <Area type="monotone" dataKey="count" name="Yêu cầu" stroke="#d4af37" strokeWidth={2} fillOpacity={1} fill="url(#colorCount)" />
+                </AreaChart>
+              </ResponsiveContainer>
             </CardContent>
+          </Card>
 
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-              {/* filter tabs */}
-              <div className="flex bg-[#e2e8f0]/40 p-0.5 rounded-lg border border-border/40 text-xs font-semibold">
-                {(['all', 'approved', 'new'] as const).map(f => {
-                  const isActive = filter === f
-                  const label = f === 'all' ? 'TẤT CẢ' : f === 'approved' ? 'ĐÃ DUYỆT' : 'MỚI'
-                  return (
-                    <button
-                      key={f}
-                      onClick={() => { setFilter(f); setPage(1) }}
-                      className={cn(
-                        'px-3.5 py-1.5 rounded-md transition-all duration-200 tracking-wider text-[10px] font-bold',
-                        isActive
-                          ? 'bg-[#6e5812] text-white shadow-sm'
-                          : 'text-[#64748b] hover:text-[#b4904c] hover:bg-white/40'
-                      )}
-                    >
-                      {label}
-                    </button>
-                  )
-                })}
-              </div>
+          {/* Chart 2: Materials distribution */}
+          <Card className="border-luxury shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-serif font-semibold text-foreground tracking-wide flex items-center gap-2">
+                <Layers className="h-4 w-4 text-primary" />
+                Cơ cấu chất liệu trang sức yêu cầu
+              </CardTitle>
+              <CardDescription>Số lượng yêu cầu phân bổ theo phân loại chất liệu</CardDescription>
+            </CardHeader>
+            <CardContent className="h-64 pt-4 flex flex-col justify-between">
+              {materialChartData.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                  Chưa có dữ liệu chất liệu
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 h-full">
+                  <div className="flex-1 w-full h-full max-h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={materialChartData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={70}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {materialChartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={MATERIAL_COLORS[index % MATERIAL_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <ChartTooltip
+                          contentStyle={{ background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  
+                  {/* Custom Legends list */}
+                  <div className="flex flex-wrap sm:flex-col gap-x-4 gap-y-1.5 justify-center sm:justify-start shrink-0 text-xs">
+                    {materialChartData.map((entry, index) => (
+                      <div key={entry.name} className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: MATERIAL_COLORS[index % MATERIAL_COLORS.length] }} />
+                        <span className="font-medium text-zinc-700 dark:text-zinc-300">{entry.name}:</span>
+                        <span className="font-bold text-[#b4904c]">{entry.value} đơn</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
-              {/* refresh button */}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={fetchData}
-                className="p-2 rounded-lg text-muted-foreground hover:text-[#b4904c] hover:bg-muted transition-all border border-border/60 shadow-sm bg-white"
+      {/* ── Action Center Section ── */}
+      <section>
+        <Card className="border-luxury shadow-sm overflow-hidden">
+          
+          {/* Card Header with tabs */}
+          <div className="px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b bg-card">
+            <div>
+              <h2 className="text-lg font-serif font-semibold text-foreground tracking-wide flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-primary" />
+                Trung tâm tác vụ yêu cầu
+              </h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Xử lý nhanh các yêu cầu theo trạng thái công việc</p>
+            </div>
+
+            {/* Tab switchers */}
+            <div className="flex bg-[#e2e8f0]/40 p-0.5 rounded-lg border border-border/40 text-xs font-semibold">
+              <button
+                onClick={() => setActiveActionTab('urgent')}
+                className={cn(
+                  'px-4 py-1.5 rounded-md transition-all duration-200 tracking-wider text-[10px] font-bold flex items-center gap-1.5',
+                  activeActionTab === 'urgent'
+                    ? 'bg-[#6e5812] text-white shadow-sm'
+                    : 'text-[#64748b] hover:text-[#b4904c] hover:bg-white/40'
+                )}
               >
-                <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
-              </motion.button>
+                CẦN XỬ LÝ NGAY
+                {actionQuotes.urgent.length > 0 && (
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[8px] font-extrabold rounded-full bg-rose-500 text-white leading-none">
+                    {actionQuotes.urgent.length}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => setActiveActionTab('progress')}
+                className={cn(
+                  'px-4 py-1.5 rounded-md transition-all duration-200 tracking-wider text-[10px] font-bold',
+                  activeActionTab === 'progress'
+                    ? 'bg-[#6e5812] text-white shadow-sm'
+                    : 'text-[#64748b] hover:text-[#b4904c] hover:bg-white/40'
+                )}
+              >
+                ĐANG CHỜ BÁO GIÁ
+              </button>
             </div>
           </div>
 
-          {/* Table Container */}
+          {/* List display */}
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#FBF6E9] border-b border-[#EDE8DE]">
-                  {['ID BÁO GIÁ','SẢN PHẨM','CHẤT LIỆU','NGƯỜI YÊU CẦU','NGÀY TẠO','GIÁ BÁN','TRẠNG THÁI','THAO TÁC'].map(h => (
+                  {['Mã yêu cầu', 'Sản phẩm', 'Chất liệu', 'Ngày tạo', 'Giá bán', 'Trạng thái', 'Thao tác'].map((h) => (
                     <th key={h} className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-[#6B5E4C] h-10">
                       {h}
                     </th>
@@ -311,23 +483,27 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess }:
               </thead>
               <tbody>
                 {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
+                  Array.from({ length: 3 }).map((_, i) => (
                     <tr key={i} className="border-b border-slate-100/60">
-                      {Array.from({ length: 8 }).map((__, j) => (
+                      {Array.from({ length: 7 }).map((__, j) => (
                         <td key={j} className="px-5 py-3.5">
                           <div className="h-3 rounded bg-muted animate-pulse" style={{ width: `${60 + (j * 15) % 40}%` }} />
                         </td>
                       ))}
                     </tr>
                   ))
-                ) : paginated.length === 0 ? (
+                ) : (activeActionTab === 'urgent' ? actionQuotes.urgent : actionQuotes.progress).length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-5 py-12 text-center text-xs text-muted-foreground font-medium">
-                      Không tìm thấy yêu cầu báo giá nào
+                    <td colSpan={7} className="px-5 py-12 text-center text-xs text-muted-foreground font-medium bg-muted/5">
+                      <div className="max-w-sm mx-auto space-y-2">
+                        <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 opacity-60" />
+                        <p className="font-semibold text-zinc-700">Tuyệt vời! Không có yêu cầu nào cần xử lý</p>
+                        <p className="text-[11px] text-muted-foreground">Tất cả các báo giá của bạn đã được cập nhật ổn định.</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
-                  paginated.map((q, i) => {
+                  (activeActionTab === 'urgent' ? actionQuotes.urgent : actionQuotes.progress).map((q, i) => {
                     const st = STATUS_MAP[q.status] ?? { label: q.status, badgeClass: 'border-slate-200 bg-slate-50 text-slate-500' }
                     return (
                       <motion.tr
@@ -335,35 +511,34 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess }:
                         onClick={() => onCreateSuccess?.(q)}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
-                        transition={{ delay: i * 0.02, duration: 0.2 }}
-                        whileHover={{ backgroundColor: 'rgba(212, 175, 55, 0.025)' }}
+                        transition={{ delay: i * 0.02, duration: 0.15 }}
+                        whileHover={{ backgroundColor: 'rgba(212, 175, 55, 0.02)' }}
                         className="border-b border-border/40 hover:bg-muted/10 transition-all duration-200 group cursor-pointer"
                       >
-                        <td className="px-5 py-3 text-xs font-bold text-[#b4904c] tracking-wider font-mono">{q.quoteCode}</td>
-                        <td className="px-5 py-3">
+                        <td className="px-5 py-3.5 text-xs font-bold text-[#b4904c] tracking-wider font-mono">{q.quoteCode}</td>
+                        <td className="px-5 py-3.5">
                           <span className="text-xs font-semibold text-foreground group-hover:text-[#b4904c] transition-colors">
                             {q.productName}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-xs text-[#526071] font-medium">
+                        <td className="px-5 py-3.5 text-xs text-[#526071] font-medium">
                           {formatMaterialType(q.materialType)}
                         </td>
-                        <td className="px-5 py-3 text-xs text-muted-foreground">{q.requestedBy}</td>
-                        <td className="px-5 py-3 text-xs text-muted-foreground">{formatDate(q.createdAt)}</td>
-                        <td className="px-5 py-3 text-xs font-bold text-[#b4904c] tracking-wide">
+                        <td className="px-5 py-3.5 text-xs text-muted-foreground">{formatDate(q.createdAt)}</td>
+                        <td className="px-5 py-3.5 text-xs font-bold text-[#b4904c] tracking-wide">
                           {q.sellingPrice ? (
                             <span>{formatCurrency(q.sellingPrice)}</span>
                           ) : (
                             <span className="text-muted-foreground/60 font-normal italic text-[11px]">Chờ tính giá</span>
                           )}
                         </td>
-                        <td className="px-5 py-3">
+                        <td className="px-5 py-3.5">
                           <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border', st.badgeClass)}>
                             {st.label}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-right">
-                          <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                             {/* NEED_MORE_INFO: Bổ sung */}
                             {q.status === 'NEED_MORE_INFO' && (
                               <button
@@ -429,42 +604,19 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess }:
             </table>
           </div>
 
-          {/* Pagination Container */}
-          <div className="px-6 py-4 border-t bg-muted/20 flex items-center justify-between">
-            <span className="text-[11px] text-muted-foreground font-medium">
-              Hiển thị {Math.min(filtered.length, (page - 1) * perPage + paginated.length)} / {filtered.length} yêu cầu
-            </span>
-            <div className="flex gap-1 items-center">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="w-7 h-7 flex items-center justify-center rounded-lg border bg-white hover:bg-muted transition-colors text-muted-foreground disabled:opacity-20 shadow-sm"
+          {/* Card footer redirecting to quotes tab */}
+          {onViewAll && (
+            <div className="px-6 py-4 border-t bg-muted/5 flex items-center justify-center">
+              <Button
+                variant="ghost"
+                onClick={onViewAll}
+                className="text-xs font-semibold text-primary hover:text-primary/80 flex items-center gap-1.5"
               >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-                <button
-                  key={p}
-                  onClick={() => setPage(p)}
-                  className={cn(
-                    'w-7 h-7 flex items-center justify-center rounded-lg text-xs font-bold border transition-all',
-                    p === page
-                      ? 'border-[#6e5812] bg-[#6e5812] text-white shadow-sm'
-                      : 'border-border/60 bg-white hover:bg-muted text-muted-foreground'
-                  )}
-                >
-                  {p}
-                </button>
-              ))}
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="w-7 h-7 flex items-center justify-center rounded-lg border bg-white hover:bg-muted transition-colors text-muted-foreground disabled:opacity-20 shadow-sm"
-              >
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
+                Xem toàn bộ lịch sử yêu cầu báo giá
+                <ArrowUpRight className="h-4 w-4" />
+              </Button>
             </div>
-          </div>
+          )}
         </Card>
       </section>
     </div>
