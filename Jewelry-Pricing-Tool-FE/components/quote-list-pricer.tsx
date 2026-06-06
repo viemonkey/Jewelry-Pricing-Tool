@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
@@ -904,123 +904,162 @@ function MultiMaterialPricingRows({
     onTotalChange(next.reduce((s, r) => s + (parseFloat(r.materialCost) || 0), 0))
   }
 
+  const handleSharedPriceChange = (newPrice: string) => {
+    const next = rows.map(r => {
+      const u = { ...r, goldPrice24K: newPrice }
+      const cost = computeCost(u.materialType, u.goldPrice24K, u.weightChi, (u as any).weightUnit)
+      u.materialCost = String(cost)
+      return u
+    })
+    onChange(next)
+    onTotalChange(next.reduce((s, r) => s + (parseFloat(r.materialCost) || 0), 0))
+  }
+
+  const toggleUnit = (row: GoldRow) => {
+    const isGram = (row as any).weightUnit === 'gram'
+    if (isGram) {
+      // gram → chỉ (1 chỉ = 3.75g)
+      const grams = parseFloat(row.weightChi) || 0
+      const chi = grams > 0 ? String(Math.round((grams / 3.75) * 1000) / 1000) : ''
+      update(row.id, { weightChi: chi, weightUnit: 'chi' } as any)
+    } else {
+      // chỉ → gram
+      const chi = parseFloat(row.weightChi) || 0
+      const grams = chi > 0 ? String(Math.round(chi * 3.75 * 1000) / 1000) : ''
+      update(row.id, { weightChi: grams, weightUnit: 'gram' } as any)
+    }
+  }
+
   const total = rows.reduce((s, r) => s + (parseFloat(r.materialCost) || 0), 0)
+  const sharedGoldPrice = rows[0]?.goldPrice24K || ''
 
   return (
-    <div className="space-y-3">
-      {rows.map((row, idx) => {
-        const key   = row.materialType.replace('GOLD_', '')
-        const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)
-        const hasData = !!(parseFloat(row.goldPrice24K) && parseFloat(row.weightChi))
-        return (
-          <motion.div key={row.id}
-            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.15, delay: idx * 0.04 }}
-            className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2"
-          >
-            {/* Header dòng */}
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-300/60 dark:border-amber-700/60 text-amber-700 dark:text-amber-300 text-xs font-semibold px-2.5 py-0.5">
-                <Layers className="h-3 w-3" />
-                {row.label}
-                {ratio && (
-                  <span className="opacity-60 font-normal ml-0.5">· {Math.round(ratio.applied * 100)}%</span>
-                )}
-              </span>
-              {hasData && (
-                <span className="text-xs font-bold text-primary tabular-nums">{fmt(row.materialCost)}</span>
-              )}
-            </div>
+    <div className="space-y-4">
+      {/* Ô nhập chung giá vàng 24K */}
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 space-y-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <Label className="text-xs font-semibold text-primary uppercase tracking-wide">
+              Giá vàng 24K gốc hôm nay (đ/chỉ)
+            </Label>
+            <p className="text-[10px] text-muted-foreground">
+              Áp dụng làm giá vàng cơ sở quy đổi cho tất cả các loại vàng bên dưới.
+            </p>
+          </div>
+          <div className="relative w-full sm:w-48 shrink-0">
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="9.000.000"
+              value={sharedGoldPrice ? Number(sharedGoldPrice).toLocaleString('vi-VN') : ''}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/\./g, '').replace(/,/g, '')
+                handleSharedPriceChange(raw)
+              }}
+              className="w-full h-10 rounded-md border border-primary/30 bg-background px-3 pr-6 text-sm font-semibold tabular-nums text-right focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
+          </div>
+        </div>
+      </div>
 
-            {/* Inputs */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground font-medium">Trọng lượng</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const isGram = (row as any).weightUnit === 'gram'
-                      if (isGram) {
-                        // gram → chỉ (1 chỉ = 3.75g)
-                        const grams = parseFloat(row.weightChi) || 0
-                        const chi = grams > 0 ? String(Math.round((grams / 3.75) * 1000) / 1000) : ''
-                        update(row.id, { weightChi: chi, weightUnit: 'chi' } as any)
-                      } else {
-                        // chỉ → gram
-                        const chi = parseFloat(row.weightChi) || 0
-                        const grams = chi > 0 ? String(Math.round(chi * 3.75 * 1000) / 1000) : ''
-                        update(row.id, { weightChi: grams, weightUnit: 'gram' } as any)
-                      }
-                    }}
-                    className="text-[10px] text-primary underline underline-offset-2 hover:text-primary/70 transition-colors"
-                  >
-                    {(row as any).weightUnit === 'gram' ? 'Đổi sang chỉ' : 'Đổi sang gram'}
-                  </button>
-                </div>
-                <div className="relative">
-                  <input
-                    type="text" inputMode="decimal" placeholder="0"
-                    value={row.weightChi}
-                    onChange={e => update(row.id, { weightChi: e.target.value.replace(/[^0-9.]/g, '') })}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 pr-12 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/30"
-                  />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none font-medium">
-                    {(row as any).weightUnit === 'gram' ? 'gram' : 'chỉ'}
-                  </span>
-                </div>
-                {(row as any).weightUnit === 'gram' && parseFloat(row.weightChi) > 0 && (
-                  <p className="text-[10px] text-muted-foreground">
-                    ≈ {Math.round((parseFloat(row.weightChi) / 3.75) * 1000) / 1000} chỉ (dùng để tính giá)
-                  </p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <span className="text-[10px] text-muted-foreground font-medium">Giá vàng gốc 24K (đ/chỉ)</span>
-                <div className="relative">
-                  <input
-                    type="text" inputMode="numeric" placeholder="9.000.000"
-                    value={row.goldPrice24K ? Number(row.goldPrice24K).toLocaleString('vi-VN') : ''}
-                    onChange={e => {
-                      const raw = e.target.value.replace(/\./g, '').replace(/,/g, '')
-                      update(row.id, { goldPrice24K: raw })
-                    }}
-                    className="w-full h-9 rounded-md border border-input bg-background px-3 pr-5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/30"
-                  />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none">đ</span>
-                </div>
-                {ratio && parseFloat(row.goldPrice24K) > 0 && (
-                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium leading-none mt-1">
-                    ≈ Quy đổi {row.label}: {Number(Math.round(ratio.applied * (parseFloat(row.goldPrice24K) || 0))).toLocaleString('vi-VN')} đ/chỉ
-                  </p>
-                )}
-              </div>
-            </div>
+      {/* Bảng chất liệu */}
+      <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-border/60 bg-muted/30">
+                <th className="p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Chất liệu / Công thức</th>
+                <th className="p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right w-44">Trọng lượng</th>
+                <th className="p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right w-36">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {rows.map((row, idx) => {
+                const key = row.materialType.replace('GOLD_', '')
+                const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)
+                const hasData = !!(parseFloat(row.goldPrice24K) && parseFloat(row.weightChi))
+                const unit = (row as any).weightUnit === 'gram' ? 'gram' : 'chi'
 
-            {/* Công thức tính */}
-            {hasData && (
-              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200/70 px-3 py-1.5 text-xs text-amber-700 dark:text-amber-300">
-                {ratio ? (
-                  <>{Number(row.goldPrice24K).toLocaleString('vi-VN')} × {Math.round(ratio.applied * 100)}% × {row.weightChi} chỉ = <strong>{fmt(row.materialCost)}</strong></>
-                ) : (
-                  <>Giá vàng {row.label}: <strong>{fmt(row.materialCost)}</strong></>
-                )}
-              </div>
-            )}
-          </motion.div>
-        )
-      })}
+                // Tính giá trị quy đổi mỗi chỉ
+                const appliedRatio = ratio?.applied ?? 0
+                const goldPrice = parseFloat(row.goldPrice24K) || 0
+                const ratePerChi = Math.round(appliedRatio * goldPrice)
+
+                return (
+                  <tr key={row.id} className="hover:bg-muted/10 transition-colors">
+                    {/* Chất liệu & Quy đổi */}
+                    <td className="p-3 align-middle space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-200 text-amber-800 dark:text-amber-300 text-[10px] font-semibold px-2 py-0.5">
+                          <Layers className="h-2.5 w-2.5" />
+                          {row.label}
+                          {ratio && <span className="opacity-70 font-normal"> · {Math.round(ratio.applied * 100)}%</span>}
+                        </span>
+                      </div>
+                      {goldPrice > 0 && ratio && (
+                        <p className="text-[10px] text-muted-foreground font-medium">
+                          {Number(row.goldPrice24K).toLocaleString('vi-VN')} × {Math.round(appliedRatio * 100)}% = {ratePerChi.toLocaleString('vi-VN')} đ/chỉ
+                        </p>
+                      )}
+                    </td>
+
+                    {/* Trọng lượng */}
+                    <td className="p-3 align-middle">
+                      <div className="flex items-center gap-1 justify-end">
+                        <div className="relative w-28">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="0"
+                            value={row.weightChi}
+                            onChange={(e) => update(row.id, { weightChi: e.target.value.replace(/[^0-9.]/g, '') })}
+                            className="w-full h-9 rounded-md border border-input bg-background px-2.5 pr-8 text-xs text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/30"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none font-medium">
+                            {unit === 'gram' ? 'g' : 'chỉ'}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleUnit(row)}
+                          className="h-8 w-8 rounded-md hover:bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-all shrink-0"
+                          title={unit === 'gram' ? 'Đổi sang chỉ' : 'Đổi sang gram'}
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </button>
+                      </div>
+                      {unit === 'gram' && parseFloat(row.weightChi) > 0 && (
+                        <p className="text-[9px] text-muted-foreground text-right mt-0.5">
+                          ≈ {Math.round((parseFloat(row.weightChi) / 3.75) * 1000) / 1000} chỉ
+                        </p>
+                      )}
+                    </td>
+
+                    {/* Thành tiền */}
+                    <td className="p-3 align-middle text-right font-semibold text-xs text-primary tabular-nums">
+                      {hasData ? fmt(row.materialCost) : '0 đ'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Tổng cộng nhiều loại */}
       {rows.length > 1 && total > 0 && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className="flex items-center justify-between rounded-xl border-2 border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 px-4 py-2.5"
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center justify-between rounded-xl border border-amber-300/40 bg-amber-50/50 dark:bg-amber-950/20 px-4 py-2.5"
         >
-          <span className="text-sm font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
-            <Layers className="h-3.5 w-3.5" />
-            Tổng giá vàng ({rows.length} loại)
+          <span className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+            <Layers className="h-3 w-3" />
+            Tổng cộng vàng ({rows.length} loại)
           </span>
-          <span className="text-base font-bold text-amber-700 dark:text-amber-300 tabular-nums">
+          <span className="text-sm font-bold text-amber-800 dark:text-amber-300 tabular-nums">
             {fmt(total)}
           </span>
         </motion.div>
@@ -1355,7 +1394,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
           autoSellingPrice = costBeforeVAT > 0 ? Math.round(costWithVAT / divisor / 1000) * 1000 : 0
         }
 
-        const finalSellingPrice = parseFloat(row.sellingPrice || '') || autoSellingPrice
+        const finalSellingPrice = parseFloat((row as any).sellingPrice || '') || autoSellingPrice
 
         return {
           materialType: row.materialType as any,

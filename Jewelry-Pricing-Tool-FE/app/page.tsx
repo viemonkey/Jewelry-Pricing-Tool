@@ -6,7 +6,6 @@ import { Header, type UserRole } from '@/components/header'
 import { cn } from '@/lib/utils'
 import { GoldCalculator } from '@/components/gold-calculator'
 import { SilverCalculator } from '@/components/silver-calculator'
-import { WorkflowStatus, type WorkflowStep } from '@/components/workflow-status'
 import { StatsCards } from '@/components/stats-cards'
 import { RecentQuotes } from '@/components/recent-quotes'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -53,7 +52,6 @@ const cardVariants = {
 
 export default function Home() {
   const [currentRole, setCurrentRole] = useState<UserRole>('order')
-  const [currentStep] = useState<WorkflowStep>(3)
   const [goldPrice24K, setGoldPrice24K] = useState<string>('9000000')
   const [goldPriceInputDisplay, setGoldPriceInputDisplay] = useState<string>('')
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -297,7 +295,6 @@ export default function Home() {
                       </motion.div>
 
                       <StatsCards />
-                      <WorkflowStatus currentStep={currentStep} />
                       <RecentQuotes currentRole={currentRole} />
                     </div>
                   )}
