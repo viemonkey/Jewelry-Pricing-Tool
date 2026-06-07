@@ -133,6 +133,7 @@ export interface QuoteStats {
   pending: number
   quoted: number
   confirmed: number
+  confirmedRevenue: number
 }
 
 export const statsApi = {

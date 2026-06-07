@@ -62,6 +62,7 @@ export interface IQuote extends Document {
   stones: any[]
   costPrice: number
   sellingPrice: number
+  confirmedPrice?: number
   notes?: string
   rejectReason?: string
   images: string[]
@@ -110,6 +111,7 @@ const QuoteSchema = new Schema<IQuote>(
     stones: { type: [Object], default: [] },
     costPrice: { type: Number, default: 0 },
     sellingPrice: { type: Number, default: 0 },
+    confirmedPrice: { type: Number },
     notes: { type: String },
     rejectReason: { type: String },
     images: { type: [String], default: [] },

@@ -11,7 +11,7 @@ const app = (0, express_1.default)();
 // CORS configuration
 app.use((0, cors_1.default)({
     origin: process.env.FE_URL || 'http://localhost:3001',
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 // Body parsers

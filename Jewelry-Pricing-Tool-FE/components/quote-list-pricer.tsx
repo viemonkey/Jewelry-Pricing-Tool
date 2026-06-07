@@ -1247,7 +1247,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     setEditImages([])
     setKeepImages([])
     setDialogMode(mode ?? (
-      q.status === 'PENDING' ? 'review' :
+      q.status === 'PENDING' ? (isPricer ? 'pricing' : 'review') :
       q.status === 'QUOTING' ? 'pricing' :
       q.status === 'NEED_MORE_INFO' ? 'view' :
       'view'
@@ -1635,16 +1635,11 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          {/* NV order: PENDING → Kiểm tra hoặc Tính giá */}
+                          {/* NV order: PENDING → Tính giá */}
                           {isPricer && q.status === 'PENDING' && (
-                            <>
-                              <Button size="sm" variant="outline" onClick={() => openDetail(q, 'review')} className="gap-1 h-7 text-xs">
-                                <Eye className="h-3 w-3" /> Kiểm tra
-                              </Button>
-                              <Button size="sm" onClick={() => openDetail(q, 'pricing')} className="gap-1 h-7 text-xs">
-                                <Calculator className="h-3 w-3" /> Tính giá
-                              </Button>
-                            </>
+                            <Button size="sm" onClick={() => openDetail(q, 'pricing')} className="gap-1 h-7 text-xs">
+                              <Calculator className="h-3 w-3" /> Tính giá
+                            </Button>
                           )}
                           {/* NV order: QUOTING → Tiếp tục tính giá */}
                           {isPricer && q.status === 'QUOTING' && (
@@ -1899,6 +1894,35 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
 
                   <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
 
+                    {/* Biểu mẫu trả lại yêu cầu (Rejection Form) của Pricer hiển thị trực tiếp ở đây trong mode pricing */}
+                    {isPricer && showRejectForm && (
+                      <div className="rounded-xl border-2 border-red-200 bg-red-50/50 p-4 space-y-3.5 shadow-sm">
+                        <p className="text-xs font-bold text-red-700 flex items-center gap-1.5 uppercase tracking-wider">
+                          <Ban className="h-4 w-4" /> Trả lại yêu cầu cho Sale
+                        </p>
+                        <div className="space-y-2">
+                          <Label className="text-[10px] font-bold text-red-800 uppercase tracking-wide">Lý do yêu cầu bổ sung thông tin</Label>
+                          <Textarea 
+                            placeholder="VD: Thiếu hình ảnh góc nghiêng, chưa rõ size đá chính, hạn chót quá gấp..."
+                            rows={3} 
+                            value={rejectReason} 
+                            onChange={(e) => setRejectReason(e.target.value)} 
+                            className="text-xs border-red-200 focus-visible:ring-red-500/20 focus-visible:border-red-500 rounded-xl resize-none p-3 bg-white text-red-950 font-medium" 
+                          />
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <Button variant="outline" className="flex-1 border-red-200 text-red-700 hover:bg-red-100 rounded-xl font-semibold text-xs h-9" onClick={() => setShowRejectForm(false)}>
+                            Huỷ
+                          </Button>
+                          <Button variant="destructive" className="flex-1 gap-1.5 rounded-xl font-semibold text-xs shadow-sm h-9"
+                            onClick={handleReject} disabled={!rejectReason.trim() || saving}>
+                            {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
+                            Xác nhận trả lại
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
                     {selected.materialType === 'SILVER' ? (
                       /* ── BẠC: Luồng tối giản & đặc biệt ── */
                       <div className="space-y-4">
@@ -2137,12 +2161,22 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                     <Button variant="ghost" onClick={() => setSelected(null)} className="text-muted-foreground">
                       Đóng
                     </Button>
-                    <Button onClick={handleCompleteQuoting} disabled={saving}
-                      className="gap-2 min-w-[175px] bg-gradient-to-r from-primary to-amber-600 hover:from-primary/90 hover:to-amber-600/90 shadow-md shadow-primary/20">
-                      {saving
-                        ? <><Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...</>
-                        : <><CheckCircle className="h-4 w-4" /> Hoàn thành báo giá</>}
-                    </Button>
+                    <div className="flex gap-2">
+                      {isPricer && !showRejectForm && (
+                        <Button variant="outline" className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50 font-semibold px-4 rounded-xl h-10 transition-all"
+                          onClick={() => setShowRejectForm(true)}>
+                          <Ban className="h-4 w-4" /> Trả lại Sale bổ sung
+                        </Button>
+                      )}
+                      {!showRejectForm && (
+                        <Button onClick={handleCompleteQuoting} disabled={saving}
+                          className="gap-2 min-w-[175px] bg-gradient-to-r from-primary to-amber-600 hover:from-primary/90 hover:to-amber-600/90 shadow-md shadow-primary/20">
+                          {saving
+                            ? <><Loader2 className="h-4 w-4 animate-spin" /> Đang lưu...</>
+                            : <><CheckCircle className="h-4 w-4" /> Hoàn thành báo giá</>}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

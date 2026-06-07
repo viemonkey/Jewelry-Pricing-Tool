@@ -21,8 +21,16 @@ class QuotesService {
         const year = new Date().getFullYear();
         const count = await Quote_1.Quote.countDocuments();
         const quoteCode = `QT-${year}-${String(count + 1).padStart(4, '0')}`;
+        let options = [];
+        if (dto.options) {
+            try {
+                options = typeof dto.options === 'string' ? JSON.parse(dto.options) : dto.options;
+            }
+            catch (err) { }
+        }
         const quote = new Quote_1.Quote({
             ...dto,
+            options,
             quoteCode,
             images: imageUrls,
             status: Quote_1.QuoteStatus.PENDING,
@@ -30,7 +38,22 @@ class QuotesService {
         return quote.save();
     }
     async updatePrice(id, dto) {
-        const quote = await Quote_1.Quote.findByIdAndUpdate(id, { ...dto, status: Quote_1.QuoteStatus.QUOTING }, { new: true }).lean();
+        const updateData = { ...dto };
+        // Backwards compatibility: populate top-level fields from the first option
+        if (dto.options && Array.isArray(dto.options) && dto.options.length > 0) {
+            const firstOpt = dto.options[0];
+            updateData.materialType = firstOpt.materialType;
+            updateData.weightChi = firstOpt.weightChi;
+            updateData.weightGram = firstOpt.weightGram;
+            updateData.laborCost = firstOpt.laborCost;
+            updateData.goldPrice24K = firstOpt.goldPrice24K;
+            updateData.materialCost = firstOpt.materialCost;
+            updateData.stoneCost = firstOpt.stoneCost;
+            updateData.costBeforeVAT = firstOpt.costBeforeVAT;
+            updateData.costPrice = firstOpt.costPrice;
+            updateData.sellingPrice = firstOpt.sellingPrice;
+        }
+        const quote = await Quote_1.Quote.findByIdAndUpdate(id, { ...updateData, status: Quote_1.QuoteStatus.QUOTING }, { new: true }).lean();
         if (!quote) {
             const err = new Error('Quote not found');
             err.statusCode = 404;
@@ -97,7 +120,21 @@ class QuotesService {
         return quote;
     }
     async confirm(id) {
-        const quote = await this.updateStatus(id, Quote_1.QuoteStatus.CONFIRMED);
+        const currentQuote = await Quote_1.Quote.findById(id).lean();
+        if (!currentQuote) {
+            const err = new Error('Quote not found');
+            err.statusCode = 404;
+            throw err;
+        }
+        const quote = await Quote_1.Quote.findByIdAndUpdate(id, {
+            status: Quote_1.QuoteStatus.CONFIRMED,
+            confirmedPrice: currentQuote.sellingPrice || 0
+        }, { new: true }).lean();
+        if (!quote) {
+            const err = new Error('Quote not found');
+            err.statusCode = 404;
+            throw err;
+        }
         notifications_service_1.notificationsService.notifyQuoteConfirmed(quote.quoteCode || '', quote.productName, String(quote._id));
         return quote;
     }
@@ -116,13 +153,30 @@ class QuotesService {
         return quote;
     }
     async getStats() {
-        const [total, pending, quoted, confirmed] = await Promise.all([
+        const [total, pending, quoted, confirmed, revenueResult] = await Promise.all([
             Quote_1.Quote.countDocuments(),
             Quote_1.Quote.countDocuments({ status: Quote_1.QuoteStatus.PENDING }),
             Quote_1.Quote.countDocuments({ status: Quote_1.QuoteStatus.QUOTED }),
             Quote_1.Quote.countDocuments({ status: Quote_1.QuoteStatus.CONFIRMED }),
+            Quote_1.Quote.aggregate([
+                { $match: { status: Quote_1.QuoteStatus.CONFIRMED } },
+                {
+                    $group: {
+                        _id: null,
+                        totalRevenue: {
+                            $sum: {
+                                $multiply: [
+                                    { $ifNull: ['$confirmedPrice', '$sellingPrice'] },
+                                    '$quantity',
+                                ],
+                            },
+                        },
+                    },
+                },
+            ]),
         ]);
-        return { total, pending, quoted, confirmed };
+        const confirmedRevenue = revenueResult[0]?.totalRevenue || 0;
+        return { total, pending, quoted, confirmed, confirmedRevenue };
     }
 }
 exports.QuotesService = QuotesService;

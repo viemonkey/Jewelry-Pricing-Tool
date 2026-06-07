@@ -153,7 +153,28 @@ export class QuotesService {
   }
 
   async confirm(id: string) {
-    const quote = await this.updateStatus(id, QuoteStatus.CONFIRMED)
+    const currentQuote = await Quote.findById(id).lean()
+    if (!currentQuote) {
+      const err = new Error('Quote not found')
+      ;(err as any).statusCode = 404
+      throw err
+    }
+
+    const quote = await Quote.findByIdAndUpdate(
+      id,
+      { 
+        status: QuoteStatus.CONFIRMED,
+        confirmedPrice: currentQuote.sellingPrice || 0
+      },
+      { new: true }
+    ).lean()
+
+    if (!quote) {
+      const err = new Error('Quote not found')
+      ;(err as any).statusCode = 404
+      throw err
+    }
+
     notificationsService.notifyQuoteConfirmed(
       quote.quoteCode || '',
       quote.productName,
@@ -185,13 +206,30 @@ export class QuotesService {
   }
 
   async getStats() {
-    const [total, pending, quoted, confirmed] = await Promise.all([
+    const [total, pending, quoted, confirmed, revenueResult] = await Promise.all([
       Quote.countDocuments(),
       Quote.countDocuments({ status: QuoteStatus.PENDING }),
       Quote.countDocuments({ status: QuoteStatus.QUOTED }),
       Quote.countDocuments({ status: QuoteStatus.CONFIRMED }),
+      Quote.aggregate([
+        { $match: { status: QuoteStatus.CONFIRMED } },
+        {
+          $group: {
+            _id: null,
+            totalRevenue: {
+              $sum: {
+                $multiply: [
+                  { $ifNull: ['$confirmedPrice', '$sellingPrice'] },
+                  '$quantity',
+                ],
+              },
+            },
+          },
+        },
+      ]),
     ])
-    return { total, pending, quoted, confirmed }
+    const confirmedRevenue = revenueResult[0]?.totalRevenue || 0
+    return { total, pending, quoted, confirmed, confirmedRevenue }
   }
 }
 

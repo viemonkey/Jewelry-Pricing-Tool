@@ -61,6 +61,19 @@ var MaterialType;
     MaterialType["GOLD_610"] = "GOLD_610";
     MaterialType["SILVER"] = "SILVER";
 })(MaterialType || (exports.MaterialType = MaterialType = {}));
+const QuoteOptionSchema = new mongoose_1.Schema({
+    materialType: { type: String, enum: Object.values(MaterialType), required: true },
+    weightChi: { type: Number },
+    weightGram: { type: Number },
+    laborCost: { type: Number, default: 0 },
+    goldPrice24K: { type: Number, default: null },
+    materialCost: { type: Number },
+    stoneCost: { type: Number },
+    costBeforeVAT: { type: Number },
+    costWithVAT: { type: Number },
+    costPrice: { type: Number, default: 0 },
+    sellingPrice: { type: Number, default: 0 },
+}, { _id: false });
 const QuoteSchema = new mongoose_1.Schema({
     quoteCode: { type: String },
     productName: { type: String, required: true },
@@ -83,12 +96,14 @@ const QuoteSchema = new mongoose_1.Schema({
     stones: { type: [Object], default: [] },
     costPrice: { type: Number, default: 0 },
     sellingPrice: { type: Number, default: 0 },
+    confirmedPrice: { type: Number },
     notes: { type: String },
     rejectReason: { type: String },
     images: { type: [String], default: [] },
     status: { type: String, enum: Object.values(QuoteStatus), default: QuoteStatus.PENDING },
     requestedBy: { type: String, required: true },
     quotedBy: { type: String },
+    options: { type: [QuoteOptionSchema], default: [] },
 }, { timestamps: true });
 QuoteSchema.index({ status: 1, createdAt: -1 });
 QuoteSchema.index({ requestedBy: 1, status: 1 });
