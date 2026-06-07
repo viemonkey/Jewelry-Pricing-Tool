@@ -1087,7 +1087,15 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [showEditForm, setShowEditForm] = useState(false)
-  const [editForm, setEditForm] = useState({ dimensions: '', stoneRequirements: '', productDescription: '', notes: '' })
+  const [editForm, setEditForm] = useState({
+    productName: '',
+    dimensions: '',
+    stoneRequirements: '',
+    productDescription: '',
+    notes: '',
+    quantity: 1,
+    deadline: '',
+  })
   const [editImages, setEditImages] = useState<{ file: File; url: string }[]>([])
   const [keepImages, setKeepImages] = useState<string[]>([])
   const editFileRef = useRef<HTMLInputElement>(null)
@@ -1242,16 +1250,40 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     setSelected(q)
     setShowRejectForm(false)
     setRejectReason('')
-    setShowEditForm(false)
-    setEditForm({ dimensions: '', stoneRequirements: '', productDescription: '', notes: '' })
-    setEditImages([])
-    setKeepImages([])
-    setDialogMode(mode ?? (
-      q.status === 'PENDING' ? (isPricer ? 'pricing' : 'review') :
-      q.status === 'QUOTING' ? 'pricing' :
-      q.status === 'NEED_MORE_INFO' ? 'view' :
-      'view'
-    ))
+    if (q.status === 'PENDING' && !isPricer) {
+      setEditForm({
+        productName: q.productName || '',
+        dimensions: (q as any).dimensions || '',
+        stoneRequirements: (q as any).stoneRequirements || '',
+        productDescription: q.productDescription || '',
+        notes: q.notes || '',
+        quantity: (q as any).quantity || 1,
+        deadline: (q as any).deadline || '',
+      })
+      setKeepImages(q.images || [])
+      setEditImages([])
+      setShowEditForm(true)
+      setDialogMode('view')
+    } else {
+      setShowEditForm(false)
+      setEditForm({
+        productName: '',
+        dimensions: '',
+        stoneRequirements: '',
+        productDescription: '',
+        notes: '',
+        quantity: 1,
+        deadline: '',
+      })
+      setEditImages([])
+      setKeepImages([])
+      setDialogMode(mode ?? (
+        q.status === 'PENDING' ? (isPricer ? 'pricing' : 'review') :
+        q.status === 'QUOTING' ? 'pricing' :
+        q.status === 'NEED_MORE_INFO' ? 'view' :
+        'view'
+      ))
+    }
 
     // Init multi-material rows từ dữ liệu Sale đã nhập
     const parsedRows = parseMaterialsFromQuote({
@@ -1488,24 +1520,23 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     if (!selected) return
     setSaving(true)
     try {
-      // Upload ảnh mới nếu có
-      let newImageUrls: string[] = []
-      if (editImages.length > 0) {
-        const { uploadApi } = await import('@/lib/api')
-        newImageUrls = await uploadApi.uploadImages(editImages.map(i => i.file))
-      }
-      // Gộp ảnh giữ lại + ảnh mới upload
-      const finalImages = [...keepImages, ...newImageUrls]
-
       await quotesApi.updateInfo(selected._id, {
-        dimensions: editForm.dimensions || (selected as any).dimensions,
-        stoneRequirements: editForm.stoneRequirements || (selected as any).stoneRequirements,
-        productDescription: editForm.productDescription || selected.productDescription,
-        notes: editForm.notes || selected.notes,
-        ...(finalImages.length > 0 ? { images: finalImages } : {}),
+        productName: editForm.productName || selected.productName,
+        dimensions: editForm.dimensions,
+        stoneRequirements: editForm.stoneRequirements,
+        productDescription: editForm.productDescription,
+        notes: editForm.notes,
+        quantity: editForm.quantity,
+        deadline: editForm.deadline,
+        keepImages: keepImages,
+        newImages: editImages.map(i => i.file),
       })
-      await quotesApi.resubmit(selected._id)
-      addNotification({ type: 'success', title: '✅ Đã gửi lại yêu cầu', message: `"${selected.productName}" đã được cập nhật và gửi lại.` })
+      if (selected.status === 'NEED_MORE_INFO') {
+        await quotesApi.resubmit(selected._id)
+        addNotification({ type: 'success', title: '✅ Đã gửi lại yêu cầu', message: `"${selected.productName}" đã được cập nhật và gửi lại.` })
+      } else {
+        addNotification({ type: 'success', title: '✅ Đã cập nhật yêu cầu', message: `Yêu cầu báo giá "${selected.productName}" đã được cập nhật.` })
+      }
       // Cleanup preview URLs
       editImages.forEach(i => URL.revokeObjectURL(i.url))
       setSelected(null)
@@ -1647,6 +1678,12 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                               <Calculator className="h-3 w-3" /> Tính giá
                             </Button>
                           )}
+                           {/* Sale: PENDING → Sửa */}
+                           {!isPricer && q.status === 'PENDING' && (
+                             <Button size="sm" onClick={() => openDetail(q)} className="gap-1 h-7 text-xs bg-[#8C6D1F] hover:bg-[#735A19] text-white">
+                               ✏️ Sửa
+                             </Button>
+                           )}
                            {/* Sale: NEED_MORE_INFO → Xem lý do + Gửi lại */}
                            {!isPricer && q.status === 'NEED_MORE_INFO' && (
                              <Button size="sm" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs bg-orange-500 hover:bg-orange-600">
@@ -2182,154 +2219,216 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
               </div>
 
             ) : (
+              showEditForm && (selected.status === 'NEED_MORE_INFO' || selected.status === 'PENDING') ? (
 
-              /* ── REVIEW / VIEW MODE ── */
-              showEditForm && selected.status === 'NEED_MORE_INFO' ? (
-
-                /* ══ EDIT FORM — thay thế toàn bộ nội dung ══ */
-                <div className="flex flex-col" style={{ maxHeight: 'calc(80vh - 110px)' }}>
-                  {/* Header form */}
-                  <div className="px-6 py-4 border-b bg-orange-50 dark:bg-orange-950/20 shrink-0">
-                    <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 mb-1">
-                      <AlertCircle className="h-4 w-4" />
-                      <span className="text-sm font-semibold">Cập nhật thông tin bổ sung</span>
-                    </div>
+              /* ══ EDIT FORM — thay thế toàn bộ nội dung ══ */
+              <div className="flex flex-col" style={{ maxHeight: 'calc(80vh - 110px)' }}>
+                {/* Header form */}
+                <div className="px-6 py-4 border-b bg-orange-50 dark:bg-orange-950/20 shrink-0">
+                  <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 mb-1">
+                    <AlertCircle className="h-4 w-4" />
+                    <span className="text-sm font-semibold">
+                      {selected.status === 'NEED_MORE_INFO' ? 'Cập nhật thông tin bổ sung' : 'Chỉnh sửa yêu cầu báo giá'}
+                    </span>
+                  </div>
+                  {selected.status === 'NEED_MORE_INFO' && (
                     <p className="text-xs text-orange-600/80 dark:text-orange-400/80">
                       Lý do trả lại: <span className="font-medium">{selected.rejectReason}</span>
                     </p>
-                  </div>
+                  )}
+                </div>
 
-                  {/* Form fields */}
-                  <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2 col-span-1">
-                        <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Kích thước / Trọng lượng</Label>
-                        <Input
-                          value={editForm.dimensions}
-                          onChange={(e) => setEditForm(f => ({ ...f, dimensions: e.target.value }))}
-                          placeholder="VD: Size 12, khoảng 3 chỉ, dài 45cm..."
-                          className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl"
-                        />
-                      </div>
-                      <div className="space-y-2 col-span-1">
-                        <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Yêu cầu đá / phụ kiện</Label>
-                        <Input
-                          value={editForm.stoneRequirements}
-                          onChange={(e) => setEditForm(f => ({ ...f, stoneRequirements: e.target.value }))}
-                          placeholder="VD: 1 viên kim cương 0.3ct, đá CZ trắng..."
-                          className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl"
-                        />
-                      </div>
-                      <div className="space-y-2 col-span-1">
-                        <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Mô tả sản phẩm</Label>
-                        <Textarea
-                          value={editForm.productDescription}
-                          onChange={(e) => setEditForm(f => ({ ...f, productDescription: e.target.value }))}
-                          placeholder="Mô tả chi tiết kiểu dáng, yêu cầu đặc biệt..."
-                          rows={3}
-                          className="border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl resize-none"
-                        />
-                      </div>
-                      <div className="space-y-2 col-span-1">
-                        <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Ghi chú thêm cho NV báo giá</Label>
-                        <Textarea
-                          value={editForm.notes}
-                          onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))}
-                          placeholder="Thông tin bổ sung, yêu cầu đặc biệt khác..."
-                          rows={3}
-                          className="border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl resize-none"
-                        />
-                      </div>
+                {/* Form fields */}
+                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Hàng 1: Tên sản phẩm | Số lượng */}
+                    <div className="space-y-2 col-span-1">
+                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Tên sản phẩm</Label>
+                      <Input
+                        value={editForm.productName}
+                        onChange={(e) => setEditForm(f => ({ ...f, productName: e.target.value }))}
+                        placeholder="Nhập tên sản phẩm..."
+                        className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
+                      />
+                    </div>
+                    <div className="space-y-2 col-span-1">
+                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Số lượng</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={editForm.quantity}
+                        onChange={(e) => setEditForm(f => ({ ...f, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
+                        className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
+                      />
                     </div>
 
-                    {/* Ảnh sản phẩm */}
-                    <div className="space-y-3 pt-3 border-t border-[#EDE8DE]">
-                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Hình ảnh sản phẩm</Label>
+                    {/* Hàng 2: Thời hạn hoàn thành | Kích thước / Trọng lượng */}
+                    <div className="space-y-2 col-span-1">
+                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Thời hạn hoàn thành</Label>
+                      <Input
+                        type="date"
+                        value={editForm.deadline ? editForm.deadline.substring(0, 10) : ''}
+                        onChange={(e) => setEditForm(f => ({ ...f, deadline: e.target.value }))}
+                        className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
+                      />
+                    </div>
+                    <div className="space-y-2 col-span-1">
+                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Kích thước / Trọng lượng</Label>
+                      <Input
+                        value={editForm.dimensions}
+                        onChange={(e) => setEditForm(f => ({ ...f, dimensions: e.target.value }))}
+                        placeholder="VD: Size 12, khoảng 3 chỉ, dài 45cm..."
+                        className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
+                      />
+                    </div>
 
-                      {/* Ảnh cũ — có thể xoá từng cái */}
-                      {keepImages.length > 0 && (
-                        <div>
-                          <p className="text-xs text-muted-foreground mb-2">Ảnh hiện tại (bấm vào ảnh để xoá)</p>
-                          <div className="flex flex-wrap gap-2">
-                            {keepImages.map((img, i) => (
-                              <div key={img} className="relative h-16 w-16 rounded-xl border border-[#EDE8DE] overflow-hidden group p-0.5 bg-white">
-                                <img src={`http://localhost:3000${img}`} alt="" className="h-full w-full object-cover rounded-lg" />
-                                <button
-                                  type="button"
-                                  onClick={() => setKeepImages(prev => prev.filter((_, idx) => idx !== i))}
-                                  className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg"
-                                >
-                                  <X className="h-4 w-4 text-white" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    {/* Hàng 3: Yêu cầu đá / phụ kiện | Mô tả sản phẩm */}
+                    <div className="space-y-2 col-span-1">
+                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Yêu cầu đá / phụ kiện</Label>
+                      <Input
+                        value={editForm.stoneRequirements}
+                        onChange={(e) => setEditForm(f => ({ ...f, stoneRequirements: e.target.value }))}
+                        placeholder="VD: 1 viên kim cương 0.3ct, đá CZ trắng..."
+                        className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
+                      />
+                    </div>
+                    <div className="space-y-2 col-span-1">
+                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Mô tả sản phẩm</Label>
+                      <Textarea
+                        value={editForm.productDescription}
+                        onChange={(e) => setEditForm(f => ({ ...f, productDescription: e.target.value }))}
+                        placeholder="Mô tả chi tiết kiểu dáng, yêu cầu đặc biệt..."
+                        rows={3}
+                        className="border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl resize-none bg-white min-h-[80px]"
+                      />
+                    </div>
 
-                      {/* Ảnh mới thêm */}
+                    {/* Hàng 4: Ghi chú thêm cho NV báo giá (chiếm cả 2 cột) */}
+                    <div className="space-y-2 col-span-2">
+                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Ghi chú thêm cho NV báo giá</Label>
+                      <Textarea
+                        value={editForm.notes}
+                        onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                        placeholder="Thông tin bổ sung, yêu cầu đặc biệt khác..."
+                        rows={3}
+                        className="border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl resize-none bg-white min-h-[80px]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Ảnh sản phẩm */}
+                  <div className="space-y-3 pt-3 border-t border-[#EDE8DE]">
+                    <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Hình ảnh sản phẩm</Label>
+
+                    {/* Ảnh cũ — có thể xoá từng cái */}
+                    {keepImages.length > 0 && (
                       <div>
-                        <p className="text-xs text-muted-foreground mb-2">Thêm ảnh mới (tối đa {5 - keepImages.length} ảnh)</p>
+                        <p className="text-xs text-muted-foreground mb-2">Ảnh hiện tại (bấm vào ảnh để xoá)</p>
                         <div className="flex flex-wrap gap-2">
-                          {editImages.map((img, i) => (
-                            <div key={img.url} className="relative h-16 w-16 rounded-xl border border-[#EDE8DE] overflow-hidden group p-0.5 bg-white">
-                              <img src={img.url} alt="" className="h-full w-full object-cover rounded-lg" />
+                          {keepImages.map((img, i) => (
+                            <div key={img} className="relative h-16 w-16 rounded-xl border border-[#EDE8DE] overflow-hidden group p-0.5 bg-white">
+                              <img src={`http://localhost:3000${img}`} alt="" className="h-full w-full object-cover rounded-lg" />
                               <button
                                 type="button"
-                                onClick={() => {
-                                  URL.revokeObjectURL(img.url)
-                                  setEditImages(prev => prev.filter((_, idx) => idx !== i))
-                                }}
+                                onClick={() => setKeepImages(prev => prev.filter((_, idx) => idx !== i))}
                                 className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg"
                               >
                                 <X className="h-4 w-4 text-white" />
                               </button>
                             </div>
                           ))}
-                          {keepImages.length + editImages.length < 5 && (
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Ảnh mới thêm */}
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">Thêm ảnh mới (tối đa {5 - keepImages.length} ảnh)</p>
+                      <div className="flex flex-wrap gap-2">
+                        {editImages.map((img, i) => (
+                          <div key={img.url} className="relative h-16 w-16 rounded-xl border border-[#EDE8DE] overflow-hidden group p-0.5 bg-white">
+                            <img src={img.url} alt="" className="h-full w-full object-cover rounded-lg" />
                             <button
                               type="button"
-                              onClick={() => editFileRef.current?.click()}
-                              className="flex h-16 w-16 flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#C9981A]/40 text-[#A07810] hover:border-[#C9981A] hover:bg-[#FBF6E9] hover:text-[#C9981A] transition-all"
+                              onClick={() => {
+                                URL.revokeObjectURL(img.url)
+                                setEditImages(prev => prev.filter((_, idx) => idx !== i))
+                              }}
+                              className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg"
                             >
-                              <ImageIcon className="h-5 w-5" />
-                              <span className="mt-0.5 text-[10px] font-medium">Thêm</span>
+                              <X className="h-4 w-4 text-white" />
                             </button>
-                          )}
-                        </div>
-                        <input
-                          ref={editFileRef}
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => {
-                            const files = Array.from(e.target.files || [])
-                            const remaining = 5 - keepImages.length - editImages.length
-                            const newImgs = files.slice(0, remaining).map(f => ({ file: f, url: URL.createObjectURL(f) }))
-                            setEditImages(prev => [...prev, ...newImgs])
-                            e.target.value = ''
-                          }}
-                        />
+                          </div>
+                        ))}
+                        {keepImages.length + editImages.length < 5 && (
+                          <button
+                            type="button"
+                            onClick={() => editFileRef.current?.click()}
+                            className="flex h-16 w-16 flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#C9981A]/40 text-[#A07810] hover:border-[#C9981A] hover:bg-[#FBF6E9] hover:text-[#C9981A] transition-all bg-white"
+                          >
+                            <ImageIcon className="h-5 w-5" />
+                            <span className="mt-0.5 text-[10px] font-medium">Thêm</span>
+                          </button>
+                        )}
                       </div>
+                      <input
+                        ref={editFileRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || [])
+                          const remaining = 5 - keepImages.length - editImages.length
+                          const newImgs = files.slice(0, remaining).map(f => ({ file: f, url: URL.createObjectURL(f) }))
+                          setEditImages(prev => [...prev, ...newImgs])
+                          e.target.value = ''
+                        }}
+                      />
                     </div>
                   </div>
-
-                  {/* Footer */}
-                  <div className="border-t px-6 py-4 flex gap-3 shrink-0 bg-muted/10">
-                    <Button variant="outline" className="flex-1" onClick={() => setShowEditForm(false)}>
-                      ← Quay lại
-                    </Button>
-                    <Button
-                      className="flex-1 gap-2 bg-orange-500 hover:bg-orange-600 shadow-md"
-                      disabled={saving}
-                      onClick={handleResubmitWithEdit}
-                    >
-                      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                      Xác nhận gửi lại
-                    </Button>
-                  </div>
                 </div>
+
+                {/* Footer */}
+                <div className="border-t px-6 py-4 flex gap-3 shrink-0 bg-[#FBF6E9]">
+                  {selected.status === 'PENDING' ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="flex-1 border-red-300 text-red-600 hover:bg-red-50 font-semibold px-4 rounded-xl h-10 transition-all bg-white"
+                        onClick={() => {
+                          handleCancel(selected._id)
+                          setSelected(null)
+                        }}
+                      >
+                        <Ban className="h-4 w-4" /> Hủy yêu cầu báo giá
+                      </Button>
+                      <Button
+                        className="flex-1 gap-2 bg-gradient-to-r from-primary to-amber-600 hover:from-primary/90 hover:to-amber-600/90 shadow-md text-white font-semibold rounded-xl h-10"
+                        disabled={saving}
+                        onClick={handleResubmitWithEdit}
+                      >
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                        Sửa lại thông tin
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button variant="outline" className="flex-1 border-[#E6DFD0] hover:bg-[#F5EFE0] text-[#6B5E4C] rounded-xl h-10 bg-white" onClick={() => setShowEditForm(false)}>
+                        ← Quay lại
+                      </Button>
+                      <Button
+                        className="flex-1 gap-2 bg-gradient-to-r from-primary to-amber-600 hover:from-primary/90 hover:to-amber-600/90 shadow-md text-white font-semibold rounded-xl h-10"
+                        disabled={saving}
+                        onClick={handleResubmitWithEdit}
+                      >
+                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        Xác nhận gửi lại
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
 
               ) : (
               <div className="flex flex-col overflow-hidden bg-background animate-in fade-in zoom-in-95 duration-200" style={{ height: '78vh' }}>
@@ -2789,10 +2888,13 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         className="gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-5 rounded-xl h-10 shadow-md shadow-orange-500/10 transition-all"
                         onClick={() => {
                           setEditForm({
+                            productName: selected.productName || '',
                             dimensions: (selected as any).dimensions || '',
                             stoneRequirements: (selected as any).stoneRequirements || '',
                             productDescription: selected.productDescription || '',
                             notes: selected.notes || '',
+                            quantity: (selected as any).quantity || 1,
+                            deadline: (selected as any).deadline || '',
                           })
                           setKeepImages(selected.images || [])
                           setEditImages([])

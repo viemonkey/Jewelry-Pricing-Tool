@@ -81,18 +81,24 @@ export const quotesApi = {
 
   /** Sale: Cập nhật thông tin bổ sung (khi bị trả lại) */
   updateInfo: async (id: string, data: {
+    productName?: string
     dimensions?: string
     stoneRequirements?: string
     productDescription?: string
     notes?: string
+    quantity?: number
+    deadline?: string
     keepImages?: string[]   // URL ảnh cũ muốn giữ lại
     newImages?: File[]      // File ảnh mới cần upload
   }): Promise<Quote> => {
     const form = new FormData()
+    if (data.productName) form.append('productName', data.productName)
     if (data.dimensions) form.append('dimensions', data.dimensions)
     if (data.stoneRequirements) form.append('stoneRequirements', data.stoneRequirements)
     if (data.productDescription) form.append('productDescription', data.productDescription)
     if (data.notes) form.append('notes', data.notes)
+    if (data.quantity !== undefined) form.append('quantity', String(data.quantity))
+    if (data.deadline !== undefined) form.append('deadline', data.deadline)
     // Gửi danh sách ảnh cũ cần giữ dưới dạng JSON string
     form.append('keepImages', JSON.stringify(data.keepImages ?? []))
     // Gửi file ảnh mới
