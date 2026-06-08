@@ -202,6 +202,7 @@ interface PricingSummaryProps {
   margin: number | null
   profit: number | null
   marginGood: boolean
+  materialType?: string
 }
 
 function PricingSummary({
@@ -213,9 +214,11 @@ function PricingSummary({
   margin,
   profit,
   marginGood,
+  materialType,
 }: PricingSummaryProps) {
   const n = (v: string) => parseFloat(v) || 0
   const cost = n(priceForm.costWithVAT) || n(priceForm.costPrice) || 0
+  const isSilver = materialType === 'SILVER'
 
   return (
     <div className="space-y-4">
@@ -223,19 +226,28 @@ function PricingSummary({
       <div className="rounded-xl border-2 border-primary/25 bg-gradient-to-br from-primary/5 to-amber-50/60 dark:from-primary/10 dark:to-amber-950/20 p-4">
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <div className="flex items-center gap-4 mb-1">
+            {isSilver ? (
               <div>
-                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Giá vốn chưa VAT</p>
-                <p className="text-base font-semibold text-foreground tabular-nums">
-                  {priceForm.costBeforeVAT ? fmt(parseFloat(priceForm.costBeforeVAT)) : '0 đ'}
+                <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Tổng giá vốn bạc (Không VAT)</p>
+                <p className="text-xl font-bold text-primary tabular-nums">
+                  {priceForm.materialCost ? fmt(parseFloat(priceForm.materialCost)) : '0 đ'}
                 </p>
               </div>
-              <span className="text-muted-foreground text-xs">+10% →</span>
-              <div>
-                <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Giá vốn có VAT</p>
-                <p className="text-xl font-bold text-primary tabular-nums">{fmt(cost)}</p>
+            ) : (
+              <div className="flex items-center gap-4 mb-1">
+                <div>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Giá vốn chưa VAT</p>
+                  <p className="text-base font-semibold text-foreground tabular-nums">
+                    {priceForm.costBeforeVAT ? fmt(parseFloat(priceForm.costBeforeVAT)) : '0 đ'}
+                  </p>
+                </div>
+                <span className="text-muted-foreground text-xs">+10% →</span>
+                <div>
+                  <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Giá vốn có VAT</p>
+                  <p className="text-xl font-bold text-primary tabular-nums">{fmt(cost)}</p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
           <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
             <Calculator className="h-5 w-5 text-primary" />
@@ -266,14 +278,22 @@ function PricingSummary({
       {/* Giá bán */}
       <div className="space-y-3">
         {/* Thông tin biên lợi nhuận tự động */}
-        {cost > 0 && pricingConfig?.profitMargins && (() => {
-          const { divisor, margin: tier } = getProfitDivisor(cost, pricingConfig.profitMargins)
-          return (
-            <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-              📊 Áp dụng biên <strong>{tier}</strong> (÷{divisor}) → Giá bán tự tính bên dưới
+        {cost > 0 && (
+          isSilver ? (
+            <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+              💡 Sản phẩm bạc: <strong>Giá bán = Giá vốn × {pricingConfig?.silverMultiplier ?? 3}</strong>
             </div>
+          ) : (
+            pricingConfig?.profitMargins && (() => {
+              const { divisor, margin: tier } = getProfitDivisor(cost, pricingConfig.profitMargins)
+              return (
+                <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                  📊 Áp dụng biên <strong>{tier}</strong> (÷{divisor}) → Giá bán tự tính bên dưới
+                </div>
+              )
+            })()
           )
-        })()}
+        )}
         <div className="relative">
           <Input type="text" inputMode="numeric" placeholder="0"
             value={formatInputNumber(priceForm.sellingPrice)}
@@ -282,7 +302,7 @@ function PricingSummary({
           <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-primary/50 pointer-events-none font-bold">đ</span>
         </div>
 
-        {margin !== null && (
+        {!isSilver && margin !== null && (
           <div
             className={`rounded-xl p-3.5 border-2 flex items-center justify-between gap-4 ${
               marginGood
@@ -572,6 +592,7 @@ function PricingDialogTabs({
                   margin={margin}
                   profit={profit}
                   marginGood={marginGood}
+                  materialType={selected.materialType}
                 />
               </>
             )}
@@ -912,7 +933,7 @@ function MultiMaterialPricingRows({
       return u
     })
     onChange(next)
-    onTotalChange(next.reduce((s, r) => s + (parseFloat(r.materialCost) || 0), 0))
+    onTotalChange(parseFloat(next[0]?.materialCost) || 0)
   }
 
   const handleSharedPriceChange = (newPrice: string) => {
@@ -925,7 +946,7 @@ function MultiMaterialPricingRows({
       return u
     })
     onChange(next)
-    onTotalChange(next.reduce((s, r) => s + (parseFloat(r.materialCost) || 0), 0))
+    onTotalChange(parseFloat(next[0]?.materialCost) || 0)
   }
 
   const toggleUnit = (row: GoldRow) => {
@@ -1069,7 +1090,16 @@ function MultiMaterialPricingRows({
 
                     {/* Thành tiền */}
                     <td className="p-3 align-middle text-right font-semibold text-xs text-primary tabular-nums">
-                      {hasData ? fmt(row.materialCost) : '0 đ'}
+                      {hasData ? (
+                        isSilver
+                          ? fmt(row.sellingPrice || (parseFloat(row.materialCost) || 0) * (pricingConfig?.silverMultiplier ?? 3))
+                          : fmt(row.materialCost)
+                      ) : '0 đ'}
+                      {isSilver && hasData && (
+                        <span className="block text-[9px] text-emerald-600 font-medium mt-0.5">
+                          (Giá bán)
+                        </span>
+                      )}
                     </td>
                   </tr>
                 )
@@ -1151,7 +1181,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     const updated = { ...currentForm }
     const n = (v: string) => parseFloat(v) || 0
 
-    if (materialType === 'SILVER' && goldRows.length <= 1) {
+    if (materialType === 'SILVER') {
       const cost = n(updated.materialCost)
       updated.laborCost = '0'
       updated.stoneCost = '0'
@@ -1385,9 +1415,16 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
           goldPrice24K: finalPrice,
           materialCost: row.materialType === 'SILVER' ? (row.weightChi || '') : (cost > 0 ? String(cost) : ''),
           budget: (row as any).budget || '',
+          sellingPrice: row.materialType === 'SILVER' ? (row.sellingPrice || String((parseFloat(row.weightChi) || 0) * (pricingConfig?.silverMultiplier ?? 3))) : '',
         }
       })
     }
+    // Sort finalRows to ensure the quote's primary materialType is at index 0
+    finalRows.sort((a, b) => {
+      if (a.materialType === q.materialType) return -1
+      if (b.materialType === q.materialType) return 1
+      return 0
+    })
     setGoldRows(finalRows)
 
     const initialMaterials = q.options && q.options.length > 0
@@ -1405,7 +1442,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
         }))
     setEditMaterialRows(initialMaterials)
 
-    const computedTotalMaterialCost = finalRows.reduce((sum: number, r: any) => sum + (parseFloat(r.materialCost) || 0), 0)
+    const computedTotalMaterialCost = parseFloat(finalRows[0]?.materialCost) || 0
     const initialMaterialCost = (q as any).materialCost?.toString() || (computedTotalMaterialCost > 0 ? String(computedTotalMaterialCost) : '')
 
     let initialWeightGram = q.weightGram?.toString() || ''
@@ -1496,18 +1533,18 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     setSaving(true)
     try {
       const optionsPayload = goldRows.map(row => {
-        const goldCost = parseFloat(row.materialCost) || 0
-        const stoneCostVal = parseFloat(priceForm.stoneCost) || 0
-        const laborCostVal = parseFloat(priceForm.laborCost) || 0
-        const costBeforeVAT = goldCost + stoneCostVal + laborCostVal
-        
         const isSilver = row.materialType === 'SILVER'
+        const goldCost = parseFloat(row.materialCost) || 0
+        const stoneCostVal = isSilver ? 0 : (parseFloat(priceForm.stoneCost) || 0)
+        const laborCostVal = isSilver ? 0 : (parseFloat(priceForm.laborCost) || 0)
+        
+        const costBeforeVAT = isSilver ? goldCost : (goldCost + stoneCostVal + laborCostVal)
         const costWithVAT = isSilver ? costBeforeVAT : (costBeforeVAT * 1.1)
         
         let autoSellingPrice = 0
         if (isSilver) {
           const multiplier = pricingConfig?.silverMultiplier ?? 3
-          autoSellingPrice = goldCost * multiplier + laborCostVal + stoneCostVal
+          autoSellingPrice = goldCost * multiplier
         } else if (pricingConfig?.profitMargins) {
           const { divisor } = getProfitDivisor(costWithVAT, pricingConfig.profitMargins)
           autoSellingPrice = costBeforeVAT > 0 ? Math.round(costWithVAT / divisor / 1000) * 1000 : 0
@@ -1789,9 +1826,9 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                       
                       {/* Cột Chất liệu */}
                       <TableCell className="p-0 align-middle">
-                        <div className="flex flex-col">
+                        <div className="flex flex-col gap-1 py-2">
                           {options.map((opt, idx) => (
-                            <div key={idx} className={`px-4 py-2 flex items-center min-h-[48px] justify-start ${idx < options.length - 1 ? 'border-b border-border/60' : ''}`}>
+                            <div key={idx} className="px-4 py-1 flex items-center min-h-[40px] justify-start">
                               <Badge variant="outline" className={opt.isCancelled ? 'line-through text-muted-foreground opacity-60 bg-muted/40' : ''}>
                                 {opt.materialType.replace(/_/g, ' ')}
                               </Badge>
@@ -1800,14 +1837,14 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         </div>
                       </TableCell>
                       
-                      <TableCell className="text-muted-foreground text-sm align-middle py-3">{q.requestedBy}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm align-middle py-3 px-4">{q.requestedBy}</TableCell>
                       
                       {/* Cột Giá vốn */}
                       {canViewCost && (
                         <TableCell className="p-0 align-middle text-right">
-                          <div className="flex flex-col">
+                          <div className="flex flex-col gap-1 py-2">
                             {options.map((opt, idx) => (
-                              <div key={idx} className={`px-4 py-2 flex items-center justify-end min-h-[48px] font-medium text-right tabular-nums ${idx < options.length - 1 ? 'border-b border-border/60' : ''} ${opt.isCancelled ? 'line-through text-muted-foreground opacity-50' : ''}`}>
+                              <div key={idx} className={`px-4 py-1 flex items-center justify-end min-h-[40px] font-medium text-right tabular-nums ${opt.isCancelled ? 'line-through text-muted-foreground opacity-50' : ''}`}>
                                 {opt.costPrice ? formatCurrency(opt.costPrice) : '—'}
                               </div>
                             ))}
@@ -1817,121 +1854,45 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                       
                       {/* Cột Giá bán */}
                       <TableCell className="p-0 align-middle text-right">
-                        <div className="flex flex-col">
+                        <div className="flex flex-col gap-1 py-2">
                           {options.map((opt, idx) => (
-                            <div key={idx} className={`px-4 py-2 flex items-center justify-end min-h-[48px] font-bold text-primary text-right tabular-nums ${idx < options.length - 1 ? 'border-b border-border/60' : ''} ${opt.isCancelled ? 'line-through text-muted-foreground opacity-50' : ''}`}>
+                            <div key={idx} className={`px-4 py-1 flex items-center justify-end min-h-[40px] font-bold text-primary text-right tabular-nums ${opt.isCancelled ? 'line-through text-muted-foreground opacity-50' : ''}`}>
                               {opt.sellingPrice ? formatCurrency(opt.sellingPrice) : '—'}
                             </div>
                           ))}
                         </div>
                       </TableCell>
+
                       {/* Cột Ngày tạo */}
-                      <TableCell className="p-0 align-middle">
-                        <div className="flex flex-col">
-                          {options.map((opt, idx) => (
-                            <div key={idx} className={`px-4 py-2 flex items-center min-h-[48px] justify-start text-muted-foreground text-sm ${idx < options.length - 1 ? 'border-b border-border/60' : ''}`}>
-                              {q.status === 'CONFIRMED'
-                                ? (opt.materialType === q.materialType ? formatDate(q.createdAt) : '')
-                                : (idx === 0 ? formatDate(q.createdAt) : '')}
-                            </div>
-                          ))}
-                        </div>
+                      <TableCell className="text-muted-foreground text-sm align-middle py-3 px-4">
+                        {formatDate(q.createdAt)}
                       </TableCell>
                       
                       {/* Cột Trạng thái */}
-                      <TableCell className="p-0 align-middle">
-                        <div className="flex flex-col">
-                          {options.map((opt, idx) => {
-                            const isConfirmedOption = opt.isConfirmed || (q.status === 'CONFIRMED' && opt.materialType === q.materialType);
-                            const isCancelledOption = opt.isCancelled;
-                            
-                            let currentSc = sc;
-                            let shouldShowStatus = false;
-
-                            if (q.status === 'CONFIRMED' || q.status === 'SENT_TO_CUSTOMER') {
-                              shouldShowStatus = true;
-                              if (isConfirmedOption) {
-                                currentSc = STATUS_CONFIG['CONFIRMED'];
-                              } else if (isCancelledOption) {
-                                currentSc = STATUS_CONFIG['CANCELLED'];
-                              } else {
-                                currentSc = STATUS_CONFIG['SENT_TO_CUSTOMER'];
-                              }
-                            } else {
-                              shouldShowStatus = idx === 0;
-                              currentSc = isCancelledOption ? STATUS_CONFIG['CANCELLED'] : sc;
-                            }
-
-                            return (
-                              <div key={idx} className={`px-4 py-2 flex items-center min-h-[48px] justify-start ${idx < options.length - 1 ? 'border-b border-border/60' : ''}`}>
-                                {shouldShowStatus ? (
-                                  <Badge variant="outline" className={`${currentSc.color} gap-1.5 pl-2`}>
-                                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${currentSc.dot}`} />
-                                    {currentSc.label}
-                                  </Badge>
-                                ) : null}
-                              </div>
-                            );
-                          })}
-                        </div>
+                      <TableCell className="align-middle px-4 py-3">
+                        <Badge variant="outline" className={`${sc.color} gap-1.5 pl-2`}>
+                          <span className={`inline-block h-1.5 w-1.5 rounded-full ${sc.dot}`} />
+                          {sc.label}
+                        </Badge>
                       </TableCell>
-                                                 {/* Cột Thao tác */}
-                      <TableCell className="p-0 align-middle text-right">
-                        <div className="flex flex-col">
-                          {options.map((opt, idx) => {
-                            return (
-                              <div key={idx} className={`px-4 py-1.5 flex items-center justify-end min-h-[48px] gap-1 ${idx < options.length - 1 ? 'border-b border-border/60' : ''}`}>
-                                {/* NV order: PENDING / QUOTING → Tính giá */}
-                                {isPricer && (q.status === 'PENDING' || q.status === 'QUOTING') && idx === 0 && (
-                                  <Button size="sm" onClick={() => openDetail(q, 'pricing')} className="gap-1 h-7 text-xs">
-                                    <Calculator className="h-3 w-3" /> Tính giá
-                                  </Button>
-                                )}
-                                
-                                {/* Sale: PENDING → Sửa */}
-                                {!isPricer && q.status === 'PENDING' && idx === 0 && (
-                                  <Button size="sm" onClick={() => openDetail(q)} className="gap-1 h-7 text-xs bg-[#8C6D1F] hover:bg-[#735A19] text-white">
-                                    ✏️ Sửa
-                                  </Button>
-                                )}
-                                
-                                {/* Sale: NEED_MORE_INFO → Bổ sung */}
-                                {!isPricer && q.status === 'NEED_MORE_INFO' && idx === 0 && (
-                                  <Button size="sm" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs bg-orange-500 hover:bg-orange-600">
-                                    <AlertCircle className="h-3 w-3" /> Bổ sung
-                                  </Button>
-                                )}
-                                
-                                {/* Sale: QUOTED → Xem giá, Gửi khách */}
-                                {!isPricer && q.status === 'QUOTED' && (
-                                  <>
-                                    <Button size="sm" variant="outline" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs px-2">
-                                      <Eye className="h-3 w-3" /> Xem giá
-                                    </Button>
-                                    <Button size="sm" onClick={() => handleSentToCustomer(q._id)} className="gap-1 h-7 text-xs bg-violet-600 hover:bg-violet-700 px-2">
-                                      <Send className="h-3 w-3" /> Gửi khách
-                                    </Button>
-                                  </>
-                                )}
-                                
-                                {/* Sale: SENT_TO_CUSTOMER hoặc CONFIRMED → Khách chốt, Khách huỷ, Đã chốt, Đã huỷ */}
-                                {!isPricer && (q.status === 'SENT_TO_CUSTOMER' || q.status === 'CONFIRMED') && (() => {
-                                  const isConfirmedOption = opt.isConfirmed || (q.status === 'CONFIRMED' && opt.materialType === q.materialType);
-                                  if (isConfirmedOption) {
-                                    return (
-                                      <Badge className="bg-emerald-600 text-white border-transparent h-7 text-xs font-semibold px-2">
-                                        Đã chốt
-                                      </Badge>
-                                    );
-                                  }
-                                  if (opt.isCancelled) {
-                                    return (
-                                      <Badge variant="outline" className="bg-[#95A5A6]/10 text-[#7F8C8D] border-[#95A5A6]/30 h-7 text-xs font-semibold px-2">
-                                        Đã huỷ
-                                      </Badge>
-                                    );
-                                  }
-                                  return (
+                      
+                      {/* Cột Thao tác */}
+                      {(!isPricer && (q.status === 'SENT_TO_CUSTOMER' || q.status === 'CONFIRMED')) ? (
+                        <TableCell className="p-0 align-middle text-right">
+                          <div className="flex flex-col gap-1 py-2">
+                            {options.map((opt, idx) => {
+                              const isConfirmedOption = opt.isConfirmed || (q.status === 'CONFIRMED' && opt.materialType === q.materialType);
+                              return (
+                                <div key={idx} className="px-4 py-1 flex items-center justify-end min-h-[40px] gap-1">
+                                  {isConfirmedOption ? (
+                                    <Badge className="bg-emerald-600 text-white border-transparent h-7 text-xs font-semibold px-2">
+                                      Đã chốt
+                                    </Badge>
+                                  ) : opt.isCancelled ? (
+                                    <Badge variant="outline" className="bg-[#95A5A6]/10 text-[#7F8C8D] border-[#95A5A6]/30 h-7 text-xs font-semibold px-2">
+                                      Đã huỷ
+                                    </Badge>
+                                  ) : (
                                     <>
                                       <Button size="sm" className="gap-1 h-7 text-xs px-2" onClick={() => handleConfirm(q._id, opt)}>
                                         <ShoppingCart className="h-3 w-3" /> Khách chốt
@@ -1940,30 +1901,64 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                         <Ban className="h-3 w-3" /> Khách huỷ
                                       </Button>
                                     </>
-                                  );
-                                })()}
-
-                                {/* Sale: CANCELLED → Đã huỷ */}
-                                {!isPricer && q.status === 'CANCELLED' && (
-                                  <Badge variant="outline" className="bg-[#95A5A6]/10 text-[#7F8C8D] border-[#95A5A6]/30 h-7 text-xs font-semibold px-2">
-                                    Đã huỷ
-                                  </Badge>
-                                )}
-                                
-                                {/* Pricer: CONFIRMED/CANCELLED/QUOTED/SENT_TO_CUSTOMER → Xem */}
-                                {isPricer && (
-                                  (q.status === 'CONFIRMED' && opt.materialType === q.materialType) ||
-                                  (q.status !== 'CONFIRMED' && (q.status === 'CANCELLED' || q.status === 'QUOTED' || q.status === 'SENT_TO_CUSTOMER') && idx === 0)
-                                ) && (
-                                  <Button size="sm" variant="ghost" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
-                                    <Eye className="h-3 w-3" /> Xem
-                                  </Button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </TableCell>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </TableCell>
+                      ) : (
+                        <TableCell className="align-middle text-right px-4 py-3">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {/* NV order: PENDING / QUOTING → Tính giá */}
+                            {isPricer && (q.status === 'PENDING' || q.status === 'QUOTING') && (
+                              <Button size="sm" onClick={() => openDetail(q, 'pricing')} className="gap-1 h-7 text-xs">
+                                <Calculator className="h-3 w-3" /> Tính giá
+                              </Button>
+                            )}
+                            
+                            {/* Sale: PENDING → Sửa */}
+                            {!isPricer && q.status === 'PENDING' && (
+                              <Button size="sm" onClick={() => openDetail(q)} className="gap-1 h-7 text-xs bg-[#8C6D1F] hover:bg-[#735A19] text-white">
+                                ✏️ Sửa
+                              </Button>
+                            )}
+                            
+                            {/* Sale: NEED_MORE_INFO → Bổ sung */}
+                            {!isPricer && q.status === 'NEED_MORE_INFO' && (
+                              <Button size="sm" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs bg-orange-500 hover:bg-orange-600">
+                                <AlertCircle className="h-3 w-3" /> Bổ sung
+                              </Button>
+                            )}
+                            
+                            {/* Sale: QUOTED → Xem giá, Gửi khách */}
+                            {!isPricer && q.status === 'QUOTED' && (
+                              <>
+                                <Button size="sm" variant="outline" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs px-2">
+                                  <Eye className="h-3 w-3" /> Xem giá
+                                </Button>
+                                <Button size="sm" onClick={() => handleSentToCustomer(q._id)} className="gap-1 h-7 text-xs bg-violet-600 hover:bg-violet-700 px-2">
+                                  <Send className="h-3 w-3" /> Gửi khách
+                                </Button>
+                              </>
+                            )}
+                            
+                            {/* Sale: CANCELLED → Đã huỷ */}
+                            {!isPricer && q.status === 'CANCELLED' && (
+                              <Badge variant="outline" className="bg-[#95A5A6]/10 text-[#7F8C8D] border-[#95A5A6]/30 h-7 text-xs font-semibold px-2">
+                                Đã huỷ
+                              </Badge>
+                            )}
+                            
+                            {/* Pricer: CONFIRMED/CANCELLED/QUOTED/SENT_TO_CUSTOMER → Xem */}
+                            {isPricer && (q.status === 'CONFIRMED' || q.status === 'CANCELLED' || q.status === 'QUOTED' || q.status === 'SENT_TO_CUSTOMER') && (
+                              <Button size="sm" variant="ghost" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
+                                <Eye className="h-3 w-3" /> Xem
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      )}
                     </motion.tr>
                    )
                  })}
@@ -2336,19 +2331,28 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         <div className="rounded-xl border-2 border-primary/25 bg-gradient-to-br from-primary/5 to-amber-50/60 dark:from-primary/10 dark:to-amber-950/20 p-4">
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
-                              <div className="flex items-center gap-4 mb-1">
+                              {selected?.materialType === 'SILVER' ? (
                                 <div>
-                                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Giá vốn chưa VAT</p>
-                                  <p className="text-base font-semibold text-foreground tabular-nums">
-                                    {priceForm.costBeforeVAT ? formatCurrency(parseFloat(priceForm.costBeforeVAT)) : '0 đ'}
+                                  <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Tổng giá vốn bạc (Không VAT)</p>
+                                  <p className="text-xl font-bold text-primary tabular-nums">
+                                    {priceForm.materialCost ? formatCurrency(parseFloat(priceForm.materialCost)) : '0 đ'}
                                   </p>
                                 </div>
-                                <span className="text-muted-foreground text-xs">+10% →</span>
-                                <div>
-                                  <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Giá vốn có VAT</p>
-                                  <p className="text-xl font-bold text-primary tabular-nums">{formatCurrency(cost)}</p>
+                              ) : (
+                                <div className="flex items-center gap-4 mb-1">
+                                  <div>
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Giá vốn chưa VAT</p>
+                                    <p className="text-base font-semibold text-foreground tabular-nums">
+                                      {priceForm.costBeforeVAT ? formatCurrency(parseFloat(priceForm.costBeforeVAT)) : '0 đ'}
+                                    </p>
+                                  </div>
+                                  <span className="text-muted-foreground text-xs">+10% →</span>
+                                  <div>
+                                    <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Giá vốn có VAT</p>
+                                    <p className="text-xl font-bold text-primary tabular-nums">{formatCurrency(cost)}</p>
+                                  </div>
                                 </div>
-                              </div>
+                              )}
                             </div>
                             <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
                               <Calculator className="h-5 w-5 text-primary" />
@@ -2380,14 +2384,22 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         <SectionDivider label="Giá bán đề xuất" icon={<TrendingUp className="h-3 w-3" />} />
                         <div className="space-y-3">
                           {/* Thông tin biên lợi nhuận tự động */}
-                          {cost > 0 && pricingConfig?.profitMargins && (() => {
-                            const { divisor, margin: tier } = getProfitDivisor(cost, pricingConfig.profitMargins)
-                            return (
-                              <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                                📊 Áp dụng biên <strong>{tier}</strong> (÷{divisor}) → Giá bán tự tính bên dưới
+                          {cost > 0 && (
+                            selected?.materialType === 'SILVER' ? (
+                              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
+                                💡 Sản phẩm bạc: <strong>Giá bán = Giá vốn × {pricingConfig?.silverMultiplier ?? 3}</strong>
                               </div>
+                            ) : (
+                              pricingConfig?.profitMargins && (() => {
+                                const { divisor, margin: tier } = getProfitDivisor(cost, pricingConfig.profitMargins)
+                                return (
+                                  <div className="rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                                    📊 Áp dụng biên <strong>{tier}</strong> (÷{divisor}) → Giá bán tự tính bên dưới
+                                  </div>
+                                )
+                              })()
                             )
-                          })()}
+                          )}
                           <div className="relative">
                             <Input type="text" inputMode="numeric" placeholder="0"
                               value={formatInputNumber(priceForm.sellingPrice)}
@@ -2396,7 +2408,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                             <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-primary/50 pointer-events-none font-bold">đ</span>
                           </div>
 
-                          {margin !== null && (
+                          {selected?.materialType !== 'SILVER' && margin !== null && (
                             <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
                               className={`rounded-xl p-3.5 border-2 flex items-center justify-between gap-4 ${
                                 marginGood
