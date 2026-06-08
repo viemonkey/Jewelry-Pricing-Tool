@@ -126,7 +126,8 @@ export class QuotesController {
 
   async confirm(req: Request, res: Response, next: NextFunction) {
     try {
-      const quote = await quotesService.confirm(req.params.id)
+      const { selectedOption } = req.body
+      const quote = await quotesService.confirm(req.params.id, selectedOption)
       res.json(quote)
     } catch (error) {
       next(error)
@@ -135,7 +136,8 @@ export class QuotesController {
 
   async cancel(req: Request, res: Response, next: NextFunction) {
     try {
-      const quote = await quotesService.cancel(req.params.id)
+      const { materialType } = req.body
+      const quote = await quotesService.cancel(req.params.id, materialType)
       res.json(quote)
     } catch (error) {
       next(error)

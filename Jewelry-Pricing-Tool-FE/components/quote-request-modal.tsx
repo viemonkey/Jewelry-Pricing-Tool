@@ -66,10 +66,26 @@ interface MaterialRow {
   materialType: MaterialValue | ''
   weight: string
   unit: 'chi' | 'gram'
+  budget?: string
 }
 
 function newRow(): MaterialRow {
-  return { id: `${Date.now()}-${Math.random()}`, materialType: '', weight: '', unit: 'chi' }
+  return { id: `${Date.now()}-${Math.random()}`, materialType: '', weight: '', unit: 'chi', budget: '' }
+}
+
+const formatBudgetValue = (val: string): string => {
+  const raw = val.replace(/\./g, '')
+  if (/^\d+$/.test(raw)) {
+    return Number(raw).toLocaleString('vi-VN')
+  }
+  const rangeMatch = raw.match(/^(\d+)(\s*-\s*)(\d+)$/)
+  if (rangeMatch) {
+    const num1 = Number(rangeMatch[1]).toLocaleString('vi-VN')
+    const separator = rangeMatch[2]
+    const num2 = Number(rangeMatch[3]).toLocaleString('vi-VN')
+    return `${num1}${separator}${num2}`
+  }
+  return val
 }
 
 interface FormErrors {
@@ -204,14 +220,20 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
     const filledRows    = materialRows.filter((r) => r.materialType)
     const materialSummary = filledRows.map((r) => {
       const opt = MATERIAL_OPTIONS.find((o) => o.value === r.materialType)
+      if (r.materialType === 'SILVER') {
+        return `${opt?.label ?? r.materialType}${r.budget ? ` (Khoảng giá: ${r.budget})` : ''}`
+      }
       return `${opt?.label ?? r.materialType}${r.weight ? ` – ${r.weight} ${r.unit}` : ''}`
     }).join('; ')
 
     const primaryMaterial = filledRows[0].materialType as Quote['materialType']
-    const weightNotes = filledRows.filter((r) => r.weight).map((r) => {
+    const weightNotes = filledRows.map((r) => {
       const opt = MATERIAL_OPTIONS.find((o) => o.value === r.materialType)
-      return `${opt?.label}: ${r.weight} ${r.unit}`
-    }).join(', ')
+      if (r.materialType === 'SILVER') {
+        return r.budget ? `${opt?.label}: ${r.budget}` : ''
+      }
+      return r.weight ? `${opt?.label}: ${r.weight} ${r.unit}` : ''
+    }).filter(Boolean).join(', ')
 
     const catLabel   = PRODUCT_CATEGORIES.find((c) => c.value === category)?.label ?? ''
     const sizeStr    = buildSizeString()
@@ -221,8 +243,9 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
 
     const options = filledRows.map((r) => ({
       materialType: r.materialType,
-      weightChi: r.unit === 'chi' ? (parseFloat(r.weight) || 0) : undefined,
-      weightGram: r.unit === 'gram' ? (parseFloat(r.weight) || 0) : undefined,
+      weightChi: r.materialType === 'SILVER' ? undefined : (r.unit === 'chi' ? (parseFloat(r.weight) || 0) : undefined),
+      weightGram: r.materialType === 'SILVER' ? undefined : (r.unit === 'gram' ? (parseFloat(r.weight) || 0) : undefined),
+      budget: r.materialType === 'SILVER' ? r.budget : undefined,
     }))
 
     try {
@@ -763,18 +786,32 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
 
                             {/* Row header labels (first row only) */}
                             {idx === 0 && (
-                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 76px 64px 36px', gap: '6px', marginBottom: '4px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: materialRows[0]?.materialType === 'SILVER' ? '1fr 146px 36px' : '1fr 76px 64px 36px', gap: '6px', marginBottom: '4px' }}>
                                 <span style={{ fontSize: '10.5px', color: TEXT_MUTED }}>Loại</span>
-                                <span style={{ fontSize: '10.5px', color: TEXT_MUTED }}>Trọng lượng</span>
-                                <span style={{ fontSize: '10.5px', color: TEXT_MUTED }}>Đơn vị</span>
+                                {materialRows[0]?.materialType === 'SILVER' ? (
+                                  <span style={{ fontSize: '10.5px', color: TEXT_MUTED }}>Giá mong muốn</span>
+                                ) : (
+                                  <>
+                                    <span style={{ fontSize: '10.5px', color: TEXT_MUTED }}>Trọng lượng</span>
+                                    <span style={{ fontSize: '10.5px', color: TEXT_MUTED }}>Đơn vị</span>
+                                  </>
+                                )}
                                 <span />
                               </div>
                             )}
 
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 76px 64px 36px', gap: '6px', alignItems: 'center' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: row.materialType === 'SILVER' ? '1fr 146px 36px' : '1fr 76px 64px 36px', gap: '6px', alignItems: 'center' }}>
                               <Select
                                 value={row.materialType}
-                                onValueChange={(v) => { updateRow(row.id, { materialType: v as MaterialValue }); touch('materials') }}
+                                onValueChange={(v) => { 
+                                  const isSil = v === 'SILVER';
+                                  updateRow(row.id, { 
+                                    materialType: v as MaterialValue,
+                                    weight: isSil ? '' : row.weight,
+                                    budget: isSil ? row.budget || '' : ''
+                                  }); 
+                                  touch('materials');
+                                }}
                               >
                                 <SelectTrigger className={cn(errors.materials && !row.materialType && 'border-destructive')}>
                                   <SelectValue placeholder="Chọn loại..." />
@@ -787,23 +824,36 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
                                 </SelectContent>
                               </Select>
 
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                placeholder="2.5"
-                                className="qrm-input"
-                                value={row.weight}
-                                onChange={(e) => updateRow(row.id, { weight: e.target.value.replace(/[^0-9.]/g, '') })}
-                                style={{ ...fieldStyle, textAlign: 'right', padding: '8px 10px', fontSize: '13px' }}
-                              />
+                              {row.materialType === 'SILVER' ? (
+                                <input
+                                  type="text"
+                                  placeholder="Giá mong muốn..."
+                                  className="qrm-input"
+                                  value={row.budget || ''}
+                                  onChange={(e) => updateRow(row.id, { budget: formatBudgetValue(e.target.value) })}
+                                  style={{ ...fieldStyle, padding: '8px 10px', fontSize: '13px' }}
+                                />
+                              ) : (
+                                <>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="2.5"
+                                    className="qrm-input"
+                                    value={row.weight}
+                                    onChange={(e) => updateRow(row.id, { weight: e.target.value.replace(/[^0-9.]/g, '') })}
+                                    style={{ ...fieldStyle, textAlign: 'right', padding: '8px 10px', fontSize: '13px' }}
+                                  />
 
-                              <Select value={row.unit} onValueChange={(v) => updateRow(row.id, { unit: v as 'chi' | 'gram' })}>
-                                <SelectTrigger className="px-2"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="chi">Chỉ</SelectItem>
-                                  <SelectItem value="gram">Gram</SelectItem>
-                                </SelectContent>
-                              </Select>
+                                  <Select value={row.unit} onValueChange={(v) => updateRow(row.id, { unit: v as 'chi' | 'gram' })}>
+                                    <SelectTrigger className="px-2"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="chi">Chỉ</SelectItem>
+                                      <SelectItem value="gram">Gram</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </>
+                              )}
 
                               <button
                                 type="button"

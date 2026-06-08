@@ -38,6 +38,9 @@ export interface IQuoteOption {
   costWithVAT?: number
   costPrice: number
   sellingPrice: number
+  isCancelled?: boolean
+  isConfirmed?: boolean
+  budget?: string
 }
 
 export interface IQuote extends Document {
@@ -86,6 +89,9 @@ const QuoteOptionSchema = new Schema({
   costWithVAT: { type: Number },
   costPrice: { type: Number, default: 0 },
   sellingPrice: { type: Number, default: 0 },
+  isCancelled: { type: Boolean, default: false },
+  isConfirmed: { type: Boolean, default: false },
+  budget: { type: String, default: '' },
 }, { _id: false })
 
 const QuoteSchema = new Schema<IQuote>(

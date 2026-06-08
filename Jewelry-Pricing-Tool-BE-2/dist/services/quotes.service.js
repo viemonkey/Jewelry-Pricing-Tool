@@ -119,29 +119,69 @@ class QuotesService {
         });
         return quote;
     }
-    async confirm(id) {
-        const currentQuote = await Quote_1.Quote.findById(id).lean();
-        if (!currentQuote) {
-            const err = new Error('Quote not found');
-            err.statusCode = 404;
-            throw err;
-        }
-        const quote = await Quote_1.Quote.findByIdAndUpdate(id, {
-            status: Quote_1.QuoteStatus.CONFIRMED,
-            confirmedPrice: currentQuote.sellingPrice || 0
-        }, { new: true }).lean();
+    async confirm(id, selectedOption) {
+        const quote = await Quote_1.Quote.findById(id);
         if (!quote) {
             const err = new Error('Quote not found');
             err.statusCode = 404;
             throw err;
         }
-        notifications_service_1.notificationsService.notifyQuoteConfirmed(quote.quoteCode || '', quote.productName, String(quote._id));
-        return quote;
+        quote.status = Quote_1.QuoteStatus.CONFIRMED;
+        quote.confirmedPrice = selectedOption ? selectedOption.sellingPrice : (quote.sellingPrice || 0);
+        if (selectedOption) {
+            quote.materialType = selectedOption.materialType;
+            quote.weightChi = selectedOption.weightChi;
+            quote.weightGram = selectedOption.weightGram;
+            quote.laborCost = selectedOption.laborCost;
+            quote.goldPrice24K = selectedOption.goldPrice24K;
+            quote.materialCost = selectedOption.materialCost;
+            quote.stoneCost = selectedOption.stoneCost;
+            quote.costBeforeVAT = selectedOption.costBeforeVAT;
+            quote.costPrice = selectedOption.costPrice;
+            quote.sellingPrice = selectedOption.sellingPrice;
+            if (quote.options && quote.options.length > 0) {
+                const option = quote.options.find(o => o.materialType === selectedOption.materialType);
+                if (option) {
+                    option.isConfirmed = true;
+                }
+            }
+        }
+        const saved = await quote.save();
+        const result = saved.toObject();
+        notifications_service_1.notificationsService.notifyQuoteConfirmed(result.quoteCode || '', result.productName, String(result._id));
+        return result;
     }
-    async cancel(id) {
-        const quote = await this.updateStatus(id, Quote_1.QuoteStatus.CANCELLED);
-        notifications_service_1.notificationsService.notifyQuoteCancelled(quote.quoteCode || '', quote.productName, String(quote._id));
-        return quote;
+    async cancel(id, materialType) {
+        const quote = await Quote_1.Quote.findById(id);
+        if (!quote) {
+            const err = new Error('Quote not found');
+            err.statusCode = 404;
+            throw err;
+        }
+        if (materialType && quote.options && quote.options.length > 0) {
+            const option = quote.options.find(o => o.materialType === materialType);
+            if (option) {
+                option.isCancelled = true;
+            }
+            const allCancelled = quote.options.every(o => o.isCancelled);
+            if (allCancelled) {
+                quote.status = Quote_1.QuoteStatus.CANCELLED;
+            }
+        }
+        else {
+            quote.status = Quote_1.QuoteStatus.CANCELLED;
+            if (quote.options && quote.options.length > 0) {
+                quote.options.forEach(o => {
+                    o.isCancelled = true;
+                });
+            }
+        }
+        const saved = await quote.save();
+        const result = saved.toObject();
+        if (result.status === Quote_1.QuoteStatus.CANCELLED) {
+            notifications_service_1.notificationsService.notifyQuoteCancelled(result.quoteCode || '', result.productName, String(result._id));
+        }
+        return result;
     }
     async updateStatus(id, status) {
         const quote = await Quote_1.Quote.findByIdAndUpdate(id, { status }, { new: true }).lean();

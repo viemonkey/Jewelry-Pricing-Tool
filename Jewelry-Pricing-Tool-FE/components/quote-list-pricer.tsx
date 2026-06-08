@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -20,7 +23,7 @@ import {
   Calculator, CheckCircle, Eye, Loader2, RefreshCw,
   ThumbsUp, Ban, Gem, Hammer, Sparkles, TrendingUp, AlertCircle,
   Package, Zap, Send, ShoppingCart, ImageIcon, X, Layers, FileText,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, Plus, Minus,
 } from 'lucide-react'
 import { quotesApi, pricingConfigApi } from '@/lib/api'
 import type { PricingConfig } from '@/lib/api'
@@ -38,6 +41,8 @@ export interface GoldRow {
   goldPrice24K: string
   materialCost: string
   weightUnit?: 'chi' | 'gram'
+  budget?: string
+  sellingPrice?: string
 }
 
 const MATERIAL_LABEL_MAP: Record<string, string> = {
@@ -470,7 +475,7 @@ function PricingDialogTabs({
           /* ── PRICING TAB ── */
           <div className="px-6 py-5 space-y-5">
 
-            {selected.materialType === 'SILVER' ? (
+            {selected.materialType === 'SILVER' && (selected.options && selected.options.length > 0 ? selected.options.length <= 1 : parseMaterialsFromQuote(selected).length <= 1) ? (
               /* ── BẠC: nhập giá vốn → tự ra giá bán ×3 ── */
               <div className="space-y-4">
                 <SectionDivider label="Sản phẩm bạc" icon={<Gem className="h-3 w-3" />} />
@@ -896,8 +901,14 @@ function MultiMaterialPricingRows({
     const next = rows.map(r => {
       if (r.id !== id) return r
       const u = { ...r, ...patch }
-      const cost = computeCost(u.materialType, u.goldPrice24K, u.weightChi, (u as any).weightUnit)
-      u.materialCost = String(cost)
+      if (u.materialType === 'SILVER') {
+        u.materialCost = u.weightChi
+        const costVal = parseFloat(u.materialCost) || 0
+        u.sellingPrice = String(costVal * (pricingConfig?.silverMultiplier ?? 3))
+      } else {
+        const cost = computeCost(u.materialType, u.goldPrice24K, u.weightChi, (u as any).weightUnit)
+        u.materialCost = String(cost)
+      }
       return u
     })
     onChange(next)
@@ -907,8 +918,10 @@ function MultiMaterialPricingRows({
   const handleSharedPriceChange = (newPrice: string) => {
     const next = rows.map(r => {
       const u = { ...r, goldPrice24K: newPrice }
-      const cost = computeCost(u.materialType, u.goldPrice24K, u.weightChi, (u as any).weightUnit)
-      u.materialCost = String(cost)
+      if (u.materialType !== 'SILVER') {
+        const cost = computeCost(u.materialType, u.goldPrice24K, u.weightChi, (u as any).weightUnit)
+        u.materialCost = String(cost)
+      }
       return u
     })
     onChange(next)
@@ -970,15 +983,16 @@ function MultiMaterialPricingRows({
             <thead>
               <tr className="border-b border-border/60 bg-muted/30">
                 <th className="p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Chất liệu / Công thức</th>
-                <th className="p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right w-44">Trọng lượng</th>
-                <th className="p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right w-36">Thành tiền</th>
+                <th className="p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right w-44">Thông số</th>
+                <th className="p-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-right w-36">Thành tiền (Vốn)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/60">
               {rows.map((row, idx) => {
+                const isSilver = row.materialType === 'SILVER'
                 const key = row.materialType.replace('GOLD_', '')
                 const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)
-                const hasData = !!(parseFloat(row.goldPrice24K) && parseFloat(row.weightChi))
+                const hasData = isSilver ? !!parseFloat(row.materialCost) : !!(parseFloat(row.goldPrice24K) && parseFloat(row.weightChi))
                 const unit = (row as any).weightUnit === 'gram' ? 'gram' : 'chi'
 
                 // Tính giá trị quy đổi mỗi chỉ
@@ -994,42 +1008,59 @@ function MultiMaterialPricingRows({
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-200 text-amber-800 dark:text-amber-300 text-[10px] font-semibold px-2 py-0.5">
                           <Layers className="h-2.5 w-2.5" />
                           {row.label}
-                          {ratio && <span className="opacity-70 font-normal"> · {Math.round(ratio.applied * 100)}%</span>}
+                          {!isSilver && ratio && <span className="opacity-70 font-normal"> · {Math.round(ratio.applied * 100)}%</span>}
                         </span>
                       </div>
-                      {goldPrice > 0 && ratio && (
-                        <p className="text-[10px] text-muted-foreground font-medium">
-                          {Number(row.goldPrice24K).toLocaleString('vi-VN')} × {Math.round(appliedRatio * 100)}% = {ratePerChi.toLocaleString('vi-VN')} đ/chỉ
-                        </p>
+                      {isSilver ? (
+                        row.budget ? (
+                          <p className="text-[10px] text-violet-600 dark:text-violet-400 font-semibold">
+                            🎯 Khách mong muốn: {row.budget}
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-muted-foreground font-medium">
+                            Chưa nhập khoảng giá mong muốn
+                          </p>
+                        )
+                      ) : (
+                        goldPrice > 0 && ratio && (
+                          <p className="text-[10px] text-muted-foreground font-medium">
+                            {Number(row.goldPrice24K).toLocaleString('vi-VN')} × {Math.round(appliedRatio * 100)}% = {ratePerChi.toLocaleString('vi-VN')} đ/chỉ
+                          </p>
+                        )
                       )}
                     </td>
 
-                    {/* Trọng lượng */}
+                    {/* Trọng lượng / Giá vốn Bạc */}
                     <td className="p-3 align-middle">
                       <div className="flex items-center gap-1 justify-end">
-                        <div className="relative w-28">
+                        <div className={isSilver ? "relative w-36" : "relative w-28"}>
                           <input
                             type="text"
                             inputMode="decimal"
-                            placeholder="0"
-                            value={row.weightChi}
-                            onChange={(e) => update(row.id, { weightChi: e.target.value.replace(/[^0-9.]/g, '') })}
+                            placeholder={isSilver ? "Nhập giá vốn bạc..." : "0"}
+                            value={isSilver ? (row.weightChi ? Number(row.weightChi).toLocaleString('vi-VN') : '') : row.weightChi}
+                            onChange={(e) => {
+                              const raw = isSilver ? e.target.value.replace(/\./g, '').replace(/,/g, '') : e.target.value.replace(/[^0-9.]/g, '')
+                              update(row.id, { weightChi: raw })
+                            }}
                             className="w-full h-9 rounded-md border border-input bg-background px-2.5 pr-8 text-xs text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-ring/30"
                           />
                           <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none font-medium">
-                            {unit === 'gram' ? 'g' : 'chỉ'}
+                            {isSilver ? 'đ' : (unit === 'gram' ? 'g' : 'chỉ')}
                           </span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => toggleUnit(row)}
-                          className="h-8 w-8 rounded-md hover:bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-all shrink-0"
-                          title={unit === 'gram' ? 'Đổi sang chỉ' : 'Đổi sang gram'}
-                        >
-                          <RefreshCw className="h-3 w-3" />
-                        </button>
+                        {!isSilver && (
+                          <button
+                            type="button"
+                            onClick={() => toggleUnit(row)}
+                            className="h-8 w-8 rounded-md hover:bg-muted border border-border flex items-center justify-center text-muted-foreground hover:text-foreground transition-all shrink-0"
+                            title={unit === 'gram' ? 'Đổi sang chỉ' : 'Đổi sang gram'}
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
-                      {unit === 'gram' && parseFloat(row.weightChi) > 0 && (
+                      {!isSilver && unit === 'gram' && parseFloat(row.weightChi) > 0 && (
                         <p className="text-[9px] text-muted-foreground text-right mt-0.5">
                           ≈ {Math.round((parseFloat(row.weightChi) / 3.75) * 1000) / 1000} chỉ
                         </p>
@@ -1049,7 +1080,7 @@ function MultiMaterialPricingRows({
       </div>
 
       {/* Tổng cộng nhiều loại */}
-      {rows.length > 1 && total > 0 && (
+      {rows.filter(r => r.materialType !== 'SILVER').length > 1 && total > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -1057,10 +1088,10 @@ function MultiMaterialPricingRows({
         >
           <span className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
             <Layers className="h-3 w-3" />
-            Tổng cộng vàng ({rows.length} loại)
+            Tổng cộng vàng ({rows.filter(r => r.materialType !== 'SILVER').length} loại)
           </span>
           <span className="text-sm font-bold text-amber-800 dark:text-amber-300 tabular-nums">
-            {fmt(total)}
+            {fmt(rows.filter(r => r.materialType !== 'SILVER').reduce((s, r) => s + (parseFloat(r.materialCost) || 0), 0))}
           </span>
         </motion.div>
       )}
@@ -1083,7 +1114,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   const [dialogMode, setDialogMode] = useState<'review' | 'pricing' | 'view'>('view')
   const [priceForm, setPriceForm] = useState<PriceFormState>(EMPTY_PRICE_FORM(currentUserName))
   const [saving, setSaving] = useState(false)
-  const [confirmCancel, setConfirmCancel] = useState<{ id: string; name: string } | null>(null)
+  const [confirmCancel, setConfirmCancel] = useState<{ id: string; name: string; materialType?: string } | null>(null)
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [showEditForm, setShowEditForm] = useState(false)
@@ -1098,6 +1129,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   })
   const [editImages, setEditImages] = useState<{ file: File; url: string }[]>([])
   const [keepImages, setKeepImages] = useState<string[]>([])
+  const [editMaterialRows, setEditMaterialRows] = useState<{ id: string; materialType: string; weight: string; unit: 'chi' | 'gram' }[]>([])
   const editFileRef = useRef<HTMLInputElement>(null)
 
   const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null)
@@ -1119,7 +1151,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     const updated = { ...currentForm }
     const n = (v: string) => parseFloat(v) || 0
 
-    if (materialType === 'SILVER') {
+    if (materialType === 'SILVER' && goldRows.length <= 1) {
       const cost = n(updated.materialCost)
       updated.laborCost = '0'
       updated.stoneCost = '0'
@@ -1179,7 +1211,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   const handleSilverSellingPriceChange = (val: string) => {
     setPriceForm((f) => {
       const updated = { ...f, sellingPrice: val }
-      if (selected?.materialType === 'SILVER') {
+      if (selected?.materialType === 'SILVER' && goldRows.length <= 1) {
         const multiplier = pricingConfig?.silverMultiplier ?? 3
         const sellVal = parseFloat(val) || 0
         const costVal = sellVal / multiplier
@@ -1222,13 +1254,15 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   const isPricer = canViewCost
   const { addNotification } = useNotifications()
 
+  const autoOpenedRefs = useRef<Set<string>>(new Set())
+
   useEffect(() => {
-    if (newQuote) {
+    if (newQuote && !autoOpenedRefs.current.has(newQuote._id)) {
+      autoOpenedRefs.current.add(newQuote._id)
       setQuotes((prev) => {
         if (prev.some((q) => q._id === newQuote._id)) return prev
         return [newQuote, ...prev]
       })
-      openDetail(newQuote)
     }
   }, [newQuote])
 
@@ -1297,28 +1331,81 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     const systemGoldPrice = pricingConfig?.goldPrice24K?.toString() || ''
     const goldPriceToLoad = savedGoldPrice || systemGoldPrice
 
-    // Tự động điền giá vàng hệ thống và tính lại giá trị cho từng dòng vàng
-    const mappedRows = parsedRows.map(row => {
-      const finalPrice = row.goldPrice24K || goldPriceToLoad
-      const g = parseFloat(finalPrice) || 0
-      let w = parseFloat(row.weightChi) || 0
-      let cost = 0
-      if (g && w) {
-        let weightInChi = w
-        if ((row as any).weightUnit === 'gram') weightInChi = w / 3.75
-        const key = row.materialType.replace('GOLD_', '')
-        const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)?.applied ?? 0
-        cost = Math.round(ratio * g * weightInChi)
-      }
-      return {
-        ...row,
-        goldPrice24K: finalPrice,
-        materialCost: String(cost)
-      }
-    })
-    setGoldRows(mappedRows)
+    let finalRows: GoldRow[] = []
 
-    const computedTotalMaterialCost = mappedRows.reduce((sum, r) => sum + (parseFloat(r.materialCost) || 0), 0)
+    if (q.options && q.options.length > 0) {
+      finalRows = q.options.map((opt: any) => {
+        const type = opt.materialType
+        const isSilver = type === 'SILVER'
+        const weightVal = isSilver
+          ? (opt.materialCost || 0)
+          : (opt.weightChi !== undefined && opt.weightChi !== null ? opt.weightChi : (opt.weightGram !== undefined && opt.weightGram !== null ? opt.weightGram : 0))
+        const weight = weightVal > 0 ? String(weightVal) : ''
+        const weightUnit = opt.weightGram !== undefined && opt.weightGram !== null ? 'gram' : 'chi'
+        
+        const finalPrice = opt.goldPrice24K?.toString() || goldPriceToLoad
+        const g = parseFloat(finalPrice) || 0
+        let w = parseFloat(weight) || 0
+        let cost = 0
+        if (!isSilver && g && w) {
+          let weightInChi = w
+          if (weightUnit === 'gram') weightInChi = w / 3.75
+          const key = type.replace('GOLD_', '')
+          const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)?.applied ?? 0
+          cost = Math.round(ratio * g * weightInChi)
+        }
+
+        return {
+          id: `${type}-${Date.now()}-${Math.random()}`,
+          materialType: type,
+          label: MATERIAL_LABEL_MAP[type] ?? type.replace(/_/g, ' '),
+          weightChi: weight,
+          goldPrice24K: finalPrice,
+          materialCost: isSilver ? (opt.materialCost?.toString() || '') : (cost > 0 ? String(cost) : ''),
+          weightUnit,
+          budget: opt.budget || '',
+          sellingPrice: opt.sellingPrice?.toString() || '',
+        }
+      })
+    } else {
+      finalRows = parsedRows.map(row => {
+        const finalPrice = row.goldPrice24K || goldPriceToLoad
+        const g = parseFloat(finalPrice) || 0
+        let w = parseFloat(row.weightChi) || 0
+        let cost = 0
+        if (row.materialType !== 'SILVER' && g && w) {
+          let weightInChi = w
+          if ((row as any).weightUnit === 'gram') weightInChi = w / 3.75
+          const key = row.materialType.replace('GOLD_', '')
+          const ratio = pricingConfig?.goldRatios?.find((r: any) => r.key === key)?.applied ?? 0
+          cost = Math.round(ratio * g * weightInChi)
+        }
+        return {
+          ...row,
+          goldPrice24K: finalPrice,
+          materialCost: row.materialType === 'SILVER' ? (row.weightChi || '') : (cost > 0 ? String(cost) : ''),
+          budget: (row as any).budget || '',
+        }
+      })
+    }
+    setGoldRows(finalRows)
+
+    const initialMaterials = q.options && q.options.length > 0
+      ? q.options.map((opt: any) => ({
+          id: `${opt.materialType}-${Date.now()}-${Math.random()}`,
+          materialType: opt.materialType,
+          weight: opt.weightChi ? String(opt.weightChi) : (opt.weightGram ? String(opt.weightGram) : ''),
+          unit: opt.weightGram ? 'gram' as const : 'chi' as const
+        }))
+      : parsedRows.map(row => ({
+          id: row.id,
+          materialType: row.materialType as any,
+          weight: row.weightChi,
+          unit: (row.weightUnit || 'chi') as 'chi' | 'gram'
+        }))
+    setEditMaterialRows(initialMaterials)
+
+    const computedTotalMaterialCost = finalRows.reduce((sum: number, r: any) => sum + (parseFloat(r.materialCost) || 0), 0)
     const initialMaterialCost = (q as any).materialCost?.toString() || (computedTotalMaterialCost > 0 ? String(computedTotalMaterialCost) : '')
 
     let initialWeightGram = q.weightGram?.toString() || ''
@@ -1414,7 +1501,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
         const laborCostVal = parseFloat(priceForm.laborCost) || 0
         const costBeforeVAT = goldCost + stoneCostVal + laborCostVal
         
-        const isSilver = selected.materialType === 'SILVER'
+        const isSilver = row.materialType === 'SILVER'
         const costWithVAT = isSilver ? costBeforeVAT : (costBeforeVAT * 1.1)
         
         let autoSellingPrice = 0
@@ -1483,11 +1570,16 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     } finally { setSaving(false) }
   }
 
-  const handleConfirm = async (id: string) => {
+  const handleConfirm = async (id: string, selectedOption?: any) => {
     const q = quotes.find((x) => x._id === id)
     try {
-      await quotesApi.confirm(id)
-      addNotification({ type: 'success', title: '🎉 Khách chốt đơn!', message: `"${q?.productName || 'Sản phẩm'}" đã được đặt hàng thành công.` })
+      await quotesApi.confirm(id, selectedOption)
+      const matLabel = selectedOption ? ` (${MATERIAL_LABEL_MAP[selectedOption.materialType] || selectedOption.materialType})` : ''
+      addNotification({ 
+        type: 'success', 
+        title: '🎉 Khách chốt đơn!', 
+        message: `"${q?.productName || 'Sản phẩm'}"${matLabel} đã được đặt hàng thành công.` 
+      })
       fetchQuotes()
     } catch {
       addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể xác nhận đơn.' })
@@ -1520,14 +1612,41 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     if (!selected) return
     setSaving(true)
     try {
+      const filledRows = editMaterialRows.filter((r) => r.materialType)
+      const materialSummary = filledRows.map((r) => {
+        const label = MATERIAL_LABEL_MAP[r.materialType] || r.materialType
+        return `${label}${r.weight ? ` – ${r.weight} ${r.unit}` : ''}`
+      }).join('; ')
+
+      const primaryMaterial = filledRows[0]?.materialType as Quote['materialType']
+      const weightNotes = filledRows.filter((r) => r.weight).map((r) => {
+        const label = MATERIAL_LABEL_MAP[r.materialType] || r.materialType
+        return `${label}: ${r.weight} ${r.unit}`
+      }).join(', ')
+
+      const oldCatLabel = editForm.dimensions.split('|')[0]?.trim() || 'Loại: Nhẫn'
+      const newDimensions = [oldCatLabel, weightNotes].filter(Boolean).join(' | ')
+
+      const options = filledRows.map((r) => ({
+        materialType: r.materialType,
+        weightChi: r.unit === 'chi' ? (parseFloat(r.weight) || 0) : undefined,
+        weightGram: r.unit === 'gram' ? (parseFloat(r.weight) || 0) : undefined,
+      }))
+
+      // Tự động cập nhật notes nếu có chất liệu được chỉnh sửa
+      const baseNotes = editForm.notes.replace(/^Chất liệu:[^\n]*\n?/m, '').trim()
+      const newNotes = [filledRows.length > 1 ? `Chất liệu: ${materialSummary}` : '', baseNotes].filter(Boolean).join('\n')
+
       await quotesApi.updateInfo(selected._id, {
         productName: editForm.productName || selected.productName,
-        dimensions: editForm.dimensions,
+        dimensions: newDimensions,
         stoneRequirements: editForm.stoneRequirements,
         productDescription: editForm.productDescription,
-        notes: editForm.notes,
+        notes: newNotes,
         quantity: editForm.quantity,
         deadline: editForm.deadline,
+        materialType: primaryMaterial,
+        options: options,
         keepImages: keepImages,
         newImages: editImages.map(i => i.file),
       })
@@ -1550,17 +1669,22 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     }
   }
 
-  const handleCancel = async (id: string) => {
+  const handleCancel = async (id: string, materialType?: string) => {
     const q = quotes.find((x) => x._id === id)
-    setConfirmCancel({ id, name: q?.productName || 'Sản phẩm' })
+    let displayName = q?.productName || 'Sản phẩm'
+    if (materialType) {
+      const label = MATERIAL_LABEL_MAP[materialType] ?? materialType.replace(/_/g, ' ')
+      displayName += ` (${label})`
+    }
+    setConfirmCancel({ id, name: displayName, materialType })
   }
 
   const doCancel = async () => {
     if (!confirmCancel) return
-    const { id, name } = confirmCancel
+    const { id, name, materialType } = confirmCancel
     setConfirmCancel(null)
     try {
-      await quotesApi.cancel(id)
+      await quotesApi.cancel(id, materialType)
       addNotification({ type: 'warning', title: 'Báo giá đã huỷ', message: `Yêu cầu "${name}" đã bị huỷ.` })
       fetchQuotes()
     } catch {
@@ -1637,89 +1761,210 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
               <AnimatePresence>
                 {paginated.map((q, i) => {
                   const sc = STATUS_CONFIG[q.status] ?? { label: q.status, color: 'border-gray-400/60 text-gray-600 bg-gray-50', dot: 'bg-gray-400' }
+                  // Lấy danh sách phân loại (options), nếu không có options thì tự tạo 1 option từ thông tin chính của quote
+                  const options = q.options && q.options.length > 0 ? q.options : [{
+                    materialType: q.materialType,
+                    costPrice: q.costPrice,
+                    sellingPrice: q.sellingPrice,
+                    weightChi: q.weightChi,
+                    weightGram: q.weightGram,
+                    laborCost: q.laborCost,
+                    goldPrice24K: (q as any).goldPrice24K,
+                    materialCost: (q as any).materialCost,
+                    stoneCost: (q as any).stoneCost,
+                    costBeforeVAT: (q as any).costBeforeVAT,
+                    isCancelled: false,
+                    isConfirmed: false,
+                    budget: '',
+                  }]
+                  
                   return (
                     <motion.tr key={q._id}
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }} transition={{ delay: i * 0.05 }}
                       className="border-b hover:bg-muted/30 transition-colors"
                     >
-                      <TableCell className="font-mono text-xs">{q.quoteCode}</TableCell>
-                      <TableCell className="font-medium">{q.productName}</TableCell>
-                      <TableCell><Badge variant="outline">{q.materialType.replace(/_/g, ' ')}</Badge></TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{q.requestedBy}</TableCell>
+                      <TableCell className="font-mono text-xs align-middle py-3">{q.quoteCode}</TableCell>
+                      <TableCell className="font-medium align-middle py-3">{q.productName}</TableCell>
+                      
+                      {/* Cột Chất liệu */}
+                      <TableCell className="p-0 align-middle">
+                        <div className="flex flex-col">
+                          {options.map((opt, idx) => (
+                            <div key={idx} className={`px-4 py-2 flex items-center min-h-[48px] justify-start ${idx < options.length - 1 ? 'border-b border-border/60' : ''}`}>
+                              <Badge variant="outline" className={opt.isCancelled ? 'line-through text-muted-foreground opacity-60 bg-muted/40' : ''}>
+                                {opt.materialType.replace(/_/g, ' ')}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                      
+                      <TableCell className="text-muted-foreground text-sm align-middle py-3">{q.requestedBy}</TableCell>
+                      
+                      {/* Cột Giá vốn */}
                       {canViewCost && (
-                        <TableCell className="text-right font-medium">
-                          {q.costPrice ? formatCurrency(q.costPrice) : '—'}
+                        <TableCell className="p-0 align-middle text-right">
+                          <div className="flex flex-col">
+                            {options.map((opt, idx) => (
+                              <div key={idx} className={`px-4 py-2 flex items-center justify-end min-h-[48px] font-medium text-right tabular-nums ${idx < options.length - 1 ? 'border-b border-border/60' : ''} ${opt.isCancelled ? 'line-through text-muted-foreground opacity-50' : ''}`}>
+                                {opt.costPrice ? formatCurrency(opt.costPrice) : '—'}
+                              </div>
+                            ))}
+                          </div>
                         </TableCell>
                       )}
-                      <TableCell className="text-right font-bold text-primary">
-                        {q.sellingPrice ? formatCurrency(q.sellingPrice) : '—'}
+                      
+                      {/* Cột Giá bán */}
+                      <TableCell className="p-0 align-middle text-right">
+                        <div className="flex flex-col">
+                          {options.map((opt, idx) => (
+                            <div key={idx} className={`px-4 py-2 flex items-center justify-end min-h-[48px] font-bold text-primary text-right tabular-nums ${idx < options.length - 1 ? 'border-b border-border/60' : ''} ${opt.isCancelled ? 'line-through text-muted-foreground opacity-50' : ''}`}>
+                              {opt.sellingPrice ? formatCurrency(opt.sellingPrice) : '—'}
+                            </div>
+                          ))}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {formatDate(q.createdAt)}
+                      {/* Cột Ngày tạo */}
+                      <TableCell className="p-0 align-middle">
+                        <div className="flex flex-col">
+                          {options.map((opt, idx) => (
+                            <div key={idx} className={`px-4 py-2 flex items-center min-h-[48px] justify-start text-muted-foreground text-sm ${idx < options.length - 1 ? 'border-b border-border/60' : ''}`}>
+                              {q.status === 'CONFIRMED'
+                                ? (opt.materialType === q.materialType ? formatDate(q.createdAt) : '')
+                                : (idx === 0 ? formatDate(q.createdAt) : '')}
+                            </div>
+                          ))}
+                        </div>
                       </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`${sc.color} gap-1.5 pl-2`}>
-                          <span className={`inline-block h-1.5 w-1.5 rounded-full ${sc.dot}`} />
-                          {sc.label}
-                        </Badge>
+                      
+                      {/* Cột Trạng thái */}
+                      <TableCell className="p-0 align-middle">
+                        <div className="flex flex-col">
+                          {options.map((opt, idx) => {
+                            const isConfirmedOption = opt.isConfirmed || (q.status === 'CONFIRMED' && opt.materialType === q.materialType);
+                            const isCancelledOption = opt.isCancelled;
+                            
+                            let currentSc = sc;
+                            let shouldShowStatus = false;
+
+                            if (q.status === 'CONFIRMED' || q.status === 'SENT_TO_CUSTOMER') {
+                              shouldShowStatus = true;
+                              if (isConfirmedOption) {
+                                currentSc = STATUS_CONFIG['CONFIRMED'];
+                              } else if (isCancelledOption) {
+                                currentSc = STATUS_CONFIG['CANCELLED'];
+                              } else {
+                                currentSc = STATUS_CONFIG['SENT_TO_CUSTOMER'];
+                              }
+                            } else {
+                              shouldShowStatus = idx === 0;
+                              currentSc = isCancelledOption ? STATUS_CONFIG['CANCELLED'] : sc;
+                            }
+
+                            return (
+                              <div key={idx} className={`px-4 py-2 flex items-center min-h-[48px] justify-start ${idx < options.length - 1 ? 'border-b border-border/60' : ''}`}>
+                                {shouldShowStatus ? (
+                                  <Badge variant="outline" className={`${currentSc.color} gap-1.5 pl-2`}>
+                                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${currentSc.dot}`} />
+                                    {currentSc.label}
+                                  </Badge>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {/* NV order: PENDING → Tính giá */}
-                          {isPricer && q.status === 'PENDING' && (
-                            <Button size="sm" onClick={() => openDetail(q, 'pricing')} className="gap-1 h-7 text-xs">
-                              <Calculator className="h-3 w-3" /> Tính giá
-                            </Button>
-                          )}
-                          {/* NV order: QUOTING → Tiếp tục tính giá */}
-                          {isPricer && q.status === 'QUOTING' && (
-                            <Button size="sm" onClick={() => openDetail(q, 'pricing')} className="gap-1 h-7 text-xs">
-                              <Calculator className="h-3 w-3" /> Tính giá
-                            </Button>
-                          )}
-                           {/* Sale: PENDING → Sửa */}
-                           {!isPricer && q.status === 'PENDING' && (
-                             <Button size="sm" onClick={() => openDetail(q)} className="gap-1 h-7 text-xs bg-[#8C6D1F] hover:bg-[#735A19] text-white">
-                               ✏️ Sửa
-                             </Button>
-                           )}
-                           {/* Sale: NEED_MORE_INFO → Xem lý do + Gửi lại */}
-                           {!isPricer && q.status === 'NEED_MORE_INFO' && (
-                             <Button size="sm" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs bg-orange-500 hover:bg-orange-600">
-                               <AlertCircle className="h-3 w-3" /> Bổ sung
-                             </Button>
-                           )}
-                           {/* Sale: QUOTED → Xem báo giá + Gửi cho khách */}
-                           {!isPricer && q.status === 'QUOTED' && (
-                             <>
-                               <Button size="sm" variant="outline" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
-                                 <Eye className="h-3 w-3" /> Xem giá
-                               </Button>
-                               <Button size="sm" onClick={() => handleSentToCustomer(q._id)} className="gap-1 h-7 text-xs bg-violet-600 hover:bg-violet-700">
-                                 <Send className="h-3 w-3" /> Gửi khách
-                               </Button>
-                             </>
-                           )}
-                           {/* Sale: SENT_TO_CUSTOMER → Khách chốt hoặc Huỷ */}
-                           {!isPricer && q.status === 'SENT_TO_CUSTOMER' && (
-                             <>
-                               <Button size="sm" className="gap-1 h-7 text-xs" onClick={() => handleConfirm(q._id)}>
-                                 <ShoppingCart className="h-3 w-3" /> Khách chốt
-                               </Button>
-                               <Button size="sm" variant="destructive" className="gap-1 h-7 text-xs" onClick={() => handleCancel(q._id)}>
-                                 <Ban className="h-3 w-3" /> Huỷ
-                               </Button>
-                             </>
-                           )}
-                           {(q.status === 'CONFIRMED' || q.status === 'CANCELLED') && (
-                             <Button size="sm" variant="ghost" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
-                               <Eye className="h-3 w-3" /> Xem
-                             </Button>
-                           )}
-                         </div>
-                       </TableCell>
-                     </motion.tr>
+                                                 {/* Cột Thao tác */}
+                      <TableCell className="p-0 align-middle text-right">
+                        <div className="flex flex-col">
+                          {options.map((opt, idx) => {
+                            return (
+                              <div key={idx} className={`px-4 py-1.5 flex items-center justify-end min-h-[48px] gap-1 ${idx < options.length - 1 ? 'border-b border-border/60' : ''}`}>
+                                {/* NV order: PENDING / QUOTING → Tính giá */}
+                                {isPricer && (q.status === 'PENDING' || q.status === 'QUOTING') && idx === 0 && (
+                                  <Button size="sm" onClick={() => openDetail(q, 'pricing')} className="gap-1 h-7 text-xs">
+                                    <Calculator className="h-3 w-3" /> Tính giá
+                                  </Button>
+                                )}
+                                
+                                {/* Sale: PENDING → Sửa */}
+                                {!isPricer && q.status === 'PENDING' && idx === 0 && (
+                                  <Button size="sm" onClick={() => openDetail(q)} className="gap-1 h-7 text-xs bg-[#8C6D1F] hover:bg-[#735A19] text-white">
+                                    ✏️ Sửa
+                                  </Button>
+                                )}
+                                
+                                {/* Sale: NEED_MORE_INFO → Bổ sung */}
+                                {!isPricer && q.status === 'NEED_MORE_INFO' && idx === 0 && (
+                                  <Button size="sm" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs bg-orange-500 hover:bg-orange-600">
+                                    <AlertCircle className="h-3 w-3" /> Bổ sung
+                                  </Button>
+                                )}
+                                
+                                {/* Sale: QUOTED → Xem giá, Gửi khách */}
+                                {!isPricer && q.status === 'QUOTED' && (
+                                  <>
+                                    <Button size="sm" variant="outline" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs px-2">
+                                      <Eye className="h-3 w-3" /> Xem giá
+                                    </Button>
+                                    <Button size="sm" onClick={() => handleSentToCustomer(q._id)} className="gap-1 h-7 text-xs bg-violet-600 hover:bg-violet-700 px-2">
+                                      <Send className="h-3 w-3" /> Gửi khách
+                                    </Button>
+                                  </>
+                                )}
+                                
+                                {/* Sale: SENT_TO_CUSTOMER hoặc CONFIRMED → Khách chốt, Khách huỷ, Đã chốt, Đã huỷ */}
+                                {!isPricer && (q.status === 'SENT_TO_CUSTOMER' || q.status === 'CONFIRMED') && (() => {
+                                  const isConfirmedOption = opt.isConfirmed || (q.status === 'CONFIRMED' && opt.materialType === q.materialType);
+                                  if (isConfirmedOption) {
+                                    return (
+                                      <Badge className="bg-emerald-600 text-white border-transparent h-7 text-xs font-semibold px-2">
+                                        Đã chốt
+                                      </Badge>
+                                    );
+                                  }
+                                  if (opt.isCancelled) {
+                                    return (
+                                      <Badge variant="outline" className="bg-[#95A5A6]/10 text-[#7F8C8D] border-[#95A5A6]/30 h-7 text-xs font-semibold px-2">
+                                        Đã huỷ
+                                      </Badge>
+                                    );
+                                  }
+                                  return (
+                                    <>
+                                      <Button size="sm" className="gap-1 h-7 text-xs px-2" onClick={() => handleConfirm(q._id, opt)}>
+                                        <ShoppingCart className="h-3 w-3" /> Khách chốt
+                                      </Button>
+                                      <Button size="sm" variant="destructive" className="gap-1 h-7 text-xs px-2" onClick={() => handleCancel(q._id, opt.materialType)}>
+                                        <Ban className="h-3 w-3" /> Khách huỷ
+                                      </Button>
+                                    </>
+                                  );
+                                })()}
+
+                                {/* Sale: CANCELLED → Đã huỷ */}
+                                {!isPricer && q.status === 'CANCELLED' && (
+                                  <Badge variant="outline" className="bg-[#95A5A6]/10 text-[#7F8C8D] border-[#95A5A6]/30 h-7 text-xs font-semibold px-2">
+                                    Đã huỷ
+                                  </Badge>
+                                )}
+                                
+                                {/* Pricer: CONFIRMED/CANCELLED/QUOTED/SENT_TO_CUSTOMER → Xem */}
+                                {isPricer && (
+                                  (q.status === 'CONFIRMED' && opt.materialType === q.materialType) ||
+                                  (q.status !== 'CONFIRMED' && (q.status === 'CANCELLED' || q.status === 'QUOTED' || q.status === 'SENT_TO_CUSTOMER') && idx === 0)
+                                ) && (
+                                  <Button size="sm" variant="ghost" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
+                                    <Eye className="h-3 w-3" /> Xem
+                                  </Button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </TableCell>
+                    </motion.tr>
                    )
                  })}
                </AnimatePresence>
@@ -1960,7 +2205,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                       </div>
                     )}
 
-                    {selected.materialType === 'SILVER' ? (
+                    {selected.materialType === 'SILVER' && goldRows.length <= 1 ? (
                       /* ── BẠC: Luồng tối giản & đặc biệt ── */
                       <div className="space-y-4">
                         <SectionDivider label="Sản phẩm bạc" icon={<Gem className="h-3 w-3" />} />
@@ -2221,132 +2466,57 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
             ) : (
               showEditForm && (selected.status === 'NEED_MORE_INFO' || selected.status === 'PENDING') ? (
 
-              /* ══ EDIT FORM — thay thế toàn bộ nội dung ══ */
-              <div className="flex flex-col" style={{ maxHeight: 'calc(80vh - 110px)' }}>
-                {/* Header form */}
-                <div className="px-6 py-4 border-b bg-orange-50 dark:bg-orange-950/20 shrink-0">
-                  <div className="flex items-center gap-2 text-orange-600 dark:text-orange-400 mb-1">
-                    <AlertCircle className="h-4 w-4" />
-                    <span className="text-sm font-semibold">
-                      {selected.status === 'NEED_MORE_INFO' ? 'Cập nhật thông tin bổ sung' : 'Chỉnh sửa yêu cầu báo giá'}
+              /* ══ EDIT FORM — split screen layout ══ */
+              <div className="flex overflow-hidden" style={{ height: '78vh' }}>
+                {/* ══ LEFT COLUMN: Product & Image Gallery ══ */}
+                <div className="flex flex-col w-[40%] shrink-0 border-r border-[#EDE8DE] overflow-hidden bg-[#FCFAF6]">
+                  {/* Header info */}
+                  <div className="px-5 py-3.5 border-b border-[#EDE8DE] bg-[#FBF6E9] shrink-0 flex items-center justify-between">
+                    <span className="font-mono text-[10px] bg-white border border-[#E6DFD0] px-2 py-0.5 rounded text-[#6B5E4C] font-semibold">
+                      {selected.quoteCode}
                     </span>
-                  </div>
-                  {selected.status === 'NEED_MORE_INFO' && (
-                    <p className="text-xs text-orange-600/80 dark:text-orange-400/80">
-                      Lý do trả lại: <span className="font-medium">{selected.rejectReason}</span>
-                    </p>
-                  )}
-                </div>
-
-                {/* Form fields */}
-                <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Hàng 1: Tên sản phẩm | Số lượng */}
-                    <div className="space-y-2 col-span-1">
-                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Tên sản phẩm</Label>
-                      <Input
-                        value={editForm.productName}
-                        onChange={(e) => setEditForm(f => ({ ...f, productName: e.target.value }))}
-                        placeholder="Nhập tên sản phẩm..."
-                        className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
-                      />
-                    </div>
-                    <div className="space-y-2 col-span-1">
-                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Số lượng</Label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={editForm.quantity}
-                        onChange={(e) => setEditForm(f => ({ ...f, quantity: Math.max(1, parseInt(e.target.value) || 1) }))}
-                        className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
-                      />
-                    </div>
-
-                    {/* Hàng 2: Thời hạn hoàn thành | Kích thước / Trọng lượng */}
-                    <div className="space-y-2 col-span-1">
-                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Thời hạn hoàn thành</Label>
-                      <Input
-                        type="date"
-                        value={editForm.deadline ? editForm.deadline.substring(0, 10) : ''}
-                        onChange={(e) => setEditForm(f => ({ ...f, deadline: e.target.value }))}
-                        className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
-                      />
-                    </div>
-                    <div className="space-y-2 col-span-1">
-                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Kích thước / Trọng lượng</Label>
-                      <Input
-                        value={editForm.dimensions}
-                        onChange={(e) => setEditForm(f => ({ ...f, dimensions: e.target.value }))}
-                        placeholder="VD: Size 12, khoảng 3 chỉ, dài 45cm..."
-                        className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
-                      />
-                    </div>
-
-                    {/* Hàng 3: Yêu cầu đá / phụ kiện | Mô tả sản phẩm */}
-                    <div className="space-y-2 col-span-1">
-                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Yêu cầu đá / phụ kiện</Label>
-                      <Input
-                        value={editForm.stoneRequirements}
-                        onChange={(e) => setEditForm(f => ({ ...f, stoneRequirements: e.target.value }))}
-                        placeholder="VD: 1 viên kim cương 0.3ct, đá CZ trắng..."
-                        className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
-                      />
-                    </div>
-                    <div className="space-y-2 col-span-1">
-                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Mô tả sản phẩm</Label>
-                      <Textarea
-                        value={editForm.productDescription}
-                        onChange={(e) => setEditForm(f => ({ ...f, productDescription: e.target.value }))}
-                        placeholder="Mô tả chi tiết kiểu dáng, yêu cầu đặc biệt..."
-                        rows={3}
-                        className="border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl resize-none bg-white min-h-[80px]"
-                      />
-                    </div>
-
-                    {/* Hàng 4: Ghi chú thêm cho NV báo giá (chiếm cả 2 cột) */}
-                    <div className="space-y-2 col-span-2">
-                      <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Ghi chú thêm cho NV báo giá</Label>
-                      <Textarea
-                        value={editForm.notes}
-                        onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))}
-                        placeholder="Thông tin bổ sung, yêu cầu đặc biệt khác..."
-                        rows={3}
-                        className="border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl resize-none bg-white min-h-[80px]"
-                      />
-                    </div>
+                    <Badge variant="outline" className={`${STATUS_CONFIG[selected.status]?.color} gap-1.5 pl-2 py-0 h-5 font-bold text-[10px]`}>
+                      <span className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_CONFIG[selected.status]?.dot}`} />
+                      {STATUS_CONFIG[selected.status]?.label}
+                    </Badge>
                   </div>
 
-                  {/* Ảnh sản phẩm */}
-                  <div className="space-y-3 pt-3 border-t border-[#EDE8DE]">
-                    <Label className="text-xs font-semibold text-[#6B5E4C] uppercase tracking-wider">Hình ảnh sản phẩm</Label>
+                  <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5">
+                    {/* Visual instruction card */}
+                    <div className="rounded-xl border border-amber-300/40 bg-amber-50/50 p-4 space-y-1.5">
+                      <p className="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+                        <Sparkles className="h-3.5 w-3.5 text-amber-600" /> CHI TIẾT YÊU CẦU BÁO GIÁ
+                      </p>
+                      <p className="text-[11px] text-amber-700/80 leading-relaxed font-medium">
+                        {selected.status === 'NEED_MORE_INFO' 
+                          ? `NV Báo giá yêu cầu bổ sung: "${selected.rejectReason}"` 
+                          : 'Bạn có thể chỉnh sửa các thông số kỹ thuật của sản phẩm và hình ảnh đính kèm trước khi gửi yêu cầu báo giá.'
+                        }
+                      </p>
+                    </div>
 
-                    {/* Ảnh cũ — có thể xoá từng cái */}
-                    {keepImages.length > 0 && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-2">Ảnh hiện tại (bấm vào ảnh để xoá)</p>
-                        <div className="flex flex-wrap gap-2">
-                          {keepImages.map((img, i) => (
-                            <div key={img} className="relative h-16 w-16 rounded-xl border border-[#EDE8DE] overflow-hidden group p-0.5 bg-white">
-                              <img src={`http://localhost:3000${img}`} alt="" className="h-full w-full object-cover rounded-lg" />
-                              <button
-                                type="button"
-                                onClick={() => setKeepImages(prev => prev.filter((_, idx) => idx !== i))}
-                                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg"
-                              >
-                                <X className="h-4 w-4 text-white" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                    {/* Unified Image Gallery Grid */}
+                    <div className="space-y-2.5">
+                      <Label className="text-[10px] font-bold text-[#6B5E4C] uppercase tracking-wider">Hình ảnh đính kèm (Tối đa 5 ảnh)</Label>
+                      
+                      <div className="grid grid-cols-3 gap-2">
+                        {/* Current images in keepImages */}
+                        {keepImages.map((img, i) => (
+                          <div key={`keep-${img}`} className="relative aspect-square rounded-xl border border-[#EDE8DE] overflow-hidden group p-0.5 bg-white shadow-sm hover:scale-[1.03] transition-all duration-200">
+                            <img src={`http://localhost:3000${img}`} alt="" className="h-full w-full object-cover rounded-lg" />
+                            <button
+                              type="button"
+                              onClick={() => setKeepImages(prev => prev.filter((_, idx) => idx !== i))}
+                              className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg"
+                            >
+                              <X className="h-4 w-4 text-white" />
+                            </button>
+                          </div>
+                        ))}
 
-                    {/* Ảnh mới thêm */}
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-2">Thêm ảnh mới (tối đa {5 - keepImages.length} ảnh)</p>
-                      <div className="flex flex-wrap gap-2">
+                        {/* New uploaded images in editImages */}
                         {editImages.map((img, i) => (
-                          <div key={img.url} className="relative h-16 w-16 rounded-xl border border-[#EDE8DE] overflow-hidden group p-0.5 bg-white">
+                          <div key={`edit-${img.url}`} className="relative aspect-square rounded-xl border border-[#EDE8DE] overflow-hidden group p-0.5 bg-white shadow-sm hover:scale-[1.03] transition-all duration-200">
                             <img src={img.url} alt="" className="h-full w-full object-cover rounded-lg" />
                             <button
                               type="button"
@@ -2354,23 +2524,26 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                 URL.revokeObjectURL(img.url)
                                 setEditImages(prev => prev.filter((_, idx) => idx !== i))
                               }}
-                              className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg"
+                              className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-lg"
                             >
                               <X className="h-4 w-4 text-white" />
                             </button>
                           </div>
                         ))}
+
+                        {/* Upload slot button if less than 5 */}
                         {keepImages.length + editImages.length < 5 && (
                           <button
                             type="button"
                             onClick={() => editFileRef.current?.click()}
-                            className="flex h-16 w-16 flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#C9981A]/40 text-[#A07810] hover:border-[#C9981A] hover:bg-[#FBF6E9] hover:text-[#C9981A] transition-all bg-white"
+                            className="flex aspect-square flex-col items-center justify-center rounded-xl border-2 border-dashed border-[#C9981A]/40 text-[#A07810] hover:border-[#C9981A] hover:bg-[#FBF6E9] hover:text-[#C9981A] transition-all bg-white hover:scale-[1.03] duration-200"
                           >
                             <ImageIcon className="h-5 w-5" />
-                            <span className="mt-0.5 text-[10px] font-medium">Thêm</span>
+                            <span className="mt-1 text-[9px] font-semibold uppercase tracking-wide">Thêm ảnh</span>
                           </button>
                         )}
                       </div>
+
                       <input
                         ref={editFileRef}
                         type="file"
@@ -2389,48 +2562,265 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                   </div>
                 </div>
 
-                {/* Footer */}
-                <div className="border-t px-6 py-4 flex gap-3 shrink-0 bg-[#FBF6E9]">
-                  {selected.status === 'PENDING' ? (
-                    <>
-                      <Button
-                        variant="outline"
-                        className="flex-1 border-red-300 text-red-600 hover:bg-red-50 font-semibold px-4 rounded-xl h-10 transition-all bg-white"
-                        onClick={() => {
-                          handleCancel(selected._id)
-                          setSelected(null)
-                        }}
-                      >
-                        <Ban className="h-4 w-4" /> Hủy yêu cầu báo giá
-                      </Button>
-                      <Button
-                        className="flex-1 gap-2 bg-gradient-to-r from-primary to-amber-600 hover:from-primary/90 hover:to-amber-600/90 shadow-md text-white font-semibold rounded-xl h-10"
-                        disabled={saving}
-                        onClick={handleResubmitWithEdit}
-                      >
-                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-                        Sửa lại thông tin
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Button variant="outline" className="flex-1 border-[#E6DFD0] hover:bg-[#F5EFE0] text-[#6B5E4C] rounded-xl h-10 bg-white" onClick={() => setShowEditForm(false)}>
-                        ← Quay lại
-                      </Button>
-                      <Button
-                        className="flex-1 gap-2 bg-gradient-to-r from-primary to-amber-600 hover:from-primary/90 hover:to-amber-600/90 shadow-md text-white font-semibold rounded-xl h-10"
-                        disabled={saving}
-                        onClick={handleResubmitWithEdit}
-                      >
-                        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                        Xác nhận gửi lại
-                      </Button>
-                    </>
-                  )}
+                {/* ══ RIGHT COLUMN: Form fields ══ */}
+                <div className="flex-1 flex flex-col overflow-hidden bg-background">
+                  {/* Form Header */}
+                  <div className="px-5 py-3.5 border-b border-[#EDE8DE] bg-[#FFFDF9] shrink-0 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-[#C9981A]" />
+                    <span className="text-sm font-bold text-foreground">Biểu mẫu thông tin yêu cầu</span>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+                    
+                    {/* SECTION 1: Thông tin cơ bản */}
+                    <div className="rounded-xl border border-border bg-card p-4 space-y-4 shadow-sm">
+                      <p className="text-[10px] font-bold text-[#A07810] tracking-wider uppercase border-b pb-1.5 flex items-center gap-1.5">
+                        <Package className="h-3.5 w-3.5" /> Thông tin cơ bản
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Tên sản phẩm */}
+                        <div className="space-y-2 col-span-2">
+                          <Label className="text-[10px] font-bold text-[#6B5E4C] uppercase tracking-wider">Tên sản phẩm</Label>
+                          <div className="relative">
+                            <Input
+                              value={editForm.productName}
+                              onChange={(e) => setEditForm(f => ({ ...f, productName: e.target.value }))}
+                              placeholder="Nhập tên sản phẩm..."
+                              className="h-10 pl-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
+                            />
+                            <Package className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </div>
+
+                        {/* Số lượng với Stepper */}
+                        <div className="space-y-2 col-span-1">
+                          <Label className="text-[10px] font-bold text-[#6B5E4C] uppercase tracking-wider">Số lượng</Label>
+                          <div className="flex items-center">
+                            <button
+                              type="button"
+                              onClick={() => setEditForm(f => ({ ...f, quantity: Math.max(1, f.quantity - 1) }))}
+                              className="w-10 h-10 rounded-l-xl border border-r-0 border-[#E6DFD0] hover:bg-[#FBF6E9] hover:text-[#C9981A] transition-colors flex items-center justify-center font-bold text-lg select-none shrink-0"
+                            >
+                              −
+                            </button>
+                            <input
+                              type="text"
+                              pattern="[0-9]*"
+                              inputMode="numeric"
+                              value={editForm.quantity}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value.replace(/\D/g, '')) || 1
+                                setEditForm(f => ({ ...f, quantity: val }))
+                              }}
+                              className="w-full h-10 border border-[#E6DFD0] text-center text-sm font-semibold tabular-nums focus:outline-none focus:ring-1 focus:ring-[#C9981A]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setEditForm(f => ({ ...f, quantity: f.quantity + 1 }))}
+                              className="w-10 h-10 rounded-r-xl border border-l-0 border-[#E6DFD0] hover:bg-[#FBF6E9] hover:text-[#C9981A] transition-colors flex items-center justify-center font-bold text-lg select-none shrink-0"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Thời hạn hoàn thành */}
+                        <div className="space-y-2 col-span-1">
+                          <Label className="text-[10px] font-bold text-[#6B5E4C] uppercase tracking-wider">Thời hạn hoàn thành</Label>
+                          <Input
+                            type="date"
+                            value={editForm.deadline ? editForm.deadline.substring(0, 10) : ''}
+                            onChange={(e) => setEditForm(f => ({ ...f, deadline: e.target.value }))}
+                            className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION: Chất liệu yêu cầu */}
+                    <div className="rounded-xl border border-border bg-card p-4 space-y-4 shadow-sm">
+                      <div className="flex items-center justify-between border-b pb-1.5">
+                        <p className="text-[10px] font-bold text-[#A07810] tracking-wider uppercase flex items-center gap-1.5">
+                          <Layers className="h-3.5 w-3.5" /> Chất liệu yêu cầu
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditMaterialRows(prev => [...prev, { id: String(Date.now() + Math.random()), materialType: '', weight: '', unit: 'chi' }])}
+                          className="h-7 text-xs border-[#C9981A]/30 text-[#C9981A] hover:bg-[#FBF6E9] gap-1"
+                        >
+                          <Plus className="h-3 w-3" /> Thêm chất liệu
+                        </Button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {editMaterialRows.map((row, idx) => (
+                          <div key={row.id} className="flex items-center gap-3 bg-muted/20 p-2.5 rounded-xl border border-border/40">
+                            {/* Loại chất liệu */}
+                            <div className="w-[180px] shrink-0">
+                              <Select
+                                value={row.materialType}
+                                onValueChange={(val) => setEditMaterialRows(prev => prev.map(r => r.id === row.id ? { ...r, materialType: val, unit: val === 'SILVER' ? 'gram' : r.unit } : r))}
+                              >
+                                <SelectTrigger className="h-9 border-[#E6DFD0] rounded-lg text-xs bg-white">
+                                  <SelectValue placeholder="Chọn chất liệu..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="GOLD_24K">Vàng 24K</SelectItem>
+                                  <SelectItem value="GOLD_18K">Vàng 18K</SelectItem>
+                                  <SelectItem value="GOLD_14K">Vàng 14K</SelectItem>
+                                  <SelectItem value="GOLD_610">Vàng 610</SelectItem>
+                                  <SelectItem value="GOLD_10K">Vàng 10K</SelectItem>
+                                  <SelectItem value="SILVER">Bạc 925</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Trọng lượng */}
+                            <div className="flex-1 flex items-center">
+                              <Input
+                                type="text"
+                                placeholder="Trọng lượng..."
+                                value={row.weight}
+                                onChange={(e) => setEditMaterialRows(prev => prev.map(r => r.id === row.id ? { ...r, weight: e.target.value.replace(/[^0-9.]/g, '') } : r))}
+                                className="h-9 border-[#E6DFD0] rounded-l-lg border-r-0 text-xs bg-white text-right font-medium pr-3"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (row.materialType === 'SILVER') return
+                                  setEditMaterialRows(prev => prev.map(r => r.id === row.id ? { ...r, unit: r.unit === 'chi' ? 'gram' : 'chi' } : r))
+                                }}
+                                className="h-9 px-3 border border-[#E6DFD0] rounded-r-lg bg-muted/40 hover:bg-muted text-xs font-bold text-[#6B5E4C] transition-colors shrink-0"
+                                disabled={row.materialType === 'SILVER'}
+                              >
+                                {row.unit}
+                              </button>
+                            </div>
+
+                            {/* Nút xóa dòng */}
+                            {editMaterialRows.length > 1 && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEditMaterialRows(prev => prev.filter(r => r.id !== row.id))}
+                                className="h-9 w-9 p-0 hover:bg-red-50 hover:text-red-600 text-muted-foreground shrink-0 rounded-lg"
+                              >
+                                <Minus className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* SECTION 2: Thông số kỹ thuật */}
+                    <div className="rounded-xl border border-border bg-card p-4 space-y-4 shadow-sm">
+                      <p className="text-[10px] font-bold text-[#A07810] tracking-wider uppercase border-b pb-1.5 flex items-center gap-1.5">
+                        <Gem className="h-3.5 w-3.5" /> Thông số & Yêu cầu kỹ thuật
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        {/* Kích thước / Trọng lượng */}
+                        <div className="space-y-2 col-span-2">
+                          <Label className="text-[10px] font-bold text-[#6B5E4C] uppercase tracking-wider">Kích thước / Trọng lượng</Label>
+                          <Input
+                            value={editForm.dimensions}
+                            onChange={(e) => setEditForm(f => ({ ...f, dimensions: e.target.value }))}
+                            placeholder="VD: Size 12, khoảng 3 chỉ..."
+                            className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
+                          />
+                        </div>
+
+                        {/* Yêu cầu đá / phụ kiện */}
+                        <div className="space-y-2 col-span-2">
+                          <Label className="text-[10px] font-bold text-[#6B5E4C] uppercase tracking-wider">Yêu cầu đá / phụ kiện</Label>
+                          <div className="relative">
+                            <Input
+                              value={editForm.stoneRequirements}
+                              onChange={(e) => setEditForm(f => ({ ...f, stoneRequirements: e.target.value }))}
+                              placeholder="VD: 1 viên kim cương 0.3ct..."
+                              className="h-10 pl-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
+                            />
+                            <Gem className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          </div>
+                        </div>
+
+                        {/* Mô tả sản phẩm */}
+                        <div className="space-y-2 col-span-2">
+                          <Label className="text-[10px] font-bold text-[#6B5E4C] uppercase tracking-wider">Mô tả sản phẩm</Label>
+                          <Textarea
+                            value={editForm.productDescription}
+                            onChange={(e) => setEditForm(f => ({ ...f, productDescription: e.target.value }))}
+                            placeholder="Mô tả chi tiết kiểu dáng sản phẩm, yêu cầu đặc biệt..."
+                            rows={3}
+                            className="border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl resize-none bg-white min-h-[70px] p-3 text-xs leading-relaxed"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SECTION 3: Ghi chú thêm cho NV báo giá */}
+                    <div className="rounded-xl border border-amber-300/40 bg-amber-50/20 p-4 space-y-2">
+                      <Label className="text-[10px] font-bold text-[#A07810] uppercase tracking-wider flex items-center gap-1.5">
+                        <AlertCircle className="h-3.5 w-3.5" /> Ghi chú thêm cho NV báo giá
+                      </Label>
+                      <Textarea
+                        value={editForm.notes}
+                        onChange={(e) => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                        placeholder="Yêu cầu riêng tư, ghi chú gấp..."
+                        rows={2}
+                        className="border-[#E6DFD0]/70 focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl resize-none bg-white/70 min-h-[60px] p-3 text-xs leading-relaxed"
+                      />
+                    </div>
+
+                  </div>
+
+                  {/* Footer */}
+                  <div className="border-t px-6 py-4 flex gap-3 shrink-0 bg-[#FBF6E9]">
+                    {selected.status === 'PENDING' ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          className="flex-1 border-red-300 text-red-600 hover:bg-red-50 font-semibold px-4 rounded-xl h-10 transition-all bg-white"
+                          onClick={() => {
+                            handleCancel(selected._id)
+                            setSelected(null)
+                          }}
+                        >
+                          <Ban className="h-4 w-4" /> Hủy yêu cầu báo giá
+                        </Button>
+                        <Button
+                          className="flex-1 gap-2 bg-gradient-to-r from-primary to-amber-600 hover:from-primary/90 hover:to-amber-600/90 shadow-md text-white font-semibold rounded-xl h-10"
+                          disabled={saving}
+                          onClick={handleResubmitWithEdit}
+                        >
+                          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                          Sửa lại thông tin
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button variant="outline" className="flex-1 border-[#E6DFD0] hover:bg-[#F5EFE0] text-[#6B5E4C] rounded-xl h-10 bg-white" onClick={() => setShowEditForm(false)}>
+                          ← Quay lại
+                        </Button>
+                        <Button
+                          className="flex-1 gap-2 bg-gradient-to-r from-primary to-amber-600 hover:from-primary/90 hover:to-amber-600/90 shadow-md text-white font-semibold rounded-xl h-10"
+                          disabled={saving}
+                          onClick={handleResubmitWithEdit}
+                        >
+                          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                          Xác nhận gửi lại
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-
-              ) : (
+            ) : (
               <div className="flex flex-col overflow-hidden bg-background animate-in fade-in zoom-in-95 duration-200" style={{ height: '78vh' }}>
                 <div className="flex-1 flex overflow-hidden">
                   
@@ -2896,6 +3286,25 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                             quantity: (selected as any).quantity || 1,
                             deadline: (selected as any).deadline || '',
                           })
+                          const parsedRowsForEdit = parseMaterialsFromQuote({
+                            materialType: selected.materialType,
+                            dimensions: (selected as any).dimensions,
+                            notes: selected.notes,
+                          })
+                          const initialMaterialsForEdit = selected.options && selected.options.length > 0
+                            ? selected.options.map((opt: any) => ({
+                                id: `${opt.materialType}-${Date.now()}-${Math.random()}`,
+                                materialType: opt.materialType,
+                                weight: opt.weightChi ? String(opt.weightChi) : (opt.weightGram ? String(opt.weightGram) : ''),
+                                unit: opt.weightGram ? 'gram' as const : 'chi' as const
+                              }))
+                            : parsedRowsForEdit.map(row => ({
+                                id: row.id,
+                                materialType: row.materialType as any,
+                                weight: row.weightChi,
+                                unit: (row.weightUnit || 'chi') as 'chi' | 'gram'
+                              }))
+                          setEditMaterialRows(initialMaterialsForEdit)
                           setKeepImages(selected.images || [])
                           setEditImages([])
                           setShowEditForm(true)

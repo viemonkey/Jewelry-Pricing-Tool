@@ -73,6 +73,9 @@ const QuoteOptionSchema = new mongoose_1.Schema({
     costWithVAT: { type: Number },
     costPrice: { type: Number, default: 0 },
     sellingPrice: { type: Number, default: 0 },
+    isCancelled: { type: Boolean, default: false },
+    isConfirmed: { type: Boolean, default: false },
+    budget: { type: String, default: '' },
 }, { _id: false });
 const QuoteSchema = new mongoose_1.Schema({
     quoteCode: { type: String },

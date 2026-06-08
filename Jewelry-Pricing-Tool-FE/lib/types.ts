@@ -32,6 +32,9 @@ export interface QuoteOption {
   costWithVAT?: number
   costPrice?: number
   sellingPrice?: number
+  isCancelled?: boolean
+  isConfirmed?: boolean
+  budget?: string
 }
 
 export interface Quote {

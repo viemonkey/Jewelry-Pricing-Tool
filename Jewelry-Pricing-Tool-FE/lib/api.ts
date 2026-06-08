@@ -88,6 +88,8 @@ export const quotesApi = {
     notes?: string
     quantity?: number
     deadline?: string
+    materialType?: string
+    options?: any[]
     keepImages?: string[]   // URL ảnh cũ muốn giữ lại
     newImages?: File[]      // File ảnh mới cần upload
   }): Promise<Quote> => {
@@ -99,6 +101,8 @@ export const quotesApi = {
     if (data.notes) form.append('notes', data.notes)
     if (data.quantity !== undefined) form.append('quantity', String(data.quantity))
     if (data.deadline !== undefined) form.append('deadline', data.deadline)
+    if (data.materialType) form.append('materialType', data.materialType)
+    if (data.options) form.append('options', JSON.stringify(data.options))
     // Gửi danh sách ảnh cũ cần giữ dưới dạng JSON string
     form.append('keepImages', JSON.stringify(data.keepImages ?? []))
     // Gửi file ảnh mới
@@ -124,12 +128,18 @@ export const quotesApi = {
     request<Quote>(`/quotes/${id}/sent-to-customer`, { method: 'PATCH' }),
 
   /** Sale: Khách chốt → CONFIRMED */
-  confirm: (id: string) =>
-    request<Quote>(`/quotes/${id}/confirm`, { method: 'PATCH' }),
+  confirm: (id: string, selectedOption?: any) =>
+    request<Quote>(`/quotes/${id}/confirm`, { 
+      method: 'PATCH',
+      body: JSON.stringify({ selectedOption })
+    }),
 
   /** Sale: Khách huỷ → CANCELLED */
-  cancel: (id: string) =>
-    request<Quote>(`/quotes/${id}/cancel`, { method: 'PATCH' }),
+  cancel: (id: string, materialType?: string) =>
+    request<Quote>(`/quotes/${id}/cancel`, { 
+      method: 'PATCH',
+      body: materialType ? JSON.stringify({ materialType }) : undefined
+    }),
 }
 
 // ─── STATS ─────────────────────────────────────────────────

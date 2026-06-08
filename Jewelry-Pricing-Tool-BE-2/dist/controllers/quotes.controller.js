@@ -125,7 +125,8 @@ class QuotesController {
     }
     async confirm(req, res, next) {
         try {
-            const quote = await quotes_service_1.quotesService.confirm(req.params.id);
+            const { selectedOption } = req.body;
+            const quote = await quotes_service_1.quotesService.confirm(req.params.id, selectedOption);
             res.json(quote);
         }
         catch (error) {
@@ -134,7 +135,8 @@ class QuotesController {
     }
     async cancel(req, res, next) {
         try {
-            const quote = await quotes_service_1.quotesService.cancel(req.params.id);
+            const { materialType } = req.body;
+            const quote = await quotes_service_1.quotesService.cancel(req.params.id, materialType);
             res.json(quote);
         }
         catch (error) {
