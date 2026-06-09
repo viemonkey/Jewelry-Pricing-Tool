@@ -24,6 +24,7 @@ export enum MaterialType {
   GOLD_10K   = 'GOLD_10K',
   GOLD_610   = 'GOLD_610',
   SILVER     = 'SILVER',
+  PLATINUM   = 'PLATINUM',
 }
 
 export interface IQuoteOption {
@@ -32,6 +33,7 @@ export interface IQuoteOption {
   weightGram?: number
   laborCost: number
   goldPrice24K?: number | null
+  platinumPrice?: number | null
   materialCost?: number
   stoneCost?: number
   costBeforeVAT?: number
@@ -57,6 +59,7 @@ export interface IQuote extends Document {
   weightGram?: number
   laborCost: number
   goldPrice24K?: number | null
+  platinumPrice?: number | null
   goldPriceEffectiveDate?: Date | null
   materialCost?: number
   stoneCost?: number
@@ -83,6 +86,7 @@ const QuoteOptionSchema = new Schema({
   weightGram: { type: Number },
   laborCost: { type: Number, default: 0 },
   goldPrice24K: { type: Number, default: null },
+  platinumPrice: { type: Number, default: null },
   materialCost: { type: Number },
   stoneCost: { type: Number },
   costBeforeVAT: { type: Number },
@@ -109,6 +113,7 @@ const QuoteSchema = new Schema<IQuote>(
     weightGram: { type: Number },
     laborCost: { type: Number, default: 0 },
     goldPrice24K: { type: Number, default: null },
+    platinumPrice: { type: Number, default: null },
     goldPriceEffectiveDate: { type: Date, default: null },
     materialCost: { type: Number },
     stoneCost: { type: Number },

@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -39,6 +39,7 @@ export interface GoldRow {
   label: string
   weightChi: string
   goldPrice24K: string
+  platinumPrice?: string
   materialCost: string
   weightUnit?: 'chi' | 'gram'
   budget?: string
@@ -52,12 +53,13 @@ const MATERIAL_LABEL_MAP: Record<string, string> = {
   GOLD_610: 'Vàng 610',
   GOLD_10K: 'Vàng 10K',
   SILVER:   'Bạc 925',
+  PLATINUM: 'Bạch kim',
 }
 
 function labelToType(label: string): string | null {
   const map: Record<string, string> = {
     'Vàng 24K': 'GOLD_24K', 'Vàng 18K': 'GOLD_18K', 'Vàng 14K': 'GOLD_14K',
-    'Vàng 610': 'GOLD_610', 'Vàng 10K': 'GOLD_10K', 'Bạc 925': 'SILVER',
+    'Vàng 610': 'GOLD_610', 'Vàng 10K': 'GOLD_10K', 'Bạc 925': 'SILVER', 'Bạch kim': 'PLATINUM',
   }
   return map[label] ?? null
 }
@@ -95,7 +97,7 @@ export function parseMaterialsFromQuote(quote: {
   if (quote.dimensions) {
     const rows: GoldRow[] = []
     for (const part of quote.dimensions.split(/[|,;]/).map(s => s.trim())) {
-      const m = part.match(/^(Vàng \d+K|Vàng 610|Bạc 925):\s*([\d.]+)\s*(chỉ|chi|g|gram|gr)?/i)
+      const m = part.match(/^(Vàng \d+K|Vàng 610|Bạc 925|Bạch kim):\s*([\d.]*)\s*(chỉ|chi|g|gram|gr)?/i)
       if (m) {
         const t = labelToType(m[1])
         if (t) {
@@ -106,6 +108,7 @@ export function parseMaterialsFromQuote(quote: {
           } else {
             row.weightUnit = 'chi'
           }
+          if (t === 'PLATINUM') row.weightUnit = 'chi'
           rows.push(row)
         }
       }
@@ -120,7 +123,7 @@ export function parseMaterialsFromQuote(quote: {
       const rows: GoldRow[] = []
       const content = line.replace('Chất liệu:', '').trim()
       for (const part of content.split(/[;|]/).map(s => s.trim())) {
-        const m = part.match(/^(Vàng \d+K|Vàng 610|Bạc 925)(?:\s*[–-]\s*([\d.]+)\s*(chỉ|chi|g|gram|gr)?)?/i)
+        const m = part.match(/^(Vàng \d+K|Vàng 610|Bạc 925|Bạch kim)(?:\s*[–-]\s*([\d.]*)\s*(chỉ|chi|g|gram|gr)?)?/i)
         if (m) {
           const t = labelToType(m[1])
           if (t) {
@@ -131,6 +134,7 @@ export function parseMaterialsFromQuote(quote: {
             } else {
               row.weightUnit = 'chi'
             }
+            if (t === 'PLATINUM') row.weightUnit = 'chi'
             rows.push(row)
           }
         }
@@ -437,7 +441,7 @@ function PricingDialogTabs({
                         <span key={i} className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-300/60 dark:border-amber-700/60 text-amber-700 dark:text-amber-300 text-xs font-semibold px-2.5 py-0.5">
                           <Layers className="h-3 w-3" />
                           {row.label}
-                          {row.weightChi && <span className="opacity-60 font-normal">· {row.weightChi} chỉ</span>}
+                          {row.weightChi && <span className="opacity-60 font-normal">· {row.weightChi} {row.weightUnit === 'gram' ? 'g' : 'chỉ'}</span>}
                         </span>
                       ))}
                     </div>
@@ -920,6 +924,13 @@ function MultiMaterialPricingRows({
     return Math.round(ratio * g * w)
   }
 
+  const computePlatinumCost = (pricePerChi: string, weightChi: string): number => {
+    const price = parseFloat(pricePerChi) || 0
+    const weight = parseFloat(weightChi) || 0
+    if (!price || !weight) return 0
+    return Math.round(price * weight)
+  }
+
   const update = (id: string, patch: Partial<GoldRow> & { weightUnit?: string }) => {
     const next = rows.map(r => {
       if (r.id !== id) return r
@@ -928,6 +939,9 @@ function MultiMaterialPricingRows({
         u.materialCost = u.weightChi
         const costVal = parseFloat(u.materialCost) || 0
         u.sellingPrice = String(costVal * (pricingConfig?.silverMultiplier ?? 3))
+      } else if (u.materialType === 'PLATINUM') {
+        const cost = computePlatinumCost(u.platinumPrice || '', u.weightChi)
+        u.materialCost = String(cost)
       } else {
         const cost = computeCost(u.materialType, u.goldPrice24K, u.weightChi, (u as any).weightUnit)
         u.materialCost = String(cost)
@@ -941,10 +955,22 @@ function MultiMaterialPricingRows({
   const handleSharedPriceChange = (newPrice: string) => {
     const next = rows.map(r => {
       const u = { ...r, goldPrice24K: newPrice }
-      if (u.materialType !== 'SILVER') {
+      if (u.materialType !== 'SILVER' && u.materialType !== 'PLATINUM') {
         const cost = computeCost(u.materialType, u.goldPrice24K, u.weightChi, (u as any).weightUnit)
         u.materialCost = String(cost)
       }
+      return u
+    })
+    onChange(next)
+    onTotalChange(parseFloat(next[0]?.materialCost) || 0)
+  }
+
+  const handleSharedPlatinumPriceChange = (newPrice: string) => {
+    const next = rows.map(r => {
+      if (r.materialType !== 'PLATINUM') return r
+      const u = { ...r, platinumPrice: newPrice, weightUnit: 'chi' as const }
+      const cost = computePlatinumCost(u.platinumPrice || '', u.weightChi)
+      u.materialCost = String(cost)
       return u
     })
     onChange(next)
@@ -967,11 +993,15 @@ function MultiMaterialPricingRows({
   }
 
   const total = rows.reduce((s, r) => s + (parseFloat(r.materialCost) || 0), 0)
-  const sharedGoldPrice = rows[0]?.goldPrice24K || ''
+  const sharedGoldPrice = rows.find(r => r.materialType !== 'SILVER' && r.materialType !== 'PLATINUM')?.goldPrice24K || ''
+  const hasGoldRows = rows.some(r => r.materialType !== 'SILVER' && r.materialType !== 'PLATINUM')
+  const hasPlatinumRows = rows.some(r => r.materialType === 'PLATINUM')
+  const sharedPlatinumPrice = rows.find(r => r.materialType === 'PLATINUM')?.platinumPrice || ''
 
   return (
     <div className="space-y-4">
       {/* Ô nhập chung giá vàng 24K */}
+      {hasGoldRows && (
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 space-y-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="space-y-0.5">
@@ -998,6 +1028,36 @@ function MultiMaterialPricingRows({
           </div>
         </div>
       </div>
+      )}
+
+      {hasPlatinumRows && (
+      <div className="rounded-xl border border-slate-300 bg-slate-50/70 p-3.5 space-y-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <Label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
+              Giá bạch kim đã gồm tiền công (đ/chỉ)
+            </Label>
+            <p className="text-[10px] text-muted-foreground">
+              Manager nhập đơn giá bạch kim theo chỉ; đơn giá này đã bao gồm tiền công.
+            </p>
+          </div>
+          <div className="relative w-full sm:w-48 shrink-0">
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="0"
+              value={sharedPlatinumPrice ? Number(sharedPlatinumPrice).toLocaleString('vi-VN') : ''}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/\./g, '').replace(/,/g, '')
+                handleSharedPlatinumPriceChange(raw)
+              }}
+              className="w-full h-10 rounded-md border border-slate-300 bg-background px-3 pr-6 text-sm font-semibold tabular-nums text-right focus:outline-none focus:ring-2 focus:ring-slate-200"
+            />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
+          </div>
+        </div>
+      </div>
+      )}
 
       {/* Bảng chất liệu */}
       <div className="rounded-xl border border-border/60 overflow-hidden bg-card">
@@ -1013,9 +1073,14 @@ function MultiMaterialPricingRows({
             <tbody className="divide-y divide-border/60">
               {rows.map((row, idx) => {
                 const isSilver = row.materialType === 'SILVER'
+                const isPlatinum = row.materialType === 'PLATINUM'
                 const ratio = findGoldRatio(pricingConfig?.goldRatios, row.materialType)
-                const hasData = isSilver ? !!parseFloat(row.materialCost) : !!(parseFloat(row.goldPrice24K) && parseFloat(row.weightChi))
-                const unit = (row as any).weightUnit === 'gram' ? 'gram' : 'chi'
+                const hasData = isSilver
+                  ? !!parseFloat(row.materialCost)
+                  : isPlatinum
+                    ? !!(parseFloat(row.platinumPrice || '') && parseFloat(row.weightChi))
+                    : !!(parseFloat(row.goldPrice24K) && parseFloat(row.weightChi))
+                const unit = isPlatinum ? 'chi' : ((row as any).weightUnit === 'gram' ? 'gram' : 'chi')
 
                 // Tính giá trị quy đổi mỗi chỉ
                 const appliedRatio = ratio?.applied ?? 0
@@ -1030,7 +1095,7 @@ function MultiMaterialPricingRows({
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-200 text-amber-800 dark:text-amber-300 text-[10px] font-semibold px-2 py-0.5">
                           <Layers className="h-2.5 w-2.5" />
                           {row.label}
-                          {!isSilver && ratio && <span className="opacity-70 font-normal"> · {Math.round(ratio.applied * 100)}%</span>}
+                          {!isSilver && !isPlatinum && ratio && <span className="opacity-70 font-normal"> · {Math.round(ratio.applied * 100)}%</span>}
                         </span>
                       </div>
                       {isSilver ? (
@@ -1041,6 +1106,12 @@ function MultiMaterialPricingRows({
                         ) : (
                           <p className="text-[10px] text-muted-foreground font-medium">
                             Chưa nhập khoảng giá mong muốn
+                          </p>
+                        )
+                      ) : isPlatinum ? (
+                        parseFloat(row.platinumPrice || '') > 0 && (
+                          <p className="text-[10px] text-muted-foreground font-medium">
+                            {Number(row.platinumPrice).toLocaleString('vi-VN')} đ/chỉ × {parseFloat(row.weightChi) || 0} chỉ
                           </p>
                         )
                       ) : (
@@ -1071,7 +1142,7 @@ function MultiMaterialPricingRows({
                             {isSilver ? 'đ' : (unit === 'gram' ? 'g' : 'chỉ')}
                           </span>
                         </div>
-                        {!isSilver && (
+                        {!isSilver && !isPlatinum && (
                           <button
                             type="button"
                             onClick={() => toggleUnit(row)}
@@ -1082,7 +1153,7 @@ function MultiMaterialPricingRows({
                           </button>
                         )}
                       </div>
-                      {!isSilver && unit === 'gram' && parseFloat(row.weightChi) > 0 && (
+                      {!isSilver && !isPlatinum && unit === 'gram' && parseFloat(row.weightChi) > 0 && (
                         <p className="text-[9px] text-muted-foreground text-right mt-0.5">
                           ≈ {Math.round((parseFloat(row.weightChi) / 3.75) * 1000) / 1000} chỉ
                         </p>
@@ -1111,7 +1182,7 @@ function MultiMaterialPricingRows({
       </div>
 
       {/* Tổng cộng nhiều loại */}
-      {rows.filter(r => r.materialType !== 'SILVER').length > 1 && total > 0 && (
+      {rows.filter(r => r.materialType !== 'SILVER' && r.materialType !== 'PLATINUM').length > 1 && total > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -1192,6 +1263,27 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       
       const multiplier = pricingConfig?.silverMultiplier ?? 3
       updated.sellingPrice = String(Math.round((cost * multiplier) / 1000) * 1000)
+    } else if (materialType === 'PLATINUM') {
+      const materialCost = n(updated.materialCost)
+      let stoneCostVal = 0
+      if (activeStoneMethod === 'table') {
+        stoneCostVal = currentStones.reduce((sum, e) => {
+          const price = parseFloat(e.unitPrice) || 0
+          if (e.priceMethod === 'per_piece') return sum + e.quantity * price
+          const carat = parseFloat(e.sizeOrCarat) || 0
+          return sum + e.quantity * carat * price
+        }, 0)
+        updated.stoneCost = String(Math.round(stoneCostVal))
+      } else {
+        stoneCostVal = n(updated.stoneCost)
+      }
+
+      const cost = materialCost + stoneCostVal
+      updated.laborCost = '0'
+      updated.costBeforeVAT = String(Math.round(cost))
+      updated.costWithVAT = String(Math.round(cost))
+      updated.costPrice = String(Math.round(cost))
+      updated.sellingPrice = String(Math.round(cost))
     } else {
       // 1. Tiền nguyên liệu vàng (lấy từ materialCost hiện tại)
       const goldCost = n(updated.materialCost)
@@ -1374,17 +1466,22 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       finalRows = q.options.map((opt: any) => {
         const type = opt.materialType
         const isSilver = type === 'SILVER'
+        const isPlatinum = type === 'PLATINUM'
         const weightVal = isSilver
           ? (opt.materialCost || 0)
           : (opt.weightChi !== undefined && opt.weightChi !== null ? opt.weightChi : (opt.weightGram !== undefined && opt.weightGram !== null ? opt.weightGram : 0))
         const weight = weightVal > 0 ? String(weightVal) : ''
-        const weightUnit = opt.weightGram !== undefined && opt.weightGram !== null ? 'gram' : 'chi'
+        const weightUnit = isPlatinum ? 'chi' : (opt.weightGram !== undefined && opt.weightGram !== null ? 'gram' : 'chi')
         
         const finalPrice = opt.goldPrice24K?.toString() || goldPriceToLoad
+        const platinumPrice = opt.platinumPrice?.toString() || ''
         const g = parseFloat(finalPrice) || 0
         let w = parseFloat(weight) || 0
         let cost = 0
-        if (!isSilver && g && w) {
+        if (isPlatinum) {
+          const p = parseFloat(platinumPrice) || 0
+          cost = p && w ? Math.round(p * w) : 0
+        } else if (!isSilver && g && w) {
           let weightInChi = w
           if (weightUnit === 'gram') weightInChi = w / 3.75
           const ratio = findGoldRatio(pricingConfig?.goldRatios, type)?.applied ?? 0
@@ -1397,6 +1494,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
           label: MATERIAL_LABEL_MAP[type] ?? type.replace(/_/g, ' '),
           weightChi: weight,
           goldPrice24K: finalPrice,
+          platinumPrice,
           materialCost: isSilver ? (opt.materialCost?.toString() || '') : (cost > 0 ? String(cost) : ''),
           weightUnit,
           budget: opt.budget || '',
@@ -1406,10 +1504,14 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     } else {
       finalRows = parsedRows.map(row => {
         const finalPrice = row.goldPrice24K || goldPriceToLoad
+        const platinumPrice = (row as any).platinumPrice || ''
         const g = parseFloat(finalPrice) || 0
         let w = parseFloat(row.weightChi) || 0
         let cost = 0
-        if (row.materialType !== 'SILVER' && g && w) {
+        if (row.materialType === 'PLATINUM') {
+          const p = parseFloat(platinumPrice) || 0
+          cost = p && w ? Math.round(p * w) : 0
+        } else if (row.materialType !== 'SILVER' && g && w) {
           let weightInChi = w
           if ((row as any).weightUnit === 'gram') weightInChi = w / 3.75
           const ratio = findGoldRatio(pricingConfig?.goldRatios, row.materialType)?.applied ?? 0
@@ -1418,6 +1520,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
         return {
           ...row,
           goldPrice24K: finalPrice,
+          platinumPrice,
           materialCost: row.materialType === 'SILVER' ? (row.weightChi || '') : (cost > 0 ? String(cost) : ''),
           budget: (row as any).budget || '',
           sellingPrice: row.materialType === 'SILVER' ? (row.sellingPrice || String((parseFloat(row.weightChi) || 0) * (pricingConfig?.silverMultiplier ?? 3))) : '',
@@ -1437,7 +1540,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
           id: `${opt.materialType}-${Date.now()}-${Math.random()}`,
           materialType: opt.materialType,
           weight: opt.weightChi ? String(opt.weightChi) : (opt.weightGram ? String(opt.weightGram) : ''),
-          unit: opt.weightGram ? 'gram' as const : 'chi' as const
+          unit: opt.materialType === 'PLATINUM' ? 'chi' as const : (opt.weightGram ? 'gram' as const : 'chi' as const)
         }))
       : parsedRows.map(row => ({
           id: row.id,
@@ -1539,17 +1642,24 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     try {
       const optionsPayload = goldRows.map(row => {
         const isSilver = row.materialType === 'SILVER'
-        const goldCost = parseFloat(row.materialCost) || 0
+        const isPlatinum = row.materialType === 'PLATINUM'
+        const materialCost = parseFloat(row.materialCost) || 0
         const stoneCostVal = isSilver ? 0 : (parseFloat(priceForm.stoneCost) || 0)
-        const laborCostVal = isSilver ? 0 : (parseFloat(priceForm.laborCost) || 0)
+        const laborCostVal = isSilver || isPlatinum ? 0 : (parseFloat(priceForm.laborCost) || 0)
         
-        const costBeforeVAT = isSilver ? goldCost : (goldCost + stoneCostVal + laborCostVal)
-        const costWithVAT = isSilver ? costBeforeVAT : (costBeforeVAT * 1.1)
+        const costBeforeVAT = isSilver
+          ? materialCost
+          : isPlatinum
+            ? materialCost + stoneCostVal
+            : (materialCost + stoneCostVal + laborCostVal)
+        const costWithVAT = isSilver || isPlatinum ? costBeforeVAT : (costBeforeVAT * 1.1)
         
         let autoSellingPrice = 0
         if (isSilver) {
           const multiplier = pricingConfig?.silverMultiplier ?? 3
-          autoSellingPrice = goldCost * multiplier
+          autoSellingPrice = materialCost * multiplier
+        } else if (isPlatinum) {
+          autoSellingPrice = costWithVAT
         } else if (pricingConfig?.profitMargins) {
           const { divisor } = getProfitDivisor(costWithVAT, pricingConfig.profitMargins)
           autoSellingPrice = costBeforeVAT > 0 ? Math.round(costWithVAT / divisor / 1000) * 1000 : 0
@@ -1559,11 +1669,12 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
 
         return {
           materialType: row.materialType as any,
-          weightChi: row.weightUnit === 'gram' ? undefined : (parseFloat(row.weightChi) || 0),
-          weightGram: row.weightUnit === 'gram' ? (parseFloat(row.weightChi) || 0) : undefined,
+          weightChi: row.materialType === 'PLATINUM' || row.weightUnit !== 'gram' ? (parseFloat(row.weightChi) || 0) : undefined,
+          weightGram: row.materialType !== 'PLATINUM' && row.weightUnit === 'gram' ? (parseFloat(row.weightChi) || 0) : undefined,
           laborCost: laborCostVal,
-          goldPrice24K: parseFloat(row.goldPrice24K) || 0,
-          materialCost: goldCost,
+          goldPrice24K: isPlatinum ? undefined : (parseFloat(row.goldPrice24K) || 0),
+          platinumPrice: isPlatinum ? (parseFloat(row.platinumPrice || '') || 0) : undefined,
+          materialCost,
           stoneCost: stoneCostVal,
           costBeforeVAT: Math.round(costBeforeVAT),
           costWithVAT: Math.round(costWithVAT),
@@ -1578,6 +1689,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
         weightChi: primaryOption?.weightChi,
         weightGram: primaryOption?.weightGram,
         goldPrice24K: primaryOption?.goldPrice24K,
+        platinumPrice: primaryOption?.platinumPrice,
         laborCost: primaryOption?.laborCost || 0,
         materialCost: primaryOption?.materialCost || 0,
         stoneCost: primaryOption?.stoneCost || 0,
@@ -1657,13 +1769,15 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       const filledRows = editMaterialRows.filter((r) => r.materialType)
       const materialSummary = filledRows.map((r) => {
         const label = MATERIAL_LABEL_MAP[r.materialType] || r.materialType
-        return `${label}${r.weight ? ` – ${r.weight} ${r.unit}` : ''}`
+        const unit = r.materialType === 'PLATINUM' ? 'chi' : r.unit
+        return `${label}${r.weight ? ` – ${r.weight} ${unit}` : ''}`
       }).join('; ')
 
       const primaryMaterial = filledRows[0]?.materialType as Quote['materialType']
       const weightNotes = filledRows.filter((r) => r.weight).map((r) => {
         const label = MATERIAL_LABEL_MAP[r.materialType] || r.materialType
-        return `${label}: ${r.weight} ${r.unit}`
+        const unit = r.materialType === 'PLATINUM' ? 'chi' : r.unit
+        return `${label}: ${r.weight} ${unit}`
       }).join(', ')
 
       const oldCatLabel = editForm.dimensions.split('|')[0]?.trim() || 'Loại: Nhẫn'
@@ -1671,8 +1785,8 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
 
       const options = filledRows.map((r) => ({
         materialType: r.materialType,
-        weightChi: r.unit === 'chi' ? (parseFloat(r.weight) || 0) : undefined,
-        weightGram: r.unit === 'gram' ? (parseFloat(r.weight) || 0) : undefined,
+        weightChi: r.materialType === 'PLATINUM' || r.unit === 'chi' ? (parseFloat(r.weight) || undefined) : undefined,
+        weightGram: r.materialType !== 'PLATINUM' && r.unit === 'gram' ? (parseFloat(r.weight) || undefined) : undefined,
       }))
 
       // Tự động cập nhật notes nếu có chất liệu được chỉnh sửa
@@ -1754,21 +1868,28 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   const isMultiOptionPricing = goldRows.length > 1
   const optionPricings = goldRows.map((row) => {
     const isSilver = row.materialType === 'SILVER'
+    const isPlatinum = row.materialType === 'PLATINUM'
     const materialCost = parseFloat(row.materialCost) || 0
     const stoneCostVal = isSilver ? 0 : (parseFloat(priceForm.stoneCost) || 0)
-    const laborCostVal = isSilver ? 0 : (parseFloat(priceForm.laborCost) || 0)
-    const costBeforeVAT = isSilver ? materialCost : materialCost + stoneCostVal + laborCostVal
-    const costWithVAT = isSilver ? costBeforeVAT : costBeforeVAT * 1.1
-    const marginInfo = !isSilver && pricingConfig?.profitMargins
+    const laborCostVal = isSilver || isPlatinum ? 0 : (parseFloat(priceForm.laborCost) || 0)
+    const costBeforeVAT = isSilver
+      ? materialCost
+      : isPlatinum
+        ? materialCost + stoneCostVal
+        : materialCost + stoneCostVal + laborCostVal
+    const costWithVAT = isSilver || isPlatinum ? costBeforeVAT : costBeforeVAT * 1.1
+    const marginInfo = !isSilver && !isPlatinum && pricingConfig?.profitMargins
       ? getProfitDivisor(costWithVAT, pricingConfig.profitMargins)
       : null
     const sellingPrice = isSilver
       ? materialCost * (pricingConfig?.silverMultiplier ?? 3)
-      : marginInfo
-        ? Math.round(costWithVAT / marginInfo.divisor / 1000) * 1000
-        : 0
+      : isPlatinum
+        ? costWithVAT
+        : marginInfo
+          ? Math.round(costWithVAT / marginInfo.divisor / 1000) * 1000
+          : 0
 
-    return { row, isSilver, materialCost, stoneCostVal, laborCostVal, costWithVAT, marginInfo, sellingPrice }
+    return { row, isSilver, isPlatinum, materialCost, stoneCostVal, laborCostVal, costWithVAT, marginInfo, sellingPrice }
   })
 
   return (
@@ -2138,7 +2259,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                 <span key={i} className="inline-flex items-center gap-1 rounded-full bg-amber-100 dark:bg-amber-900/40 border border-amber-300/60 dark:border-amber-700/60 text-amber-700 dark:text-amber-300 text-xs font-semibold px-2.5 py-0.5">
                                   <Layers className="h-3 w-3" />
                                   {row.label}
-                                  {row.weightChi && <span className="opacity-60 font-normal">· {row.weightChi} chỉ</span>}
+                                  {row.weightChi && <span className="opacity-60 font-normal">· {row.weightChi} {row.weightUnit === 'gram' ? 'g' : 'chỉ'}</span>}
                                 </span>
                               ))}
                             </div>
@@ -2348,7 +2469,9 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           </>
                         )}
 
-                        <CurrencyInput label="Tiền công chế tác" value={priceForm.laborCost} onChange={updatePriceField('laborCost')} icon={<Hammer className="h-3 w-3" />} />
+                        {getActivePricingMaterialType() !== 'PLATINUM' && (
+                          <CurrencyInput label="Tiền công chế tác" value={priceForm.laborCost} onChange={updatePriceField('laborCost')} icon={<Hammer className="h-3 w-3" />} />
+                        )}
 
                         {isMultiOptionPricing ? (
                           <>
@@ -2361,6 +2484,44 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                   !opt.isSilver ? { label: 'Công', value: opt.laborCostVal } : null,
                                 ].filter((item): item is { label: string; value: number } => !!item && item.value > 0)
                                 const hasPriceData = opt.sellingPrice > 0 || opt.costWithVAT > 0
+
+                                if (opt.isPlatinum) {
+                                  const platinumItems = [
+                                    { label: 'Nguyên liệu', value: opt.materialCost },
+                                    { label: 'Đá', value: opt.stoneCostVal },
+                                    { label: 'Giá vốn', value: opt.costWithVAT },
+                                  ].filter((item) => item.value > 0)
+
+                                  return (
+                                    <div key={opt.row.id} className="rounded-xl border border-border bg-card px-3.5 py-3">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="text-sm font-bold text-foreground">PA {idx + 1}: {opt.row.label}</p>
+                                            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-slate-50 text-slate-700 border border-slate-200">
+                                              Giá vốn
+                                            </span>
+                                          </div>
+                                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                                            {platinumItems.length > 0 ? platinumItems.map((item) => (
+                                              <span key={item.label}>
+                                                {item.label}: <strong className="text-foreground tabular-nums">{formatCurrency(item.value)}</strong>
+                                              </span>
+                                            )) : (
+                                              <span>Chưa nhập chi phí</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Giá bán</p>
+                                          <p className={`text-lg font-bold tabular-nums ${hasPriceData ? 'text-primary' : 'text-muted-foreground'}`}>
+                                            {hasPriceData ? formatCurrency(opt.sellingPrice) : '—'}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                }
 
                                 return (
                                   <div key={opt.row.id} className="rounded-xl border border-border bg-card px-3.5 py-3">
@@ -2415,6 +2576,11 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                     {priceForm.materialCost ? formatCurrency(parseFloat(priceForm.materialCost)) : '0 đ'}
                                   </p>
                                 </div>
+                              ) : getActivePricingMaterialType() === 'PLATINUM' ? (
+                                <div>
+                                  <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Giá vốn bạch kim</p>
+                                  <p className="text-xl font-bold text-primary tabular-nums">{formatCurrency(cost)}</p>
+                                </div>
                               ) : (
                                 <div className="flex items-center gap-4 mb-1">
                                   <div>
@@ -2466,6 +2632,10 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                               <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 px-3 py-2 text-xs text-blue-700 dark:text-blue-300">
                                 💡 Sản phẩm bạc: <strong>Giá bán = Giá vốn × {pricingConfig?.silverMultiplier ?? 3}</strong>
                               </div>
+                            ) : getActivePricingMaterialType() === 'PLATINUM' ? (
+                              <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700">
+                                Bạch kim: <strong>Giá vốn = trọng lượng × giá bạch kim đã gồm tiền công + tiền đá</strong>
+                              </div>
                             ) : (
                               pricingConfig?.profitMargins && (() => {
                                 const { divisor, margin: tier } = getProfitDivisor(cost, pricingConfig.profitMargins)
@@ -2485,7 +2655,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                             <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-base text-primary/50 pointer-events-none font-bold">đ</span>
                           </div>
 
-                          {selected?.materialType !== 'SILVER' && margin !== null && (
+                          {selected?.materialType !== 'SILVER' && selected?.materialType !== 'PLATINUM' && margin !== null && (
                             <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
                               className={`rounded-xl p-3.5 border-2 flex items-center justify-between gap-4 ${
                                 marginGood
@@ -2753,7 +2923,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                             <div className="w-[180px] shrink-0">
                               <Select
                                 value={row.materialType}
-                                onValueChange={(val) => setEditMaterialRows(prev => prev.map(r => r.id === row.id ? { ...r, materialType: val, unit: val === 'SILVER' ? 'gram' : r.unit } : r))}
+                                onValueChange={(val) => setEditMaterialRows(prev => prev.map(r => r.id === row.id ? { ...r, materialType: val, unit: val === 'SILVER' ? 'gram' : val === 'PLATINUM' ? 'chi' : r.unit } : r))}
                               >
                                 <SelectTrigger className="h-9 border-[#E6DFD0] rounded-lg text-xs bg-white">
                                   <SelectValue placeholder="Chọn chất liệu..." />
@@ -2765,6 +2935,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                   <SelectItem value="GOLD_610">Vàng 610</SelectItem>
                                   <SelectItem value="GOLD_10K">Vàng 10K</SelectItem>
                                   <SelectItem value="SILVER">Bạc 925</SelectItem>
+                                  <SelectItem value="PLATINUM">Bạch kim</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
@@ -2781,11 +2952,11 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                               <button
                                 type="button"
                                 onClick={() => {
-                                  if (row.materialType === 'SILVER') return
+                                  if (row.materialType === 'SILVER' || row.materialType === 'PLATINUM') return
                                   setEditMaterialRows(prev => prev.map(r => r.id === row.id ? { ...r, unit: r.unit === 'chi' ? 'gram' : 'chi' } : r))
                                 }}
                                 className="h-9 px-3 border border-[#E6DFD0] rounded-r-lg bg-muted/40 hover:bg-muted text-xs font-bold text-[#6B5E4C] transition-colors shrink-0"
-                                disabled={row.materialType === 'SILVER'}
+                                disabled={row.materialType === 'SILVER' || row.materialType === 'PLATINUM'}
                               >
                                 {row.unit}
                               </button>
@@ -2970,7 +3141,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                 <span key={i} className="inline-flex items-center gap-1 rounded-full bg-[#FBF6E9] border border-[#E6DFD0] text-[#8C6D1F] text-xs font-semibold px-3 py-1">
                                   <Layers className="h-3 w-3" />
                                   {row.label}
-                                  {row.weightChi && <span className="opacity-75 font-normal">· {row.weightChi} chỉ</span>}
+                                  {row.weightChi && <span className="opacity-75 font-normal">· {row.weightChi} {row.weightUnit === 'gram' ? 'g' : 'chỉ'}</span>}
                                 </span>
                               ))}
                             </div>
@@ -3387,7 +3558,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                 id: `${opt.materialType}-${Date.now()}-${Math.random()}`,
                                 materialType: opt.materialType,
                                 weight: opt.weightChi ? String(opt.weightChi) : (opt.weightGram ? String(opt.weightGram) : ''),
-                                unit: opt.weightGram ? 'gram' as const : 'chi' as const
+                                unit: opt.materialType === 'PLATINUM' ? 'chi' as const : (opt.weightGram ? 'gram' as const : 'chi' as const)
                               }))
                             : parsedRowsForEdit.map(row => ({
                                 id: row.id,

@@ -47,6 +47,7 @@ class QuotesService {
             updateData.weightGram = firstOpt.weightGram;
             updateData.laborCost = firstOpt.laborCost;
             updateData.goldPrice24K = firstOpt.goldPrice24K;
+            updateData.platinumPrice = firstOpt.platinumPrice;
             updateData.materialCost = firstOpt.materialCost;
             updateData.stoneCost = firstOpt.stoneCost;
             updateData.costBeforeVAT = firstOpt.costBeforeVAT;
@@ -135,6 +136,7 @@ class QuotesService {
             quote.weightGram = selectedOption.weightGram;
             quote.laborCost = selectedOption.laborCost;
             quote.goldPrice24K = selectedOption.goldPrice24K;
+            quote.platinumPrice = selectedOption.platinumPrice;
             quote.materialCost = selectedOption.materialCost;
             quote.stoneCost = selectedOption.stoneCost;
             quote.costBeforeVAT = selectedOption.costBeforeVAT;

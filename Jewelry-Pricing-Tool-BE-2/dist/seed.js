@@ -78,8 +78,16 @@ async function seed() {
                 isSpecialRule: true,
                 specialRuleNote: 'Sản phẩm bạc: áp dụng silverMultiplier trong PricingConfig',
             },
+            {
+                material: 'PLATINUM',
+                labelVi: 'Bạch kim',
+                ratio: 1,
+                unit: 'chi',
+                isSpecialRule: true,
+                specialRuleNote: 'Bạch kim: manager nhập giá theo chỉ đã gồm tiền công, giá vốn = trọng lượng * giá bạch kim + tiền đá',
+            },
         ]);
-        console.log('  ✅ MaterialRatio seeded (6 materials)');
+        console.log('  ✅ MaterialRatio seeded (7 materials)');
     }
     else {
         console.log('  ⏭  MaterialRatio already exists, skipping');

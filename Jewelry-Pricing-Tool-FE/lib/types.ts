@@ -21,11 +21,12 @@ export interface StoneDetail {
 }
 
 export interface QuoteOption {
-  materialType: 'GOLD_24K' | 'GOLD_18K' | 'GOLD_14K' | 'GOLD_10K' | 'GOLD_610' | 'SILVER'
+  materialType: 'GOLD_24K' | 'GOLD_18K' | 'GOLD_14K' | 'GOLD_10K' | 'GOLD_610' | 'SILVER' | 'PLATINUM'
   weightChi?: number
   weightGram?: number
   laborCost?: number
   goldPrice24K?: number | null
+  platinumPrice?: number | null
   materialCost?: number
   stoneCost?: number
   costBeforeVAT?: number
@@ -42,7 +43,7 @@ export interface Quote {
   quoteCode: string        // VD: QT-2025-001
   productName: string
   productDescription?: string
-  materialType: 'GOLD_24K' | 'GOLD_18K' | 'GOLD_14K' | 'GOLD_10K' | 'GOLD_610' | 'SILVER'
+  materialType: 'GOLD_24K' | 'GOLD_18K' | 'GOLD_14K' | 'GOLD_10K' | 'GOLD_610' | 'SILVER' | 'PLATINUM'
   weightChi?: number       // Số chi vàng
   weightGram?: number      // Gram bạc
   laborCost: number        // Tiền công
@@ -82,6 +83,7 @@ export interface UpdateQuotePrice {
   weightChi?: number
   weightGram?: number
   goldPrice24K?: number    // Giá vàng 24K/chỉ tại thời điểm báo giá — lưu để restore
+  platinumPrice?: number   // Giá bạch kim theo chỉ đã gồm tiền công tại thời điểm báo giá
   materialCost?: number    // Giá vàng theo tuổi (tự tính)
   stoneCost?: number       // Tổng tiền đá
   costBeforeVAT?: number   // Giá vốn chưa VAT

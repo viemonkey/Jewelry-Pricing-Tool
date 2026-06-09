@@ -7,6 +7,7 @@ export enum MaterialKey {
   GOLD_24K   = 'GOLD_24K',
   GOLD_610   = 'GOLD_610',
   SILVER_925 = 'SILVER',
+  PLATINUM   = 'PLATINUM',
 }
 
 export interface IMaterialRatio extends Document {

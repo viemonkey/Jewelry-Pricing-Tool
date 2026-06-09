@@ -34,6 +34,7 @@ const MATERIAL_OPTIONS = [
   { value: 'GOLD_610', label: 'Vàng 610',  isGold: true },
   { value: 'GOLD_10K', label: 'Vàng 10K', isGold: true },
   { value: 'SILVER',   label: 'Bạc 925',  isGold: false },
+  { value: 'PLATINUM', label: 'Bạch kim', isGold: false },
 ] as const
 
 type MaterialValue = (typeof MATERIAL_OPTIONS)[number]['value']
@@ -223,7 +224,7 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
       if (r.materialType === 'SILVER') {
         return `${opt?.label ?? r.materialType}${r.budget ? ` (Khoảng giá: ${r.budget})` : ''}`
       }
-      return `${opt?.label ?? r.materialType}${r.weight ? ` – ${r.weight} ${r.unit}` : ''}`
+      return `${opt?.label ?? r.materialType}${r.weight ? ` – ${r.weight} ${r.materialType === 'PLATINUM' ? 'chi' : r.unit}` : ''}`
     }).join('; ')
 
     const primaryMaterial = filledRows[0].materialType as Quote['materialType']
@@ -232,7 +233,7 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
       if (r.materialType === 'SILVER') {
         return r.budget ? `${opt?.label}: ${r.budget}` : ''
       }
-      return r.weight ? `${opt?.label}: ${r.weight} ${r.unit}` : ''
+      return r.weight ? `${opt?.label}: ${r.weight} ${r.materialType === 'PLATINUM' ? 'chi' : r.unit}` : ''
     }).filter(Boolean).join(', ')
 
     const catLabel   = PRODUCT_CATEGORIES.find((c) => c.value === category)?.label ?? ''
@@ -243,8 +244,8 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
 
     const options = filledRows.map((r) => ({
       materialType: r.materialType,
-      weightChi: r.materialType === 'SILVER' ? undefined : (r.unit === 'chi' ? (parseFloat(r.weight) || 0) : undefined),
-      weightGram: r.materialType === 'SILVER' ? undefined : (r.unit === 'gram' ? (parseFloat(r.weight) || 0) : undefined),
+      weightChi: r.materialType === 'SILVER' ? undefined : (r.materialType === 'PLATINUM' || r.unit === 'chi' ? (parseFloat(r.weight) || undefined) : undefined),
+      weightGram: r.materialType === 'SILVER' || r.materialType === 'PLATINUM' ? undefined : (r.unit === 'gram' ? (parseFloat(r.weight) || 0) : undefined),
       budget: r.materialType === 'SILVER' ? r.budget : undefined,
     }))
 
@@ -786,10 +787,12 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
 
                             {/* Row header labels (first row only) */}
                             {idx === 0 && (
-                              <div style={{ display: 'grid', gridTemplateColumns: materialRows[0]?.materialType === 'SILVER' ? '1fr 146px 36px' : '1fr 76px 64px 36px', gap: '6px', marginBottom: '4px' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: materialRows[0]?.materialType === 'SILVER' ? '1fr 146px 36px' : materialRows[0]?.materialType === 'PLATINUM' ? '1fr 146px 36px' : '1fr 76px 64px 36px', gap: '6px', marginBottom: '4px' }}>
                                 <span style={{ fontSize: '10.5px', color: TEXT_MUTED }}>Loại</span>
                                 {materialRows[0]?.materialType === 'SILVER' ? (
                                   <span style={{ fontSize: '10.5px', color: TEXT_MUTED }}>Giá mong muốn</span>
+                                ) : materialRows[0]?.materialType === 'PLATINUM' ? (
+                                  <span style={{ fontSize: '10.5px', color: TEXT_MUTED }}>Trọng lượng (chỉ)</span>
                                 ) : (
                                   <>
                                     <span style={{ fontSize: '10.5px', color: TEXT_MUTED }}>Trọng lượng</span>
@@ -800,14 +803,16 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
                               </div>
                             )}
 
-                            <div style={{ display: 'grid', gridTemplateColumns: row.materialType === 'SILVER' ? '1fr 146px 36px' : '1fr 76px 64px 36px', gap: '6px', alignItems: 'center' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: row.materialType === 'SILVER' ? '1fr 146px 36px' : row.materialType === 'PLATINUM' ? '1fr 146px 36px' : '1fr 76px 64px 36px', gap: '6px', alignItems: 'center' }}>
                               <Select
                                 value={row.materialType}
                                 onValueChange={(v) => { 
                                   const isSil = v === 'SILVER';
+                                  const isPlatinum = v === 'PLATINUM';
                                   updateRow(row.id, { 
                                     materialType: v as MaterialValue,
                                     weight: isSil ? '' : row.weight,
+                                    unit: isPlatinum ? 'chi' : row.unit,
                                     budget: isSil ? row.budget || '' : ''
                                   }); 
                                   touch('materials');
@@ -832,6 +837,16 @@ export function QuoteRequestModal({ requesterName, onSuccess }: QuoteRequestModa
                                   value={row.budget || ''}
                                   onChange={(e) => updateRow(row.id, { budget: formatBudgetValue(e.target.value) })}
                                   style={{ ...fieldStyle, padding: '8px 10px', fontSize: '13px' }}
+                                />
+                              ) : row.materialType === 'PLATINUM' ? (
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="Có thể để trống"
+                                  className="qrm-input"
+                                  value={row.weight}
+                                  onChange={(e) => updateRow(row.id, { weight: e.target.value.replace(/[^0-9.]/g, ''), unit: 'chi' })}
+                                  style={{ ...fieldStyle, textAlign: 'right', padding: '8px 10px', fontSize: '13px' }}
                                 />
                               ) : (
                                 <>

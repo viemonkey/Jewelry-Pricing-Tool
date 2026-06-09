@@ -85,6 +85,7 @@ function formatMaterialType(type: string) {
     GOLD_610: 'Vàng 610',
     GOLD_10K: 'Vàng 10K',
     SILVER: 'Bạc 925',
+    PLATINUM: 'Bạch kim',
   }
   return map[type] || type.replace(/_/g, ' ')
 }

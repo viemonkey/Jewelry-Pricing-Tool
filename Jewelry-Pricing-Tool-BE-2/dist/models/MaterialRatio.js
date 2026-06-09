@@ -43,6 +43,7 @@ var MaterialKey;
     MaterialKey["GOLD_24K"] = "GOLD_24K";
     MaterialKey["GOLD_610"] = "GOLD_610";
     MaterialKey["SILVER_925"] = "SILVER";
+    MaterialKey["PLATINUM"] = "PLATINUM";
 })(MaterialKey || (exports.MaterialKey = MaterialKey = {}));
 const MaterialRatioSchema = new mongoose_1.Schema({
     material: { type: String, required: true, unique: true, enum: Object.values(MaterialKey) },

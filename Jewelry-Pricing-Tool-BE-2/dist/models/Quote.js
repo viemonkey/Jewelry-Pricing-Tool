@@ -60,6 +60,7 @@ var MaterialType;
     MaterialType["GOLD_10K"] = "GOLD_10K";
     MaterialType["GOLD_610"] = "GOLD_610";
     MaterialType["SILVER"] = "SILVER";
+    MaterialType["PLATINUM"] = "PLATINUM";
 })(MaterialType || (exports.MaterialType = MaterialType = {}));
 const QuoteOptionSchema = new mongoose_1.Schema({
     materialType: { type: String, enum: Object.values(MaterialType), required: true },
@@ -67,6 +68,7 @@ const QuoteOptionSchema = new mongoose_1.Schema({
     weightGram: { type: Number },
     laborCost: { type: Number, default: 0 },
     goldPrice24K: { type: Number, default: null },
+    platinumPrice: { type: Number, default: null },
     materialCost: { type: Number },
     stoneCost: { type: Number },
     costBeforeVAT: { type: Number },
@@ -91,6 +93,7 @@ const QuoteSchema = new mongoose_1.Schema({
     weightGram: { type: Number },
     laborCost: { type: Number, default: 0 },
     goldPrice24K: { type: Number, default: null },
+    platinumPrice: { type: Number, default: null },
     goldPriceEffectiveDate: { type: Date, default: null },
     materialCost: { type: Number },
     stoneCost: { type: Number },

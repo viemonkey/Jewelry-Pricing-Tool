@@ -43,7 +43,7 @@ class PricingConfigService {
             // 1. Recalculate options array if it exists
             if (quote.options && quote.options.length > 0) {
                 quote.options = quote.options.map((opt) => {
-                    if (opt.materialType && opt.materialType !== 'SILVER') {
+                    if (opt.materialType && opt.materialType.startsWith('GOLD_')) {
                         const ratio = getRatio(opt.materialType);
                         const weightChi = getWeightChi(opt);
                         const laborCost = opt.laborCost || 0;
@@ -81,6 +81,7 @@ class PricingConfigService {
                     quote.weightGram = firstOpt.weightGram;
                     quote.laborCost = firstOpt.laborCost;
                     quote.goldPrice24K = firstOpt.goldPrice24K;
+                    quote.platinumPrice = firstOpt.platinumPrice;
                     quote.materialCost = firstOpt.materialCost;
                     quote.stoneCost = firstOpt.stoneCost;
                     quote.costBeforeVAT = firstOpt.costBeforeVAT;
@@ -92,7 +93,7 @@ class PricingConfigService {
             }
             else {
                 // Fallback: If quote has no options but is a gold product, recalculate top-level directly
-                if (quote.materialType && quote.materialType !== 'SILVER') {
+                if (quote.materialType && quote.materialType.startsWith('GOLD_')) {
                     const ratio = getRatio(quote.materialType);
                     const weightChi = getWeightChi(quote);
                     const laborCost = quote.laborCost || 0;
