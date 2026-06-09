@@ -53,6 +53,7 @@ export class QuotesService {
       updateData.materialCost = firstOpt.materialCost
       updateData.stoneCost = firstOpt.stoneCost
       updateData.costBeforeVAT = firstOpt.costBeforeVAT
+      updateData.costWithVAT = firstOpt.costWithVAT
       updateData.costPrice = firstOpt.costPrice
       updateData.sellingPrice = firstOpt.sellingPrice
     }
@@ -172,6 +173,7 @@ export class QuotesService {
       quote.materialCost = selectedOption.materialCost
       quote.stoneCost = selectedOption.stoneCost
       quote.costBeforeVAT = selectedOption.costBeforeVAT
+      quote.costWithVAT = selectedOption.costWithVAT
       quote.costPrice = selectedOption.costPrice
       quote.sellingPrice = selectedOption.sellingPrice
 

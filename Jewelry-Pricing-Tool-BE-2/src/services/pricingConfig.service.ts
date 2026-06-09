@@ -30,6 +30,15 @@ export class PricingConfigService {
       }
     }
     const profitMargins = config.profitMargins || []
+    const getRatio = (materialType: string) => {
+      const legacyKey = materialType.replace('GOLD_', '').replace('GOLD', '24K')
+      return ratiosMap[materialType] ?? ratiosMap[legacyKey] ?? 0
+    }
+    const getWeightChi = (item: any) => {
+      if (item.weightChi !== undefined && item.weightChi !== null) return item.weightChi || 0
+      if (item.weightGram !== undefined && item.weightGram !== null) return (item.weightGram || 0) / 3.75
+      return 0
+    }
 
     for (const quote of quotes) {
       let isModified = false
@@ -38,9 +47,8 @@ export class PricingConfigService {
       if (quote.options && quote.options.length > 0) {
         quote.options = quote.options.map((opt: any) => {
           if (opt.materialType && opt.materialType !== 'SILVER') {
-            const ratioKey = opt.materialType.replace('GOLD_', '')
-            const ratio = ratiosMap[ratioKey] || 0
-            const weightChi = opt.weightChi || 0
+            const ratio = getRatio(opt.materialType)
+            const weightChi = getWeightChi(opt)
             const laborCost = opt.laborCost || 0
             const stoneCost = opt.stoneCost || 0
 
@@ -92,9 +100,8 @@ export class PricingConfigService {
       } else {
         // Fallback: If quote has no options but is a gold product, recalculate top-level directly
         if (quote.materialType && quote.materialType !== 'SILVER') {
-          const ratioKey = quote.materialType.replace('GOLD_', '')
-          const ratio = ratiosMap[ratioKey] || 0
-          const weightChi = quote.weightChi || 0
+          const ratio = getRatio(quote.materialType)
+          const weightChi = getWeightChi(quote)
           const laborCost = quote.laborCost || 0
           const stoneCost = quote.stoneCost || 0
 

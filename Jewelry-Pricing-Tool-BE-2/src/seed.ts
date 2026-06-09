@@ -95,30 +95,24 @@ async function seed() {
   }
 
   // 4. Pricing Config
-  const cfgCount = await PricingConfig.countDocuments()
-  if (cfgCount === 0) {
-    await PricingConfig.create({
-      goldRatios: [
-        { key: 'GOLD_10K', standard: 10, applied: 10, label: 'Vàng 10K' },
-        { key: 'GOLD_14K', standard: 14, applied: 14, label: 'Vàng 14K' },
-        { key: 'GOLD_18K', standard: 18, applied: 18, label: 'Vàng 18K' },
-        { key: 'GOLD_24K', standard: 24, applied: 24, label: 'Vàng 24K' },
-        { key: 'GOLD_610', standard: 14, applied: 14, label: 'Vàng 610' },
-      ],
-      profitMargins: [
-        { maxCost: 5_000_000, divisor: 0.65, margin: '35%' },
-        { maxCost: 10_000_000, divisor: 0.68, margin: '30%' },
-        { maxCost: 20_000_000, divisor: 0.70, margin: '30%' },
-        { maxCost: 50_000_000, divisor: 0.72, margin: '28%' },
-        { maxCost: 999_999_999, divisor: 0.75, margin: '25%' },
-      ],
-      silverMultiplier: 3,
-      goldPrice24K: 8_700_000,
-    })
-    console.log('  ✅ PricingConfig seeded')
-  } else {
-    console.log('  ⏭  PricingConfig already exists, skipping')
-  }
+  await PricingConfig.deleteMany({}) // Clear old config to force correct rates to seed
+  await PricingConfig.create({
+    goldRatios: [
+      { key: 'GOLD_10K', standard: 0.417, applied: 0.47, label: 'Vàng 10K' },
+      { key: 'GOLD_14K', standard: 0.583, applied: 0.64, label: 'Vàng 14K' },
+      { key: 'GOLD_18K', standard: 0.75, applied: 0.80, label: 'Vàng 18K' },
+      { key: 'GOLD_24K', standard: 0.9999, applied: 1.05, label: 'Vàng 24K' },
+      { key: 'GOLD_610', standard: 0.61, applied: 0.66, label: 'Vàng 610' },
+    ],
+    profitMargins: [
+      { maxCost: 10_000_000, divisor: 0.65, margin: '35%' },
+      { maxCost: 50_000_000, divisor: 0.70, margin: '30%' },
+      { maxCost: 999_999_999_999, divisor: 0.75, margin: '25%' },
+    ],
+    silverMultiplier: 3,
+    goldPrice24K: 8_700_000,
+  })
+  console.log('  ✅ PricingConfig seeded')
 
   await mongoose.disconnect()
   console.log('\n🎉 Seed completed!')

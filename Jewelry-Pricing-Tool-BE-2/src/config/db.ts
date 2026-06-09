@@ -3,11 +3,11 @@ import { PricingConfig } from '../models/PricingConfig'
 
 const DEFAULT_CONFIG = {
   goldRatios: [
-    { key: '10K', standard: 0.417, applied: 0.47, label: 'Vàng 10K' },
-    { key: '14K', standard: 0.583, applied: 0.64, label: 'Vàng 14K' },
-    { key: '18K', standard: 0.750, applied: 0.80, label: 'Vàng 18K' },
-    { key: '610', standard: 0.610, applied: 0.66, label: 'Vàng 610' },
-    { key: '24K', standard: 0.9999, applied: 1.05, label: 'Vàng 24K' },
+    { key: 'GOLD_10K', standard: 0.417, applied: 0.47, label: 'Vàng 10K' },
+    { key: 'GOLD_14K', standard: 0.583, applied: 0.64, label: 'Vàng 14K' },
+    { key: 'GOLD_18K', standard: 0.750, applied: 0.80, label: 'Vàng 18K' },
+    { key: 'GOLD_610', standard: 0.610, applied: 0.66, label: 'Vàng 610' },
+    { key: 'GOLD_24K', standard: 0.9999, applied: 1.05, label: 'Vàng 24K' },
   ],
   profitMargins: [
     { maxCost: 10_000_000, divisor: 0.65, margin: '35%' },

@@ -85,6 +85,7 @@ export interface UpdateQuotePrice {
   materialCost?: number    // Giá vàng theo tuổi (tự tính)
   stoneCost?: number       // Tổng tiền đá
   costBeforeVAT?: number   // Giá vốn chưa VAT
+  costWithVAT?: number     // Giá vốn có VAT
   laborCost: number        // Tiền công chế tác
   stones: StoneDetail[]
   costPrice: number        // Giá vốn có VAT
