@@ -41,6 +41,7 @@ export interface GoldRow {
   goldPrice24K: string
   platinumPrice?: string
   materialCost: string
+  stoneCost?: string
   weightUnit?: 'chi' | 'gram'
   budget?: string
   sellingPrice?: string
@@ -77,6 +78,7 @@ function makeGoldRow(type: string, weight = ''): GoldRow {
     weightChi: weight,
     goldPrice24K: '',
     materialCost: '',
+    stoneCost: '',
     weightUnit: type === 'SILVER' ? 'gram' : 'chi',
   }
 }
@@ -1000,63 +1002,52 @@ function MultiMaterialPricingRows({
 
   return (
     <div className="space-y-4">
-      {/* Ô nhập chung giá vàng 24K */}
-      {hasGoldRows && (
-      <div className="rounded-xl border border-primary/20 bg-primary/5 p-3.5 space-y-2">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-0.5">
-            <Label className="text-xs font-semibold text-primary uppercase tracking-wide">
-              Giá vàng 24K gốc hôm nay (đ/chỉ)
-            </Label>
-            <p className="text-[10px] text-muted-foreground">
-              Áp dụng làm giá vàng cơ sở quy đổi cho tất cả các loại vàng bên dưới.
-            </p>
-          </div>
-          <div className="relative w-full sm:w-48 shrink-0">
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="9.000.000"
-              value={sharedGoldPrice ? Number(sharedGoldPrice).toLocaleString('vi-VN') : ''}
-              onChange={(e) => {
-                const raw = e.target.value.replace(/\./g, '').replace(/,/g, '')
-                handleSharedPriceChange(raw)
-              }}
-              className="w-full h-10 rounded-md border border-primary/30 bg-background px-3 pr-6 text-sm font-semibold tabular-nums text-right focus:outline-none focus:ring-2 focus:ring-primary/20"
-            />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
-          </div>
-        </div>
-      </div>
-      )}
+      {(hasGoldRows || hasPlatinumRows) && (
+        <div className="grid gap-3 md:grid-cols-2">
+          {hasGoldRows && (
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+              <Label className="mb-2 block text-xs font-semibold text-primary uppercase tracking-wide">
+                Giá vàng 24K (đ/chỉ)
+              </Label>
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="9.000.000"
+                  value={sharedGoldPrice ? Number(sharedGoldPrice).toLocaleString('vi-VN') : ''}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\./g, '').replace(/,/g, '')
+                    handleSharedPriceChange(raw)
+                  }}
+                  className="w-full h-10 rounded-md border border-primary/30 bg-background px-3 pr-6 text-sm font-semibold tabular-nums text-right focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
+              </div>
+            </div>
+          )}
 
-      {hasPlatinumRows && (
-      <div className="rounded-xl border border-slate-300 bg-slate-50/70 p-3.5 space-y-2">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-0.5">
-            <Label className="text-xs font-semibold text-slate-700 uppercase tracking-wide">
-              Giá bạch kim đã gồm tiền công (đ/chỉ)
-            </Label>
-            <p className="text-[10px] text-muted-foreground">
-              Manager nhập đơn giá bạch kim theo chỉ; đơn giá này đã bao gồm tiền công.
-            </p>
-          </div>
-          <div className="relative w-full sm:w-48 shrink-0">
-            <input
-              type="text"
-              inputMode="numeric"
-              placeholder="0"
-              value={sharedPlatinumPrice ? Number(sharedPlatinumPrice).toLocaleString('vi-VN') : ''}
-              onChange={(e) => {
-                const raw = e.target.value.replace(/\./g, '').replace(/,/g, '')
-                handleSharedPlatinumPriceChange(raw)
-              }}
-              className="w-full h-10 rounded-md border border-slate-300 bg-background px-3 pr-6 text-sm font-semibold tabular-nums text-right focus:outline-none focus:ring-2 focus:ring-slate-200"
-            />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
-          </div>
+          {hasPlatinumRows && (
+            <div className="rounded-xl border border-slate-300 bg-slate-50/70 p-3">
+              <Label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">
+                Giá bạch kim (đ/chỉ)
+              </Label>
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={sharedPlatinumPrice ? Number(sharedPlatinumPrice).toLocaleString('vi-VN') : ''}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\./g, '').replace(/,/g, '')
+                    handleSharedPlatinumPriceChange(raw)
+                  }}
+                  className="w-full h-10 rounded-md border border-slate-300 bg-background px-3 pr-6 text-sm font-semibold tabular-nums text-right focus:outline-none focus:ring-2 focus:ring-slate-200"
+                />
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
       )}
 
       {/* Bảng chất liệu */}
@@ -1496,6 +1487,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
           goldPrice24K: finalPrice,
           platinumPrice,
           materialCost: isSilver ? (opt.materialCost?.toString() || '') : (cost > 0 ? String(cost) : ''),
+          stoneCost: opt.stoneCost?.toString() || '',
           weightUnit,
           budget: opt.budget || '',
           sellingPrice: opt.sellingPrice?.toString() || '',
@@ -1522,6 +1514,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
           goldPrice24K: finalPrice,
           platinumPrice,
           materialCost: row.materialType === 'SILVER' ? (row.weightChi || '') : (cost > 0 ? String(cost) : ''),
+          stoneCost: '',
           budget: (row as any).budget || '',
           sellingPrice: row.materialType === 'SILVER' ? (row.sellingPrice || String((parseFloat(row.weightChi) || 0) * (pricingConfig?.silverMultiplier ?? 3))) : '',
         }
@@ -1643,12 +1636,15 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       const optionsPayload = goldRows.map(row => {
         const isSilver = row.materialType === 'SILVER'
         const isPlatinum = row.materialType === 'PLATINUM'
+        const isMulti = goldRows.length > 1
         const materialCost = parseFloat(row.materialCost) || 0
-        const stoneCostVal = isSilver ? 0 : (parseFloat(priceForm.stoneCost) || 0)
+        const stoneCostVal = isMulti
+          ? (parseFloat(row.stoneCost || '') || 0)
+          : (isSilver ? 0 : (parseFloat(priceForm.stoneCost) || 0))
         const laborCostVal = isSilver || isPlatinum ? 0 : (parseFloat(priceForm.laborCost) || 0)
         
         const costBeforeVAT = isSilver
-          ? materialCost
+          ? materialCost + stoneCostVal
           : isPlatinum
             ? materialCost + stoneCostVal
             : (materialCost + stoneCostVal + laborCostVal)
@@ -1657,7 +1653,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
         let autoSellingPrice = 0
         if (isSilver) {
           const multiplier = pricingConfig?.silverMultiplier ?? 3
-          autoSellingPrice = materialCost * multiplier
+          autoSellingPrice = materialCost * multiplier + stoneCostVal
         } else if (isPlatinum) {
           autoSellingPrice = costWithVAT
         } else if (pricingConfig?.profitMargins) {
@@ -1854,6 +1850,20 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       return calculateQuotePrices(nextForm, getActivePricingMaterialType(), stoneEntries, stoneInputMethod)
     })
   }
+
+  const updateOptionStoneCost = (rowId: string, value: string) => {
+    setGoldRows((rows) => rows.map((row) => (
+      row.id === rowId ? { ...row, stoneCost: value } : row
+    )))
+  }
+
+  const applySharedStoneCostToOptions = (mode: 'all' | 'clear') => {
+    const sharedStoneCost = mode === 'clear' ? '' : priceForm.stoneCost
+    setGoldRows((rows) => rows.map((row) => {
+      return { ...row, stoneCost: sharedStoneCost }
+    }))
+  }
+
   const filtered = filterStatus === 'ALL' ? quotes : quotes.filter((q) => q.status === filterStatus)
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage))
   const paginated = filtered.slice((page - 1) * perPage, page * perPage)
@@ -1870,10 +1880,12 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     const isSilver = row.materialType === 'SILVER'
     const isPlatinum = row.materialType === 'PLATINUM'
     const materialCost = parseFloat(row.materialCost) || 0
-    const stoneCostVal = isSilver ? 0 : (parseFloat(priceForm.stoneCost) || 0)
+    const stoneCostVal = isMultiOptionPricing
+      ? (parseFloat(row.stoneCost || '') || 0)
+      : (isSilver ? 0 : (parseFloat(priceForm.stoneCost) || 0))
     const laborCostVal = isSilver || isPlatinum ? 0 : (parseFloat(priceForm.laborCost) || 0)
     const costBeforeVAT = isSilver
-      ? materialCost
+      ? materialCost + stoneCostVal
       : isPlatinum
         ? materialCost + stoneCostVal
         : materialCost + stoneCostVal + laborCostVal
@@ -1882,14 +1894,14 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       ? getProfitDivisor(costWithVAT, pricingConfig.profitMargins)
       : null
     const sellingPrice = isSilver
-      ? materialCost * (pricingConfig?.silverMultiplier ?? 3)
+      ? materialCost * (pricingConfig?.silverMultiplier ?? 3) + stoneCostVal
       : isPlatinum
         ? costWithVAT
         : marginInfo
           ? Math.round(costWithVAT / marginInfo.divisor / 1000) * 1000
           : 0
 
-    return { row, isSilver, isPlatinum, materialCost, stoneCostVal, laborCostVal, costWithVAT, marginInfo, sellingPrice }
+    return { row, isSilver, isPlatinum, materialCost, stoneCostVal, laborCostVal, costBeforeVAT, costWithVAT, marginInfo, sellingPrice }
   })
 
   return (
@@ -2420,53 +2432,101 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           }}
                         />
 
-                        {/* Section 2: Bảng tính đá / phụ kiện */}
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tiền đá / phụ kiện</span>
-                          <div className="flex rounded-md bg-muted p-0.5 text-[10px] font-medium">
-                            <button
-                              type="button"
-                              onClick={() => handleStoneMethodChange('direct')}
-                              className={`px-2.5 py-1 rounded transition-all ${
-                                stoneInputMethod === 'direct'
-                                  ? 'bg-background text-foreground shadow-sm font-semibold'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              Nhập tổng tiền
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStoneMethodChange('table')}
-                              className={`px-2.5 py-1 rounded transition-all ${
-                                stoneInputMethod === 'table'
-                                  ? 'bg-background text-foreground shadow-sm font-semibold'
-                                  : 'text-muted-foreground hover:text-foreground'
-                              }`}
-                            >
-                              Tính từ bảng đá
-                            </button>
-                          </div>
-                        </div>
-
-                        {stoneInputMethod === 'direct' ? (
-                          <CurrencyInput
-                            label="Tổng tiền đá / phụ kiện"
-                            value={priceForm.stoneCost}
-                            onChange={updatePriceField('stoneCost')}
-                            icon={<Sparkles className="h-3.5 w-3.5" />}
-                            hideLabel
-                          />
-                        ) : (
+                        {!isMultiOptionPricing ? (
                           <>
-                            <StoneTable entries={stoneEntries} onChange={setStoneEntries} fmt={fmt} />
-                            {parseFloat(priceForm.stoneCost) > 0 && (
-                              <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 px-3 py-2 text-xs text-blue-700 dark:text-blue-300 flex justify-between">
-                                <span>Tổng tiền đá / phụ kiện</span>
-                                <strong>{fmt(priceForm.stoneCost)}</strong>
+                            {/* Section 2: Bảng tính đá / phụ kiện */}
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Tiền đá / phụ kiện</span>
+                              <div className="flex rounded-md bg-muted p-0.5 text-[10px] font-medium">
+                                <button
+                                  type="button"
+                                  onClick={() => handleStoneMethodChange('direct')}
+                                  className={`px-2.5 py-1 rounded transition-all ${
+                                    stoneInputMethod === 'direct'
+                                      ? 'bg-background text-foreground shadow-sm font-semibold'
+                                      : 'text-muted-foreground hover:text-foreground'
+                                  }`}
+                                >
+                                  Nhập tổng tiền
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStoneMethodChange('table')}
+                                  className={`px-2.5 py-1 rounded transition-all ${
+                                    stoneInputMethod === 'table'
+                                      ? 'bg-background text-foreground shadow-sm font-semibold'
+                                      : 'text-muted-foreground hover:text-foreground'
+                                  }`}
+                                >
+                                  Tính từ bảng đá
+                                </button>
                               </div>
+                            </div>
+
+                            {stoneInputMethod === 'direct' ? (
+                              <CurrencyInput
+                                label="Tổng tiền đá / phụ kiện"
+                                value={priceForm.stoneCost}
+                                onChange={updatePriceField('stoneCost')}
+                                icon={<Sparkles className="h-3.5 w-3.5" />}
+                                hideLabel
+                              />
+                            ) : (
+                              <>
+                                <StoneTable entries={stoneEntries} onChange={setStoneEntries} fmt={fmt} />
+                                {parseFloat(priceForm.stoneCost) > 0 && (
+                                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 px-3 py-2 text-xs text-blue-700 dark:text-blue-300 flex justify-between">
+                                    <span>Tổng tiền đá / phụ kiện</span>
+                                    <strong>{fmt(priceForm.stoneCost)}</strong>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </>
+                        ) : (
+                          <div className="rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 p-3">
+                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                              <div className="space-y-1.5">
+                                <Label className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">
+                                  Tiền đá dùng chung
+                                </Label>
+                                <div className="relative">
+                                  <Input
+                                    type="text"
+                                    inputMode="numeric"
+                                    placeholder="0"
+                                    value={formatInputNumber(priceForm.stoneCost)}
+                                    onChange={(e) => {
+                                      const raw = parseInputNumber(e.target.value)
+                                      setPriceForm((f) => ({ ...f, stoneCost: raw }))
+                                    }}
+                                    className="h-9 pr-7 text-xs tabular-nums bg-background"
+                                  />
+                                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="h-9 text-xs"
+                                  onClick={() => applySharedStoneCostToOptions('all')}
+                                  disabled={!priceForm.stoneCost}
+                                >
+                                  Áp dụng tất cả
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-9 text-xs bg-background"
+                                  onClick={() => applySharedStoneCostToOptions('clear')}
+                                >
+                                  Xóa tất cả
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
                         )}
 
                         {getActivePricingMaterialType() !== 'PLATINUM' && (
@@ -2479,9 +2539,10 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                               {optionPricings.map((opt, idx) => {
                                 const detailItems = [
                                   { label: 'Nguyên liệu', value: opt.materialCost },
+                                  { label: 'Đá', value: opt.stoneCostVal },
+                                  !opt.isSilver && !opt.isPlatinum ? { label: 'Công', value: opt.laborCostVal } : null,
+                                  !opt.isSilver && !opt.isPlatinum ? { label: 'Vốn chưa VAT', value: opt.costBeforeVAT } : null,
                                   { label: opt.isSilver ? 'Giá vốn' : 'Vốn VAT', value: opt.costWithVAT },
-                                  !opt.isSilver ? { label: 'Đá', value: opt.stoneCostVal } : null,
-                                  !opt.isSilver ? { label: 'Công', value: opt.laborCostVal } : null,
                                 ].filter((item): item is { label: string; value: number } => !!item && item.value > 0)
                                 const hasPriceData = opt.sellingPrice > 0 || opt.costWithVAT > 0
 
@@ -2497,7 +2558,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                       <div className="flex items-center justify-between gap-3">
                                         <div className="min-w-0">
                                           <div className="flex items-center gap-2 flex-wrap">
-                                            <p className="text-sm font-bold text-foreground">PA {idx + 1}: {opt.row.label}</p>
+                                            <p className="text-sm font-bold text-foreground">Phương án {idx + 1}: {opt.row.label}</p>
                                             <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-slate-50 text-slate-700 border border-slate-200">
                                               Giá vốn
                                             </span>
@@ -2510,6 +2571,22 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                             )) : (
                                               <span>Chưa nhập chi phí</span>
                                             )}
+                                          </div>
+                                          <div className="mt-2 max-w-56">
+                                            <Label className="mb-1 block text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                                              Tiền đá / phụ kiện
+                                            </Label>
+                                            <div className="relative">
+                                              <Input
+                                                type="text"
+                                                inputMode="numeric"
+                                                placeholder="0"
+                                                value={formatInputNumber(opt.row.stoneCost)}
+                                                onChange={(e) => updateOptionStoneCost(opt.row.id, parseInputNumber(e.target.value))}
+                                                className="h-9 pr-7 text-xs tabular-nums"
+                                              />
+                                              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
+                                            </div>
                                           </div>
                                         </div>
                                         <div className="text-right shrink-0">
@@ -2528,7 +2605,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                     <div className="flex items-center justify-between gap-3">
                                       <div className="min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap">
-                                          <p className="text-sm font-bold text-foreground">PA {idx + 1}: {opt.row.label}</p>
+                                          <p className="text-sm font-bold text-foreground">Phương án {idx + 1}: {opt.row.label}</p>
                                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                             opt.isSilver
                                               ? 'bg-blue-50 text-blue-700 border border-blue-200'
@@ -2549,6 +2626,22 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                           )) : (
                                             <span>Chưa nhập chi phí</span>
                                           )}
+                                        </div>
+                                        <div className="mt-2 max-w-56">
+                                          <Label className="mb-1 block text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                                            Tiền đá / phụ kiện
+                                          </Label>
+                                          <div className="relative">
+                                            <Input
+                                              type="text"
+                                              inputMode="numeric"
+                                              placeholder="0"
+                                              value={formatInputNumber(opt.row.stoneCost)}
+                                              onChange={(e) => updateOptionStoneCost(opt.row.id, parseInputNumber(e.target.value))}
+                                              className="h-9 pr-7 text-xs tabular-nums"
+                                            />
+                                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
+                                          </div>
                                         </div>
                                       </div>
                                       <div className="text-right shrink-0">
