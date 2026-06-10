@@ -128,7 +128,6 @@ class QuotesService {
             err.statusCode = 404;
             throw err;
         }
-        quote.status = Quote_1.QuoteStatus.CONFIRMED;
         quote.confirmedPrice = selectedOption ? selectedOption.sellingPrice : (quote.sellingPrice || 0);
         if (selectedOption) {
             quote.materialType = selectedOption.materialType;
@@ -148,7 +147,23 @@ class QuotesService {
                 if (option) {
                     option.isConfirmed = true;
                 }
+                ;
+                quote.markModified('options');
+                const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled);
+                const hasConfirmed = quote.options.some(o => o.isConfirmed);
+                if (allResolved && hasConfirmed) {
+                    quote.status = Quote_1.QuoteStatus.CONFIRMED;
+                }
+                else {
+                    quote.status = Quote_1.QuoteStatus.SENT_TO_CUSTOMER;
+                }
             }
+            else {
+                quote.status = Quote_1.QuoteStatus.CONFIRMED;
+            }
+        }
+        else {
+            quote.status = Quote_1.QuoteStatus.CONFIRMED;
         }
         const saved = await quote.save();
         const result = saved.toObject();
@@ -167,9 +182,14 @@ class QuotesService {
             if (option) {
                 option.isCancelled = true;
             }
+            ;
+            quote.markModified('options');
             const allCancelled = quote.options.every(o => o.isCancelled);
             if (allCancelled) {
                 quote.status = Quote_1.QuoteStatus.CANCELLED;
+            }
+            else {
+                quote.status = Quote_1.QuoteStatus.SENT_TO_CUSTOMER;
             }
         }
         else {

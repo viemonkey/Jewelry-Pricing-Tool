@@ -1003,10 +1003,10 @@ function MultiMaterialPricingRows({
   return (
     <div className="space-y-4">
       {(hasGoldRows || hasPlatinumRows) && (
-        <div className="grid gap-3 md:grid-cols-2">
+        <div className={`grid gap-3 ${hasGoldRows && hasPlatinumRows ? 'md:grid-cols-2' : 'grid-cols-1'}`}>
           {hasGoldRows && (
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
-              <Label className="mb-2 block text-xs font-semibold text-primary uppercase tracking-wide">
+            <div className="rounded-xl border border-primary/10 bg-primary/[0.03] p-3">
+              <Label className="mb-2 block text-center text-xs font-semibold text-primary uppercase tracking-wide">
                 Giá vàng 24K (đ/chỉ)
               </Label>
               <div className="relative">
@@ -1019,16 +1019,17 @@ function MultiMaterialPricingRows({
                     const raw = e.target.value.replace(/\./g, '').replace(/,/g, '')
                     handleSharedPriceChange(raw)
                   }}
-                  className="w-full h-10 rounded-md border border-primary/30 bg-background px-3 pr-6 text-sm font-semibold tabular-nums text-right focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="h-9 w-full appearance-none rounded-none border-0 border-b border-primary/30 bg-transparent px-6 text-center text-sm font-semibold tabular-nums shadow-none outline-none ring-0 ring-offset-0 focus:border-b-primary focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                  style={{ boxShadow: 'none' }}
                 />
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
+                <span className="absolute right-0 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
               </div>
             </div>
           )}
 
           {hasPlatinumRows && (
-            <div className="rounded-xl border border-slate-300 bg-slate-50/70 p-3">
-              <Label className="mb-2 block text-xs font-semibold text-slate-700 uppercase tracking-wide">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-3">
+              <Label className="mb-2 block text-center text-xs font-semibold text-slate-700 uppercase tracking-wide">
                 Giá bạch kim (đ/chỉ)
               </Label>
               <div className="relative">
@@ -1041,9 +1042,10 @@ function MultiMaterialPricingRows({
                     const raw = e.target.value.replace(/\./g, '').replace(/,/g, '')
                     handleSharedPlatinumPriceChange(raw)
                   }}
-                  className="w-full h-10 rounded-md border border-slate-300 bg-background px-3 pr-6 text-sm font-semibold tabular-nums text-right focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  className="h-9 w-full appearance-none rounded-none border-0 border-b border-slate-300 bg-transparent px-6 text-center text-sm font-semibold tabular-nums shadow-none outline-none ring-0 ring-offset-0 focus:border-b-slate-500 focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                  style={{ boxShadow: 'none' }}
                 />
-                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
+                <span className="absolute right-0 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
               </div>
             </div>
           )}
@@ -1233,6 +1235,95 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   const fmt = (v: number | string) => {
     const num = typeof v === 'string' ? parseFloat(v) || 0 : v
     return formatCurrency(num)
+  }
+
+  const getOptionWeightText = (opt: any) => (
+    opt?.weightChi ? `${opt.weightChi} chỉ` : opt?.weightGram ? `${opt.weightGram} g` : '—'
+  )
+
+  const getOptionCostPrice = (opt: any) => {
+    const materialCost = Number(opt?.materialCost) || 0
+    const stoneCost = Number(opt?.stoneCost) || 0
+    return Number(opt?.costPrice) || Number(opt?.costWithVAT) || Number(opt?.costBeforeVAT) || (materialCost + stoneCost)
+  }
+
+  const getOptionSellingPrice = (opt: any) => {
+    const materialCost = Number(opt?.materialCost) || 0
+    const stoneCost = Number(opt?.stoneCost) || 0
+    if (opt?.materialType === 'SILVER') {
+      return materialCost * (pricingConfig?.silverMultiplier ?? 3) + stoneCost
+    }
+    if (opt?.materialType === 'PLATINUM') {
+      return Number(opt?.sellingPrice) || getOptionCostPrice(opt)
+    }
+    return Number(opt?.sellingPrice) || 0
+  }
+
+  const getOptionSummaryMeta = (opt: any, canSeeCost: boolean) => {
+    if (opt?.materialType === 'SILVER') {
+      if (!canSeeCost) return null
+      return { label: 'Giá vốn bạc', value: formatCurrency(Number(opt?.materialCost) || 0) }
+    }
+    return { label: 'Trọng lượng', value: getOptionWeightText(opt) }
+  }
+
+  const getOptionStatusInfo = (quote: Quote, opt: any) => {
+    const isConfirmedOption = opt?.isConfirmed || (quote.status === 'CONFIRMED' && opt?.materialType === quote.materialType)
+    const isCancelledOption = opt?.isCancelled || quote.status === 'CANCELLED'
+
+    if (isConfirmedOption) {
+      return { label: 'Đã chốt', className: 'bg-emerald-600 text-white border-transparent', dot: 'bg-white/80' }
+    }
+    if (isCancelledOption) {
+      return { label: 'Đã hủy', className: 'bg-[#95A5A6]/10 text-[#7F8C8D] border-[#95A5A6]/30', dot: 'bg-[#95A5A6]' }
+    }
+    if (quote.status === 'SENT_TO_CUSTOMER' || quote.status === 'CONFIRMED') {
+      return { label: 'Chờ phản hồi', className: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500' }
+    }
+
+    const fallback = STATUS_CONFIG[quote.status] ?? { label: quote.status, color: 'border-gray-400/60 text-gray-600 bg-gray-50', dot: 'bg-gray-400' }
+    return { label: fallback.label, className: fallback.color, dot: fallback.dot }
+  }
+
+  const getOptionCostRows = (opt: any) => {
+    const materialType = opt?.materialType
+    const materialCost = Number(opt?.materialCost) || 0
+    const stoneCost = Number(opt?.stoneCost) || 0
+    const laborCost = Number(opt?.laborCost) || 0
+    const costBeforeVAT = Number(opt?.costBeforeVAT) || materialCost + stoneCost + laborCost
+    const costPrice = getOptionCostPrice(opt)
+    const sellingPrice = getOptionSellingPrice(opt)
+
+    if (materialType === 'SILVER') {
+      return [
+        { label: 'Giá vốn bạc', value: formatCurrency(materialCost) },
+        { label: 'Tiền đá / phụ kiện', value: formatCurrency(stoneCost) },
+        { label: 'Giá vốn tổng', value: formatCurrency(costPrice), strong: true },
+        { label: 'Giá bán đề xuất', value: formatCurrency(sellingPrice), strong: true, accent: true },
+      ]
+    }
+
+    if (materialType === 'PLATINUM') {
+      return [
+        { label: 'Giá bạch kim', value: opt?.platinumPrice ? `${formatCurrency(opt.platinumPrice)} / chỉ` : '—' },
+        { label: 'Trọng lượng', value: getOptionWeightText(opt) },
+        { label: 'Giá vốn bạch kim', value: formatCurrency(materialCost) },
+        { label: 'Tiền đá / phụ kiện', value: formatCurrency(stoneCost) },
+        { label: 'Giá vốn tổng', value: formatCurrency(costPrice), strong: true },
+        { label: 'Giá bán đề xuất', value: formatCurrency(sellingPrice), strong: true, accent: true },
+      ]
+    }
+
+    return [
+      { label: 'Giá vàng 24K', value: opt?.goldPrice24K ? `${formatCurrency(opt.goldPrice24K)} / chỉ` : '—' },
+      { label: 'Trọng lượng', value: getOptionWeightText(opt) },
+      { label: 'Giá vàng theo tuổi', value: formatCurrency(materialCost) },
+      { label: 'Tiền công chế tác', value: formatCurrency(laborCost) },
+      { label: 'Tiền đá / phụ kiện', value: formatCurrency(stoneCost) },
+      { label: 'Giá vốn chưa VAT', value: formatCurrency(costBeforeVAT) },
+      { label: 'Giá vốn có VAT', value: formatCurrency(costPrice), strong: true },
+      { label: 'Giá bán đề xuất', value: formatCurrency(sellingPrice), strong: true, accent: true },
+    ]
   }
 
   const calculateQuotePrices = (
@@ -1661,12 +1752,12 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
           autoSellingPrice = costBeforeVAT > 0 ? Math.round(costWithVAT / divisor / 1000) * 1000 : 0
         }
 
-        const finalSellingPrice = parseFloat((row as any).sellingPrice || '') || autoSellingPrice
+        const finalSellingPrice = autoSellingPrice
 
         return {
           materialType: row.materialType as any,
-          weightChi: row.materialType === 'PLATINUM' || row.weightUnit !== 'gram' ? (parseFloat(row.weightChi) || 0) : undefined,
-          weightGram: row.materialType !== 'PLATINUM' && row.weightUnit === 'gram' ? (parseFloat(row.weightChi) || 0) : undefined,
+          weightChi: !isSilver && (row.materialType === 'PLATINUM' || row.weightUnit !== 'gram') ? (parseFloat(row.weightChi) || 0) : undefined,
+          weightGram: !isSilver && row.materialType !== 'PLATINUM' && row.weightUnit === 'gram' ? (parseFloat(row.weightChi) || 0) : undefined,
           laborCost: laborCostVal,
           goldPrice24K: isPlatinum ? undefined : (parseFloat(row.goldPrice24K) || 0),
           platinumPrice: isPlatinum ? (parseFloat(row.platinumPrice || '') || 0) : undefined,
@@ -1954,7 +2045,6 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
             <TableBody>
               <AnimatePresence>
                 {paginated.map((q, i) => {
-                  const sc = STATUS_CONFIG[q.status] ?? { label: q.status, color: 'border-gray-400/60 text-gray-600 bg-gray-50', dot: 'bg-gray-400' }
                   // Lấy danh sách phân loại (options), nếu không có options thì tự tạo 1 option từ thông tin chính của quote
                   const options = q.options && q.options.length > 0 ? q.options : [{
                     materialType: q.materialType,
@@ -2002,7 +2092,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           <div className="flex flex-col gap-1 py-2">
                             {options.map((opt, idx) => (
                               <div key={idx} className={`px-4 py-1 flex items-center justify-end min-h-[40px] font-medium text-right tabular-nums ${opt.isCancelled ? 'line-through text-muted-foreground opacity-50' : ''}`}>
-                                {opt.costPrice ? formatCurrency(opt.costPrice) : '—'}
+                                {getOptionCostPrice(opt) ? formatCurrency(getOptionCostPrice(opt)) : '—'}
                               </div>
                             ))}
                           </div>
@@ -2014,7 +2104,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         <div className="flex flex-col gap-1 py-2">
                           {options.map((opt, idx) => (
                             <div key={idx} className={`px-4 py-1 flex items-center justify-end min-h-[40px] font-bold text-primary text-right tabular-nums ${opt.isCancelled ? 'line-through text-muted-foreground opacity-50' : ''}`}>
-                              {opt.sellingPrice ? formatCurrency(opt.sellingPrice) : '—'}
+                              {getOptionSellingPrice(opt) ? formatCurrency(getOptionSellingPrice(opt)) : '—'}
                             </div>
                           ))}
                         </div>
@@ -2026,11 +2116,20 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                       </TableCell>
                       
                       {/* Cột Trạng thái */}
-                      <TableCell className="align-middle px-4 py-3">
-                        <Badge variant="outline" className={`${sc.color} gap-1.5 pl-2`}>
-                          <span className={`inline-block h-1.5 w-1.5 rounded-full ${sc.dot}`} />
-                          {sc.label}
-                        </Badge>
+                      <TableCell className="p-0 align-middle">
+                        <div className="flex flex-col gap-1 py-2">
+                          {options.map((opt, idx) => {
+                            const optionStatus = getOptionStatusInfo(q, opt)
+                            return (
+                              <div key={idx} className="px-4 py-1 flex items-center min-h-[40px]">
+                                <Badge variant="outline" className={`${optionStatus.className} gap-1.5 pl-2 whitespace-nowrap font-semibold`}>
+                                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${optionStatus.dot}`} />
+                                  {optionStatus.label}
+                                </Badge>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </TableCell>
                       
                       {/* Cột Thao tác */}
@@ -2537,116 +2636,78 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           <>
                             <div className="space-y-2">
                               {optionPricings.map((opt, idx) => {
-                                const detailItems = [
-                                  { label: 'Nguyên liệu', value: opt.materialCost },
-                                  { label: 'Đá', value: opt.stoneCostVal },
-                                  !opt.isSilver && !opt.isPlatinum ? { label: 'Công', value: opt.laborCostVal } : null,
-                                  !opt.isSilver && !opt.isPlatinum ? { label: 'Vốn chưa VAT', value: opt.costBeforeVAT } : null,
-                                  { label: opt.isSilver ? 'Giá vốn' : 'Vốn VAT', value: opt.costWithVAT },
-                                ].filter((item): item is { label: string; value: number } => !!item && item.value > 0)
                                 const hasPriceData = opt.sellingPrice > 0 || opt.costWithVAT > 0
-
-                                if (opt.isPlatinum) {
-                                  const platinumItems = [
-                                    { label: 'Nguyên liệu', value: opt.materialCost },
-                                    { label: 'Đá', value: opt.stoneCostVal },
-                                    { label: 'Giá vốn', value: opt.costWithVAT },
-                                  ].filter((item) => item.value > 0)
-
-                                  return (
-                                    <div key={opt.row.id} className="rounded-xl border border-border bg-card px-3.5 py-3">
-                                      <div className="flex items-center justify-between gap-3">
-                                        <div className="min-w-0">
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            <p className="text-sm font-bold text-foreground">Phương án {idx + 1}: {opt.row.label}</p>
-                                            <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold bg-slate-50 text-slate-700 border border-slate-200">
-                                              Giá vốn
-                                            </span>
-                                          </div>
-                                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                                            {platinumItems.length > 0 ? platinumItems.map((item) => (
-                                              <span key={item.label}>
-                                                {item.label}: <strong className="text-foreground tabular-nums">{formatCurrency(item.value)}</strong>
-                                              </span>
-                                            )) : (
-                                              <span>Chưa nhập chi phí</span>
-                                            )}
-                                          </div>
-                                          <div className="mt-2 max-w-56">
-                                            <Label className="mb-1 block text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-                                              Tiền đá / phụ kiện
-                                            </Label>
-                                            <div className="relative">
-                                              <Input
-                                                type="text"
-                                                inputMode="numeric"
-                                                placeholder="0"
-                                                value={formatInputNumber(opt.row.stoneCost)}
-                                                onChange={(e) => updateOptionStoneCost(opt.row.id, parseInputNumber(e.target.value))}
-                                                className="h-9 pr-7 text-xs tabular-nums"
-                                              />
-                                              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
-                                            </div>
-                                          </div>
-                                        </div>
-                                        <div className="text-right shrink-0">
-                                          <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Giá bán</p>
-                                          <p className={`text-lg font-bold tabular-nums ${hasPriceData ? 'text-primary' : 'text-muted-foreground'}`}>
-                                            {hasPriceData ? formatCurrency(opt.sellingPrice) : '—'}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )
-                                }
+                                const badgeText = opt.isSilver
+                                  ? `×${pricingConfig?.silverMultiplier ?? 3}`
+                                  : opt.isPlatinum
+                                    ? 'Giá vốn'
+                                    : opt.marginInfo
+                                      ? `VAT 10% · ${opt.marginInfo.margin}`
+                                      : 'VAT 10%'
+                                const badgeClass = opt.isSilver
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                  : opt.isPlatinum
+                                    ? 'bg-slate-50 text-slate-700 border border-slate-200'
+                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                const detailItems = opt.isSilver
+                                  ? [
+                                      { label: 'Giá vốn bạc', value: opt.materialCost },
+                                      { label: 'Đá', value: opt.stoneCostVal },
+                                      { label: 'Giá vốn tổng', value: opt.costWithVAT },
+                                    ]
+                                  : opt.isPlatinum
+                                    ? [
+                                        { label: 'Giá vốn bạch kim', value: opt.materialCost },
+                                        { label: 'Đá', value: opt.stoneCostVal },
+                                        { label: 'Giá vốn', value: opt.costWithVAT },
+                                      ]
+                                    : [
+                                        { label: 'Nguyên liệu', value: opt.materialCost },
+                                        { label: 'Đá', value: opt.stoneCostVal },
+                                        { label: 'Công', value: opt.laborCostVal },
+                                        { label: 'Vốn chưa VAT', value: opt.costBeforeVAT },
+                                        { label: 'Vốn VAT', value: opt.costWithVAT },
+                                      ]
 
                                 return (
-                                  <div key={opt.row.id} className="rounded-xl border border-border bg-card px-3.5 py-3">
-                                    <div className="flex items-center justify-between gap-3">
+                                  <div key={opt.row.id} className="rounded-xl border border-border bg-card p-3.5">
+                                    <div className="space-y-3">
                                       <div className="min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                          <p className="text-sm font-bold text-foreground">Phương án {idx + 1}: {opt.row.label}</p>
-                                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                                            opt.isSilver
-                                              ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                              : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                          }`}>
-                                            {opt.isSilver
-                                              ? `×${pricingConfig?.silverMultiplier ?? 3}`
-                                              : opt.marginInfo
-                                                ? `VAT 10% · ${opt.marginInfo.margin}`
-                                                : 'VAT 10%'}
+                                        <div className="flex items-center justify-center gap-2 text-center">
+                                          <p className="min-w-0 text-sm font-bold text-foreground">Phương án {idx + 1}: {opt.row.label}</p>
+                                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badgeClass}`}>
+                                            {badgeText}
                                           </span>
                                         </div>
-                                        <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                                          {detailItems.length > 0 ? detailItems.map((item) => (
-                                            <span key={item.label}>
-                                              {item.label}: <strong className="text-foreground tabular-nums">{formatCurrency(item.value)}</strong>
-                                            </span>
-                                          )) : (
-                                            <span>Chưa nhập chi phí</span>
-                                          )}
+                                        <div className="mt-2 grid max-w-md grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[11px]">
+                                          {detailItems.map((item) => (
+                                            <div key={item.label} className="contents">
+                                              <span className="text-muted-foreground">{item.label}</span>
+                                              <span className="text-right font-semibold text-foreground tabular-nums">{formatCurrency(item.value)}</span>
+                                            </div>
+                                          ))}
                                         </div>
-                                        <div className="mt-2 max-w-56">
-                                          <Label className="mb-1 block text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
-                                            Tiền đá / phụ kiện
+                                      </div>
+                                      <div className="grid max-w-md grid-cols-[auto_minmax(0,1fr)] items-end gap-3">
+                                          <Label className="pb-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                                            Tiền đá / phụ kiện:
                                           </Label>
-                                          <div className="relative">
-                                            <Input
+                                          <div className="relative w-[140px] max-w-full">
+                                            <input
                                               type="text"
                                               inputMode="numeric"
                                               placeholder="0"
                                               value={formatInputNumber(opt.row.stoneCost)}
                                               onChange={(e) => updateOptionStoneCost(opt.row.id, parseInputNumber(e.target.value))}
-                                              className="h-9 pr-7 text-xs tabular-nums"
+                                              className="h-8 w-full appearance-none rounded-none border-0 border-b border-border bg-transparent px-0 pr-7 text-xs tabular-nums shadow-none outline-none ring-0 ring-offset-0 focus:border-b-primary focus:outline-none focus:ring-0 focus:ring-offset-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                                              style={{ boxShadow: 'none' }}
                                             />
-                                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
+                                            <span className="absolute right-0 top-1/2 -translate-y-1/2 text-xs text-muted-foreground/70 pointer-events-none font-medium">đ</span>
                                           </div>
-                                        </div>
                                       </div>
-                                      <div className="text-right shrink-0">
-                                        <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">Giá bán</p>
-                                        <p className={`text-lg font-bold tabular-nums ${hasPriceData ? 'text-primary' : 'text-muted-foreground'}`}>
+                                      <div className="border-t border-border/50 pt-2">
+                                        <p className={`text-left text-sm font-bold tabular-nums ${hasPriceData ? 'text-primary' : 'text-muted-foreground'}`}>
+                                          <span className="mr-2 text-[10px] font-semibold uppercase tracking-wider">Giá bán:</span>
                                           {hasPriceData ? formatCurrency(opt.sellingPrice) : '—'}
                                         </p>
                                       </div>
@@ -3348,7 +3409,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         <div className="space-y-4">
                           
                           {selected.options && selected.options.length > 1 ? (
-                            <div className="rounded-2xl border border-[#EDE8DE] bg-[#FFFDF9] p-4.5 shadow-sm space-y-3">
+                            <div className="rounded-2xl border border-[#EDE8DE] bg-[#FFFDF9] p-4 shadow-sm space-y-3">
                               <div className="flex items-center justify-between border-b border-[#EDE8DE]/80 pb-2.5">
                                 <span className="text-[10px] text-[#9E8E7A] font-bold tracking-wider uppercase flex items-center gap-1.5">
                                   <Layers className="h-3.5 w-3.5 text-[#C9981A]" /> Các phương án định giá ({selected.options.length})
@@ -3358,28 +3419,32 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                 </span>
                               </div>
 
-                              <div className="divide-y divide-[#EDE8DE]/60">
+                              <div className="grid gap-2.5">
                                 {selected.options.map((opt, idx) => {
                                   const materialLabel = MATERIAL_LABEL_MAP[opt.materialType] || opt.materialType
-                                  const weightText = opt.weightChi ? `${opt.weightChi} chỉ` : opt.weightGram ? `${opt.weightGram} g` : ''
+                                  const optionMeta = getOptionSummaryMeta(opt, canViewCost)
+                                  const optionSellingPrice = getOptionSellingPrice(opt)
+                                  const optionCostPrice = getOptionCostPrice(opt)
                                   return (
-                                    <div key={idx} className="py-3 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
+                                    <div key={idx} className="rounded-xl border border-[#EDE8DE]/80 bg-white px-3 py-2.5 flex items-center justify-between gap-4 shadow-[0_1px_3px_rgba(60,48,32,0.04)]">
                                       <div className="flex items-center gap-3">
                                         <div className="h-7 w-7 rounded-full bg-[#FBF6E9] border border-[#E6DFD0] flex items-center justify-center text-[10px] font-extrabold text-[#8C6D1F] shrink-0">
                                           {idx + 1}
                                         </div>
                                         <div className="space-y-0.5">
                                           <p className="text-xs font-bold text-[#3A352E]">{materialLabel}</p>
-                                          <p className="text-[10px] text-[#9E8E7A] font-medium">Trọng lượng: {weightText || '—'}</p>
+                                          {optionMeta && (
+                                            <p className="text-[10px] text-[#9E8E7A] font-medium">{optionMeta.label}: {optionMeta.value}</p>
+                                          )}
                                         </div>
                                       </div>
 
                                       <div className="text-right space-y-0.5 shrink-0">
                                         <span className="text-[9px] text-[#9E8E7A] font-bold uppercase tracking-wider block">Giá bán đề xuất</span>
-                                        <p className="text-base font-extrabold text-[#C9981A] font-lora tabular-nums">{formatCurrency(opt.sellingPrice || 0)}</p>
+                                        <p className="text-base font-extrabold text-[#C9981A] font-lora tabular-nums">{formatCurrency(optionSellingPrice)}</p>
                                         {canViewCost && (
                                           <p className="text-[10px] text-[#9E8E7A] font-semibold tabular-nums">
-                                            Vốn: <span className="text-[#6B5E4C]">{formatCurrency(opt.costPrice || 0)}</span>
+                                            Vốn: <span className="text-[#6B5E4C]">{formatCurrency(optionCostPrice)}</span>
                                           </p>
                                         )}
                                       </div>
@@ -3396,35 +3461,53 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                               </div>
                             </div>
                           ) : (
-                            /* Premium Price Card */
-                            <div className="relative overflow-hidden bg-gradient-to-br from-[#D9A723] to-[#A67C15] rounded-[16px] p-5 text-white shadow-md">
-                              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, white 0%, transparent 60%)' }} />
-                              <div className="relative">
-                                {canViewCost ? (
-                                  <div className="flex items-end justify-between">
-                                    <div>
-                                      <p className="text-[9px] font-bold text-white/80 uppercase tracking-wider mb-1">Giá bán đề xuất</p>
-                                      <p className="text-3xl font-extrabold tracking-tight font-lora">{formatCurrency(selected.sellingPrice)}</p>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-[9px] text-white/80 mb-1 uppercase tracking-wider font-bold">Giá vốn (có VAT)</p>
-                                      <p className="text-base font-bold text-white/90">{formatCurrency(selected.costPrice)}</p>
+                            (() => {
+                              const option = selected.options?.[0] || {
+                                materialType: selected.materialType,
+                                weightChi: selected.weightChi,
+                                weightGram: selected.weightGram,
+                                laborCost: selected.laborCost,
+                                goldPrice24K: (selected as any).goldPrice24K,
+                                platinumPrice: (selected as any).platinumPrice,
+                                materialCost: (selected as any).materialCost,
+                                stoneCost: (selected as any).stoneCost,
+                                costBeforeVAT: (selected as any).costBeforeVAT,
+                                costWithVAT: (selected as any).costWithVAT,
+                                costPrice: selected.costPrice,
+                                sellingPrice: selected.sellingPrice,
+                              }
+                              const isGoldOption = option.materialType !== 'SILVER' && option.materialType !== 'PLATINUM'
+                              return (
+                                <div className="relative overflow-hidden bg-gradient-to-br from-[#D9A723] to-[#A67C15] rounded-[16px] p-5 text-white shadow-md">
+                                  <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 80% 50%, white 0%, transparent 60%)' }} />
+                                  <div className="relative">
+                                    {canViewCost ? (
+                                      <div className="flex items-end justify-between">
+                                        <div>
+                                          <p className="text-[9px] font-bold text-white/80 uppercase tracking-wider mb-1">Giá bán đề xuất</p>
+                                          <p className="text-3xl font-extrabold tracking-tight font-lora">{formatCurrency(getOptionSellingPrice(option))}</p>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="text-[9px] text-white/80 mb-1 uppercase tracking-wider font-bold">{isGoldOption ? 'Giá vốn (có VAT)' : 'Giá vốn'}</p>
+                                          <p className="text-base font-bold text-white/90">{formatCurrency(getOptionCostPrice(option))}</p>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div>
+                                        <p className="text-[9px] font-bold text-white/80 uppercase tracking-wider mb-1">Giá bán đề xuất</p>
+                                        <p className="text-4xl font-extrabold tracking-tight font-lora">{formatCurrency(getOptionSellingPrice(option))}</p>
+                                      </div>
+                                    )}
+                                    <div className="mt-3.5 flex items-center justify-between border-t border-white/20 pt-2.5 text-xs text-white/85">
+                                      <span>Mã yêu cầu: <strong className="font-mono">{selected.quoteCode}</strong></span>
+                                      <span className="bg-white/20 px-2 py-0.5 rounded-full font-bold text-[9px]">
+                                        {STATUS_CONFIG[selected.status]?.label}
+                                      </span>
                                     </div>
                                   </div>
-                                ) : (
-                                  <div>
-                                    <p className="text-[9px] font-bold text-white/80 uppercase tracking-wider mb-1">Giá bán đề xuất</p>
-                                    <p className="text-4xl font-extrabold tracking-tight font-lora">{formatCurrency(selected.sellingPrice)}</p>
-                                  </div>
-                                )}
-                                <div className="mt-3.5 flex items-center justify-between border-t border-white/20 pt-2.5 text-xs text-white/85">
-                                  <span>Mã yêu cầu: <strong className="font-mono">{selected.quoteCode}</strong></span>
-                                  <span className="bg-white/20 px-2 py-0.5 rounded-full font-bold text-[9px]">
-                                    {STATUS_CONFIG[selected.status]?.label}
-                                  </span>
                                 </div>
-                              </div>
-                            </div>
+                              )
+                            })()
                           )}
 
                           {/* Chi tiết chi phí cấu thành (chỉ cho NV Order/Admin và khi báo giá đã hoàn thành) */}
@@ -3450,55 +3533,59 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                     })}
                                   </TabsList>
                                   {selected.options.map((opt, idx) => (
-                                    <TabsContent key={idx} value={`opt-${idx}`} className="space-y-3 focus-visible:outline-none">
-                                      <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                                        <div className="space-y-0.5">
-                                          <span className="text-[#9E8E7A] font-medium">Giá vàng 24K:</span>
-                                          <p className="font-bold text-[#3A352E]">
-                                            {opt.goldPrice24K ? `${formatCurrency(opt.goldPrice24K)} / chỉ` : '—'}
-                                          </p>
-                                        </div>
-                                        <div className="space-y-0.5">
-                                          <span className="text-[#9E8E7A] font-medium">Tiền công chế tác:</span>
-                                          <p className="font-bold text-[#3A352E]">{formatCurrency(opt.laborCost || 0)}</p>
-                                        </div>
-                                        <div className="space-y-0.5">
-                                          <span className="text-[#9E8E7A] font-medium">Tiền nguyên liệu:</span>
-                                          <p className="font-bold text-[#3A352E]">{formatCurrency(opt.materialCost || 0)}</p>
-                                        </div>
-                                        <div className="space-y-0.5">
-                                          <span className="text-[#9E8E7A] font-medium">Tiền đá / Phụ kiện:</span>
-                                          <p className="font-bold text-[#3A352E]">{formatCurrency(opt.stoneCost || 0)}</p>
-                                        </div>
-                                        <div className="space-y-0.5 col-span-2 border-t border-[#EDE8DE]/60 pt-2.5 flex justify-between items-center">
-                                          <span className="text-[#8C6D1F] font-bold">Tổng vốn (có VAT):</span>
-                                          <p className="font-extrabold text-sm text-[#8C6D1F]">{formatCurrency(opt.costPrice || 0)}</p>
-                                        </div>
+                                    <TabsContent key={idx} value={`opt-${idx}`} className="space-y-2 focus-visible:outline-none">
+                                      <div className="rounded-xl border border-[#EDE8DE]/70 bg-[#FFFDF9] overflow-hidden">
+                                        {getOptionCostRows(opt).map((row, rowIdx) => (
+                                          <div
+                                            key={row.label}
+                                            className={`flex items-center justify-between gap-3 px-3 py-2 text-xs ${
+                                              rowIdx > 0 ? 'border-t border-[#EDE8DE]/60' : ''
+                                            } ${row.strong ? 'bg-[#FBF6E9]/70' : ''}`}
+                                          >
+                                            <span className={`font-medium ${row.accent ? 'text-[#8C6D1F]' : 'text-[#9E8E7A]'}`}>{row.label}</span>
+                                            <span className={`text-right tabular-nums ${row.strong ? 'font-extrabold' : 'font-bold'} ${row.accent ? 'text-[#C9981A]' : 'text-[#3A352E]'}`}>
+                                              {row.value}
+                                            </span>
+                                          </div>
+                                        ))}
                                       </div>
                                     </TabsContent>
                                   ))}
                                 </Tabs>
                               ) : (
-                                <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-xs">
-                                  <div className="space-y-0.5">
-                                    <span className="text-[#9E8E7A] font-medium">Giá vàng 24K:</span>
-                                    <p className="font-bold text-[#3A352E]">
-                                      {(selected as any).goldPrice24K ? `${formatCurrency((selected as any).goldPrice24K)} / chỉ` : '—'}
-                                    </p>
-                                  </div>
-                                  <div className="space-y-0.5">
-                                    <span className="text-[#9E8E7A] font-medium">Tiền công chế tác:</span>
-                                    <p className="font-bold text-[#3A352E]">{formatCurrency(selected.laborCost || 0)}</p>
-                                  </div>
-                                  <div className="space-y-0.5">
-                                    <span className="text-[#9E8E7A] font-medium">Tiền nguyên liệu:</span>
-                                    <p className="font-bold text-[#3A352E]">{formatCurrency((selected as any).materialCost || 0)}</p>
-                                  </div>
-                                  <div className="space-y-0.5">
-                                    <span className="text-[#9E8E7A] font-medium">Tiền đá / Phụ kiện:</span>
-                                    <p className="font-bold text-[#3A352E]">{formatCurrency((selected as any).stoneCost || 0)}</p>
-                                  </div>
-                                </div>
+                                (() => {
+                                  const option = selected.options?.[0] || {
+                                    materialType: selected.materialType,
+                                    weightChi: selected.weightChi,
+                                    weightGram: selected.weightGram,
+                                    laborCost: selected.laborCost,
+                                    goldPrice24K: (selected as any).goldPrice24K,
+                                    platinumPrice: (selected as any).platinumPrice,
+                                    materialCost: (selected as any).materialCost,
+                                    stoneCost: (selected as any).stoneCost,
+                                    costBeforeVAT: (selected as any).costBeforeVAT,
+                                    costWithVAT: (selected as any).costWithVAT,
+                                    costPrice: selected.costPrice,
+                                    sellingPrice: selected.sellingPrice,
+                                  }
+                                  return (
+                                    <div className="rounded-xl border border-[#EDE8DE]/70 bg-[#FFFDF9] overflow-hidden">
+                                      {getOptionCostRows(option).map((row, rowIdx) => (
+                                        <div
+                                          key={row.label}
+                                          className={`flex items-center justify-between gap-3 px-3 py-2 text-xs ${
+                                            rowIdx > 0 ? 'border-t border-[#EDE8DE]/60' : ''
+                                          } ${row.strong ? 'bg-[#FBF6E9]/70' : ''}`}
+                                        >
+                                          <span className={`font-medium ${row.accent ? 'text-[#8C6D1F]' : 'text-[#9E8E7A]'}`}>{row.label}</span>
+                                          <span className={`text-right tabular-nums ${row.strong ? 'font-extrabold' : 'font-bold'} ${row.accent ? 'text-[#C9981A]' : 'text-[#3A352E]'}`}>
+                                            {row.value}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )
+                                })()
                               )}
 
                               {/* Hiển thị chi tiết danh sách đá nếu có */}
@@ -3581,16 +3668,6 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                               </a>
                             ))}
                           </div>
-                        </div>
-                      )}
-
-                      {/* Tip quy trình của Sale */}
-                      {!isPricer && selected.status === 'QUOTED' && (
-                        <div className="rounded-xl bg-violet-50 border border-violet-100 p-4 space-y-1.5">
-                          <p className="text-xs text-violet-700 font-bold flex items-center gap-1.5 uppercase tracking-wider">💡 Hướng dẫn tiếp theo</p>
-                          <p className="text-[11px] text-violet-800 leading-relaxed">
-                            Liên hệ trao đổi với khách hàng về mức giá bán đề xuất. Khi đã gửi giá và chờ phản hồi, vui lòng nhấn nút <strong>Gửi giá cho khách</strong> bên dưới.
-                          </p>
                         </div>
                       )}
 

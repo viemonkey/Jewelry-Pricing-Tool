@@ -162,7 +162,6 @@ export class QuotesService {
       throw err
     }
 
-    quote.status = QuoteStatus.CONFIRMED
     quote.confirmedPrice = selectedOption ? selectedOption.sellingPrice : (quote.sellingPrice || 0)
 
     if (selectedOption) {
@@ -184,7 +183,20 @@ export class QuotesService {
         if (option) {
           option.isConfirmed = true
         }
+        ;(quote as any).markModified('options')
+
+        const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled)
+        const hasConfirmed = quote.options.some(o => o.isConfirmed)
+        if (allResolved && hasConfirmed) {
+          quote.status = QuoteStatus.CONFIRMED
+        } else {
+          quote.status = QuoteStatus.SENT_TO_CUSTOMER
+        }
+      } else {
+        quote.status = QuoteStatus.CONFIRMED
       }
+    } else {
+      quote.status = QuoteStatus.CONFIRMED
     }
 
     const saved = await quote.save()
@@ -211,9 +223,12 @@ export class QuotesService {
       if (option) {
         option.isCancelled = true
       }
+      ;(quote as any).markModified('options')
       const allCancelled = quote.options.every(o => o.isCancelled)
       if (allCancelled) {
         quote.status = QuoteStatus.CANCELLED
+      } else {
+        quote.status = QuoteStatus.SENT_TO_CUSTOMER
       }
     } else {
       quote.status = QuoteStatus.CANCELLED
