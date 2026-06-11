@@ -1,24 +1,24 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type FormEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Header, type UserRole } from '@/components/header'
 import { cn } from '@/lib/utils'
 import { GoldCalculator } from '@/components/gold-calculator'
-import { SilverCalculator } from '@/components/silver-calculator'
 import { StatsCards } from '@/components/stats-cards'
 import { RecentQuotes } from '@/components/recent-quotes'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatNumber } from '@/lib/pricing'
-import { pricingConfigApi, type GoldRatioConfig } from '@/lib/api'
+import { authApi, pricingConfigApi, type GoldRatioConfig } from '@/lib/api'
+import type { AuthUser } from '@/lib/types'
 import { useSseNotifications } from '@/lib/use-sse-notifications'
 import { useNotifications } from '@/lib/notifications'
-import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, HelpCircle, LogOut, Save, Loader2 } from 'lucide-react'
+import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, Save, Loader2 } from 'lucide-react'
 import { QuoteRequestModal } from '@/components/quote-request-modal'
 import { QuoteListPricer } from '@/components/quote-list-pricer'
 import { SaleDashboard } from '@/components/sale-dashboard'
@@ -51,7 +51,8 @@ const cardVariants = {
 }
 
 export default function Home() {
-  const [currentRole, setCurrentRole] = useState<UserRole>('order')
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const [goldPrice24K, setGoldPrice24K] = useState<string>('9000000')
   const [goldPriceInputDisplay, setGoldPriceInputDisplay] = useState<string>('')
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -62,6 +63,13 @@ export default function Home() {
   const [isUpdatingGoldPrice, setIsUpdatingGoldPrice] = useState(false)
 
   const { addNotification } = useNotifications()
+
+  useEffect(() => {
+    authApi.me()
+      .then((res) => setAuthUser(res.user))
+      .catch(() => setAuthUser(null))
+      .finally(() => setAuthLoading(false))
+  }, [])
 
   useEffect(() => {
     pricingConfigApi.get().then((config) => {
@@ -109,6 +117,8 @@ export default function Home() {
   }
 
   // ── SSE: nhận thông báo real-time từ backend ──
+  const currentRole: UserRole = authUser?.role ?? 'order'
+
   useSseNotifications(currentRole, (event) => {
     // Map type sang notif severity
     const typeMap: Record<string, 'success' | 'info' | 'warning' | 'error'> = {
@@ -124,9 +134,29 @@ export default function Home() {
     })
   })
 
+  const handleLogout = async () => {
+    await authApi.logout().catch(() => {})
+    setAuthUser(null)
+  }
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Đang kiểm tra phiên đăng nhập...
+        </div>
+      </div>
+    )
+  }
+
+  if (!authUser) {
+    return <AuthScreen onAuthenticated={setAuthUser} />
+  }
+
   const canViewSettings = currentRole === 'order'
-  const canViewCalculator = currentRole === 'order'
-  const currentUserName = currentRole === 'sale' ? 'Nguyễn Văn Sale' : 'Báo giá viên'
+  const canViewCalculator = currentRole === 'sale'
+  const currentUserName = authUser.fullName
 
   return (
     <div className="flex min-h-screen bg-background tactile-noise">
@@ -174,16 +204,6 @@ export default function Home() {
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-4 border-t border-sidebar-border space-y-1.5">
-          <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-[13px] font-medium text-sidebar-foreground/75 hover:text-sidebar-foreground hover:bg-sidebar-accent">
-            <HelpCircle className="h-4 w-4" />
-            <span>Hỗ trợ</span>
-          </button>
-          <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-[13px] font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10">
-            <LogOut className="h-4 w-4" />
-            <span>Đăng xuất</span>
-          </button>
-        </div>
       </aside>
 
       {/* Vùng nội dung chính bên phải */}
@@ -191,7 +211,8 @@ export default function Home() {
         {/* Topbar thay thế Header cũ */}
         <Header 
           currentRole={currentRole} 
-          onRoleChange={setCurrentRole} 
+          currentUserName={currentUserName}
+          onLogout={handleLogout}
           search={search}
           onSearchChange={setSearch}
         />
@@ -382,7 +403,7 @@ export default function Home() {
                               </motion.span>
                             </p>
                             <motion.p
-                              className="text-2xl font-serif font-semibold text-primary tracking-wide"
+                              className="text-3xl font-serif font-semibold text-primary tracking-wide"
                               key={goldPrice24K}
                               initial={{ scale: 1.1 }}
                               animate={{ scale: 1 }}
@@ -392,90 +413,17 @@ export default function Home() {
                             </motion.p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Label htmlFor="globalGoldPrice" className="text-xs font-semibold tracking-wider text-muted-foreground shrink-0">
-                            CẬP NHẬT:
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              id="globalGoldPrice"
-                              type="text"
-                              className="w-44 transition-all focus:ring-2 focus:ring-primary/50 text-sm font-medium text-right pr-14"
-                              value={goldPriceInputDisplay}
-                              onChange={(e) => {
-                                const raw = e.target.value.replace(/\D/g, '')
-                                setGoldPriceInputDisplay(raw ? new Intl.NumberFormat('vi-VN').format(Number(raw)) : '')
-                              }}
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground pointer-events-none">
-                              đ/chỉ
-                            </span>
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSaveGoldPrice(goldPriceInputDisplay)}
-                            disabled={isUpdatingGoldPrice}
-                            className="bg-primary hover:bg-primary/95 text-primary-foreground text-xs font-semibold shrink-0"
-                          >
-                            {isUpdatingGoldPrice ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              'Lưu'
-                            )}
-                          </Button>
-                        </div>
                       </CardContent>
                     </Card>
                   </motion.div>
 
-                  {/* Calculator Tabs */}
-                  <Tabs defaultValue="gold" className="space-y-6">
-                    <TabsList>
-                      <TabsTrigger value="gold" className="gap-2 transition-all">
-                        <motion.div
-                          className="h-3 w-3 rounded-full bg-gold"
-                          whileHover={{ scale: 1.3 }}
-                          animate={{
-                            boxShadow: [
-                              '0 0 0 0 rgba(255, 215, 0, 0)',
-                              '0 0 8px 2px rgba(255, 215, 0, 0.4)',
-                              '0 0 0 0 rgba(255, 215, 0, 0)',
-                            ],
-                          }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                        />
-                        Sản phẩm vàng
-                      </TabsTrigger>
-                      <TabsTrigger value="silver" className="gap-2 transition-all">
-                        <motion.div
-                          className="h-3 w-3 rounded-full bg-silver"
-                          whileHover={{ scale: 1.3 }}
-                        />
-                        Sản phẩm bạc
-                      </TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="gold" className="mt-4">
-                      <motion.div
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.4 }}
-                      >
-                        <GoldCalculator currentRole={currentRole} />
-                      </motion.div>
-                    </TabsContent>
-
-                    <TabsContent value="silver" className="mt-4">
-                      <motion.div
-                        className="max-w-xl"
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.4 }}
-                      >
-                        <SilverCalculator currentRole={currentRole} />
-                      </motion.div>
-                    </TabsContent>
-                  </Tabs>
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.4 }}
+                  >
+                    <GoldCalculator currentRole={currentRole} />
+                  </motion.div>
                 </motion.div>
               </TabsContent>
             )}
@@ -733,3 +681,110 @@ export default function Home() {
     </div>
   )
 }
+
+function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: AuthUser) => void }) {
+  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [fullName, setFullName] = useState('')
+  const [username, setUsername] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    setError('')
+    setLoading(true)
+
+    try {
+      if (mode === 'register') {
+        await authApi.register({
+          fullName,
+          username,
+          email: email || undefined,
+          password,
+        })
+      }
+
+      const res = await authApi.login({ usernameOrEmail: username, password })
+      onAuthenticated(res.user)
+    } catch (err: any) {
+      setError(err.message || 'Không thể đăng nhập.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-background tactile-noise flex items-center justify-center p-6">
+      <div className="w-full max-w-md overflow-hidden rounded-xl border bg-card shadow-xl">
+        <div className="border-b bg-primary/5 px-7 py-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md">
+              <span className="font-serif text-sm font-bold">JQ</span>
+            </div>
+            <div>
+              <h1 className="font-serif text-2xl font-bold leading-none">Báo giá Trang sức</h1>
+              <p className="mt-1 text-xs font-medium text-muted-foreground">
+                {mode === 'login' ? 'Đăng nhập để tiếp tục làm việc' : 'Tạo tài khoản Sale mới'}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={submit} className="space-y-4 px-7 py-6">
+          {mode === 'register' && (
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Họ tên</Label>
+              <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Nguyễn Văn Sale" />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="username">Tên đăng nhập hoặc email</Label>
+            <Input id="username" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="sale hoặc order" autoComplete="username" />
+          </div>
+
+          {mode === 'register' && (
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="sale@jewelry.local" />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="password">Mật khẩu</Label>
+            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Nhập mật khẩu" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} />
+          </div>
+
+          {error && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm font-medium text-destructive">
+              {error}
+            </div>
+          )}
+
+          <Button type="submit" className="w-full" disabled={loading}>
+            {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+            {mode === 'login' ? 'Đăng nhập' : 'Đăng ký'}
+          </Button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMode(mode === 'login' ? 'register' : 'login')
+              setError('')
+            }}
+            className="w-full text-center text-sm font-medium text-primary hover:underline"
+          >
+            {mode === 'login' ? 'Chưa có tài khoản? Đăng ký Sale' : 'Đã có tài khoản? Đăng nhập'}
+          </button>
+
+          <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+            Tài khoản seed mặc định: <b>sale / sale123456</b> hoặc <b>order / order123456</b>.
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+

@@ -7,7 +7,7 @@ export type NotificationEventType =
   | 'QUOTE_CANCELLED'
   | 'QUOTE_REJECTED'
 
-export type TargetRole = 'sale' | 'order' | 'admin' | 'all'
+export type TargetRole = 'sale' | 'order' | 'all'
 
 export interface NotificationEvent {
   type: NotificationEventType

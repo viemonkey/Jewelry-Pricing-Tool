@@ -43,10 +43,45 @@ const GoldPrice_1 = require("./models/GoldPrice");
 const MaterialRatio_1 = require("./models/MaterialRatio");
 const StonePrice_1 = require("./models/StonePrice");
 const PricingConfig_1 = require("./models/PricingConfig");
+const User_1 = require("./models/User");
+const password_1 = require("./utils/password");
 async function seed() {
     const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/Jewelry-Pricing-Tool';
     await mongoose_1.default.connect(uri);
     console.log('✅ Connected to MongoDB for seeding:', uri);
+    // 0. Users
+    const defaultUsers = [
+        {
+            username: 'sale',
+            fullName: 'Nguyễn Văn Sale',
+            email: 'sale@jewelry.local',
+            role: 'sale',
+            password: process.env.SEED_SALE_PASSWORD || 'sale123456',
+        },
+        {
+            username: 'order',
+            fullName: 'Báo giá viên',
+            email: 'order@jewelry.local',
+            role: 'order',
+            password: process.env.SEED_ORDER_PASSWORD || 'order123456',
+        },
+    ];
+    for (const item of defaultUsers) {
+        await User_1.User.updateOne({ username: item.username }, {
+            $set: {
+                fullName: item.fullName,
+                username: item.username,
+                email: item.email,
+                role: item.role,
+                status: 'active',
+                passwordHash: await (0, password_1.hashPassword)(item.password),
+                mustChangePassword: false,
+                failedLoginAttempts: 0,
+                lockedUntil: null,
+            },
+        }, { upsert: true });
+        console.log(`  ✅ User ${item.username} seeded/updated`);
+    }
     // 1. Gold Price
     const goldCount = await GoldPrice_1.GoldPrice.countDocuments();
     if (goldCount === 0) {

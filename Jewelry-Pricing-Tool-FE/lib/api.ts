@@ -3,7 +3,7 @@
 // Base URL đọc từ env: NEXT_PUBLIC_API_URL
 // ============================================================
 
-import type { Quote, CreateQuoteRequest, UpdateQuotePrice } from './types'
+import type { Quote, CreateQuoteRequest, UpdateQuotePrice, AuthUser } from './types'
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
 
@@ -13,6 +13,7 @@ async function request<T>(
 ): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: { 'Content-Type': 'application/json', ...options?.headers },
+    credentials: 'include',
     ...options,
   })
   if (!res.ok) {
@@ -20,6 +21,33 @@ async function request<T>(
     throw new Error(err.message || `Request failed: ${res.status}`)
   }
   return res.json()
+}
+
+export const authApi = {
+  me: () => request<{ user: AuthUser }>('/auth/me'),
+
+  login: (data: { usernameOrEmail: string; password: string }) =>
+    request<{ user: AuthUser }>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  register: (data: {
+    fullName: string
+    username: string
+    email?: string
+    phone?: string
+    password: string
+  }) =>
+    request<{ user: AuthUser }>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  logout: () =>
+    request<{ ok: boolean }>('/auth/logout', {
+      method: 'POST',
+    }),
 }
 
 // ─── QUOTES ────────────────────────────────────────────────
@@ -52,6 +80,7 @@ export const quotesApi = {
     const res = await fetch(`${BASE_URL}/quotes`, {
       method: 'POST',
       body: form,
+      credentials: 'include',
     })
     if (!res.ok) throw new Error('Tạo yêu cầu thất bại')
     return res.json()
@@ -111,6 +140,7 @@ export const quotesApi = {
     const res = await fetch(`${BASE_URL}/quotes/${id}/info`, {
       method: 'PATCH',
       body: form,
+      credentials: 'include',
     })
     if (!res.ok) {
       const err = await res.json().catch(() => ({}))
@@ -196,7 +226,7 @@ export const uploadApi = {
   uploadImages: async (files: File[]): Promise<string[]> => {
     const form = new FormData()
     files.forEach((f) => form.append('files', f))
-    const res = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: form })
+    const res = await fetch(`${BASE_URL}/upload`, { method: 'POST', body: form, credentials: 'include' })
     if (!res.ok) throw new Error('Upload thất bại')
     const data = await res.json()
     return data.urls as string[]

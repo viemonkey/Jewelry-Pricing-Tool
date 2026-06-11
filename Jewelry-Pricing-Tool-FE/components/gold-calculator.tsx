@@ -25,7 +25,7 @@ import { StoneCalculator } from './stone-calculator'
 import type { UserRole } from './header'
 import {
   Calculator, Info, Sparkles, Eye, EyeOff,
-  Save, FileDown, CheckCircle2, Loader2,
+  Save, FileDown, CheckCircle2, Loader2, ImagePlus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -33,9 +33,11 @@ interface GoldCalculatorProps {
   currentRole: UserRole
 }
 
+type QuickMaterial = 'gold' | 'silver'
+
 // ── Currency helpers ─────────────────────────────────────────────────────────
 /** Convert formatted display string → raw number */
-const parseRaw = (s: string) => parseFloat(s.replace(/[^\d.]/g, '')) || 0
+const parseRaw = (s: string) => parseFloat(s.replace(/\D/g, '')) || 0
 
 /** Format number with thousand separators for display */
 const fmtDisplay = (n: number | string) => {
@@ -63,16 +65,20 @@ function useCurrencyInput(initial = '') {
   return { display, setDisplay, handleChange, handleBlur, rawValue }
 }
 
+const roundToThousand = (value: number) => Math.round(value / 1000) * 1000
+
 export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
   const [config, setConfig] = useState<PricingConfig | null>(null)
   const [configLoading, setConfigLoading] = useState(true)
 
-  const [productName, setProductName] = useState('')
+  const [productImage, setProductImage] = useState<string>('')
+  const [material, setMaterial] = useState<QuickMaterial>('gold')
   const [karatType, setKaratType] = useState<string>('18K')
   const [weight, setWeight] = useState<string>('')
   const [stoneCost, setStoneCost] = useState<number>(0)
   const [showStoneCalculator, setShowStoneCalculator] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [hasCalculated, setHasCalculated] = useState(false)
 
   // FIX: currency-formatted inputs for gold price and labor cost
   const goldPriceInput = useCurrencyInput()
@@ -92,6 +98,12 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
       .finally(() => setConfigLoading(false))
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (productImage) URL.revokeObjectURL(productImage)
+    }
+  }, [productImage])
+
   const goldRatiosMap = useMemo(() => {
     if (!config) return {}
     return Object.fromEntries(
@@ -99,15 +111,15 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
     )
   }, [config])
 
-  const result: PricingResult | null = useMemo(() => {
-    if (!config) return null
+  const calculatedResult: PricingResult | null = useMemo(() => {
+    if (!config || material !== 'gold') return null
     const weightNum = parseFloat(weight) || 0
     const goldPriceNum = goldPriceInput.rawValue
     const laborNum = laborCostInput.rawValue
 
     if (weightNum > 0 && goldPriceNum > 0) {
       return calculateGoldProductPrice({
-        name: productName,
+        name: '',
         karatType,
         weight: weightNum,
         goldPrice24K: goldPriceNum,
@@ -118,17 +130,22 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
       })
     }
     return null
-  }, [productName, karatType, weight, goldPriceInput.rawValue, laborCostInput.rawValue, stoneCost, config, goldRatiosMap])
+  }, [material, karatType, weight, goldPriceInput.rawValue, laborCostInput.rawValue, stoneCost, config, goldRatiosMap])
+
+  const result: PricingResult | null = hasCalculated ? calculatedResult : null
+  const canCalculate = material === 'gold' && Boolean(calculatedResult)
+  const saleBaseEstimate = result ? roundToThousand(result.suggestedPrice) : 0
+  const saleMaxEstimate = saleBaseEstimate ? saleBaseEstimate + 5000000 : 0
 
   const handleSave = () => {
-    if (!result || !productName.trim()) return
+    if (!result) return
     setIsSaving(true)
     try {
       const history = JSON.parse(localStorage.getItem('pricing_history') || '[]')
       const entry = {
         id: Date.now(),
         date: new Date().toLocaleString('vi-VN'),
-        productName,
+        productName: materialLabel,
         karatType,
         weight,
         goldPrice24K: goldPriceInput.rawValue,
@@ -162,7 +179,8 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
     )
   }
 
-  const currentKaratLabel = goldRatiosMap[karatType]?.label ?? karatType
+  const currentKaratLabel = material === 'gold' ? (goldRatiosMap[karatType]?.label ?? karatType) : 'Bạc'
+  const materialLabel = material === 'gold' ? 'Sản phẩm vàng' : 'Sản phẩm bạc'
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
@@ -176,62 +194,137 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5 text-primary" />
-              Tính giá sản phẩm vàng
+              Tính giá nhanh sản phẩm
             </CardTitle>
-            <CardDescription>Nhập thông tin sản phẩm để tính giá tự động</CardDescription>
+            <CardDescription>Nhập thông tin cơ bản để tính nhanh giá tham khảo cho khách</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
 
-            {/* Tên sản phẩm */}
             <div className="space-y-2">
-              <Label htmlFor="productName">Tên/Mã sản phẩm</Label>
+              <Label htmlFor="productImage">Hình ảnh sản phẩm</Label>
+              <label
+                htmlFor="productImage"
+                className="flex min-h-28 cursor-pointer items-center gap-4 rounded-lg border border-dashed border-primary/25 bg-muted/20 p-3 transition-colors hover:border-primary/50 hover:bg-primary/5"
+              >
+                {productImage ? (
+                  <img
+                    src={productImage}
+                    alt="Hình ảnh sản phẩm"
+                    className="h-20 w-20 rounded-md object-cover shadow-sm"
+                  />
+                ) : (
+                  <div className="flex h-20 w-20 items-center justify-center rounded-md bg-background text-muted-foreground shadow-sm">
+                    <ImagePlus className="h-7 w-7" />
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    {productImage ? 'Đổi hình ảnh' : 'Tải hình ảnh lên'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Dùng để Sale đối chiếu mẫu khi tư vấn nhanh
+                  </p>
+                </div>
+              </label>
               <Input
-                id="productName"
-                placeholder="VD: Nhẫn kim cương 18K"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
+                id="productImage"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  if (productImage) URL.revokeObjectURL(productImage)
+                  setProductImage(URL.createObjectURL(file))
+                }}
               />
             </div>
 
-            {/* Tuổi vàng */}
             <div className="space-y-2">
-              <Label htmlFor="karatType">Tuổi vàng</Label>
-              <Select value={karatType} onValueChange={setKaratType}>
-                <SelectTrigger id="karatType">
+              <Label htmlFor="material">Chất liệu</Label>
+              <Select
+                value={material}
+                onValueChange={(value) => {
+                  setMaterial(value as QuickMaterial)
+                  setHasCalculated(false)
+                }}
+              >
+                <SelectTrigger id="material">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {config.goldRatios.map(({ key, label, applied }) => (
-                    <SelectItem key={key} value={key}>
-                      <div className="flex items-center gap-2">
-                        <span>{label}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {Math.round(applied * 100)}%
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="gold">Vàng</SelectItem>
+                  <SelectItem value="silver">Bạc</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                Tỷ lệ áp dụng đã bao gồm phụ phí hao hụt chế tác
-              </p>
             </div>
 
+            {/* Tuổi vàng */}
+            {material === 'gold' && (
+              <div className="space-y-2">
+                <Label htmlFor="karatType">Tuổi vàng</Label>
+                <Select
+                  value={karatType}
+                  onValueChange={(value) => {
+                    setKaratType(value)
+                    setHasCalculated(false)
+                  }}
+                >
+                  <SelectTrigger id="karatType">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {config.goldRatios.map(({ key, label, applied }) => (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex items-center gap-2">
+                          <span>{label}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {Math.round(applied * 100)}%
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Tỷ lệ áp dụng đã bao gồm phụ phí hao hụt chế tác
+                </p>
+              </div>
+            )}
+
             {/* Trọng lượng */}
-            <div className="space-y-2">
-              <Label htmlFor="weight">Trọng lượng (chỉ)</Label>
-              <Input
-                id="weight"
-                type="number"
-                step="0.1"
-                min="0"
-                placeholder="1"
-                value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">1 chỉ = 3.75g</p>
-            </div>
+            {material === 'gold' ? (
+              <div className="space-y-2">
+                <Label htmlFor="weight">Trọng lượng (chỉ)</Label>
+                <Input
+                  id="weight"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  placeholder="1"
+                  value={weight}
+                  onChange={(e) => {
+                    setWeight(e.target.value)
+                    setHasCalculated(false)
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">1 chỉ = 3.75g</p>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-4 text-sm text-amber-900">
+                Sản phẩm bạc cần Order báo giá theo giá vốn thực tế. Sale chưa có dữ liệu giá vốn bạc để tính nhanh tại màn này.
+              </div>
+            )}
+
+            <Button
+              type="button"
+              className="w-full gap-2 bg-gold-gradient hover:opacity-95 shadow-md"
+              disabled={!canCalculate}
+              onClick={() => setHasCalculated(true)}
+            >
+              <Calculator className="h-4 w-4" />
+              Tính giá
+            </Button>
 
             {/* Giá vàng 24K — FIX: currency formatted input */}
             {canViewCost && (
@@ -345,7 +438,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
               Kết quả tính giá
             </CardTitle>
             <CardDescription>
-              {productName || 'Sản phẩm vàng'} - {currentKaratLabel}
+              {materialLabel} - {currentKaratLabel}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -409,38 +502,61 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                     {/* Spotlight glow effect */}
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(212,175,55,0.15),transparent_70%)] pointer-events-none" />
 
-                    <p className="mb-1 text-[11px] font-bold text-primary uppercase tracking-widest leading-none drop-shadow-xs">GIÁ BÁN ĐỀ XUẤT</p>
-                    <motion.p
-                      className="text-4xl font-serif font-bold text-primary tabular-nums tracking-wide my-2 drop-shadow-[0_2px_12px_rgba(212,175,55,0.25)]"
-                      key={result.suggestedPrice}
-                      initial={{ scale: 1.05, opacity: 0.7 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      {formatCurrency(result.suggestedPrice)}
-                    </motion.p>
-                    <Badge variant="outline" className="mt-1 bg-primary/10 border-primary/20 text-primary">
-                      Biên lợi nhuận: {result.profitMargin}
-                    </Badge>
+                    {canViewCost ? (
+                      <>
+                        <p className="mb-1 text-[11px] font-bold text-primary uppercase tracking-widest leading-none drop-shadow-xs">GIÁ BÁN ĐỀ XUẤT</p>
+                        <motion.p
+                          className="text-4xl font-serif font-bold text-primary tabular-nums tracking-wide my-2 drop-shadow-[0_2px_12px_rgba(212,175,55,0.25)]"
+                          key={result.suggestedPrice}
+                          initial={{ scale: 1.05, opacity: 0.7 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          {formatCurrency(result.suggestedPrice)}
+                        </motion.p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="mb-1 text-[11px] font-bold text-primary uppercase tracking-widest leading-none drop-shadow-xs">
+                          TỪ KHOẢNG
+                        </p>
+                        <motion.p
+                          className="text-2xl font-serif font-bold text-primary tabular-nums tracking-wide my-2 drop-shadow-[0_2px_12px_rgba(212,175,55,0.25)] sm:text-3xl"
+                          key={`${saleBaseEstimate}-${saleMaxEstimate}`}
+                          initial={{ scale: 1.05, opacity: 0.7 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          {saleBaseEstimate ? `${formatCurrency(saleBaseEstimate)} - ${formatCurrency(saleMaxEstimate)}` : '—'}
+                        </motion.p>
+                      </>
+                    )}
+                    {canViewCost && (
+                      <Badge variant="outline" className="mt-1 bg-primary/10 border-primary/20 text-primary">
+                        Biên lợi nhuận: {result.profitMargin}
+                      </Badge>
+                    )}
                   </div>
 
                   {/* Actions */}
-                  <div className="flex gap-2">
-                    <Button
-                      className="flex-1 gap-2 bg-gold-gradient hover:opacity-95 shadow-md active:scale-98 transition-all hover-gold-glow"
-                      onClick={handleSave}
-                      disabled={isSaving || !productName.trim()}
-                    >
-                      {isSaving
-                        ? <><CheckCircle2 className="h-4 w-4" />Đã lưu!</>
-                        : <><Save className="h-4 w-4" />Lưu báo giá</>
-                      }
-                    </Button>
-                    <Button className="flex-1 gap-2" variant="outline">
-                      <FileDown className="h-4 w-4" />
-                      Xuất PDF
-                    </Button>
-                  </div>
+                  {canViewCost && (
+                    <div className="flex gap-2">
+                      <Button
+                        className="flex-1 gap-2 bg-gold-gradient hover:opacity-95 shadow-md active:scale-98 transition-all hover-gold-glow"
+                        onClick={handleSave}
+                        disabled={isSaving}
+                      >
+                        {isSaving
+                          ? <><CheckCircle2 className="h-4 w-4" />Đã lưu!</>
+                          : <><Save className="h-4 w-4" />Lưu báo giá</>
+                        }
+                      </Button>
+                      <Button className="flex-1 gap-2" variant="outline">
+                        <FileDown className="h-4 w-4" />
+                        Xuất PDF
+                      </Button>
+                    </div>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div
@@ -452,7 +568,11 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                 >
                   <div className="text-center">
                     <Calculator className="mx-auto mb-3 h-12 w-12 opacity-20" />
-                    <p className="text-sm">Nhập thông tin sản phẩm để xem kết quả tính giá</p>
+                    <p className="text-sm">
+                      {material === 'silver'
+                        ? 'Sản phẩm bạc cần Order báo giá theo giá vốn thực tế'
+                        : 'Nhập thông tin sản phẩm rồi bấm Tính giá để xem kết quả'}
+                    </p>
                   </div>
                 </motion.div>
               )}

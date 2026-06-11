@@ -10,7 +10,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { User, Settings, LogOut, Bell, ChevronDown, CheckCheck, Trash2, Search } from 'lucide-react'
+import { User, Settings, LogOut, Bell, CheckCheck, Trash2, Search } from 'lucide-react'
 import { useNotifications } from '@/lib/notifications'
 import type { NotifType } from '@/lib/notifications'
 import { Input } from '@/components/ui/input'
@@ -19,7 +19,8 @@ export type UserRole = 'sale' | 'order'
 
 interface HeaderProps {
   currentRole: UserRole
-  onRoleChange: (role: UserRole) => void
+  currentUserName?: string
+  onLogout?: () => void
   search?: string
   onSearchChange?: (val: string) => void
 }
@@ -51,7 +52,7 @@ function timeAgo(date: Date): string {
 
 const bellVariants = { ring: { rotate: [0, 15, -15, 10, -10, 5, -5, 0], transition: { duration: 0.6 } } }
 
-export function Header({ currentRole, onRoleChange, search = '', onSearchChange }: HeaderProps) {
+export function Header({ currentRole, currentUserName = 'Người dùng', onLogout, search = '', onSearchChange }: HeaderProps) {
   const [bellHover, setBellHover] = useState(false)
   const { notifications, unreadCount, markAllRead, clearAll } = useNotifications()
 
@@ -63,43 +64,21 @@ export function Header({ currentRole, onRoleChange, search = '', onSearchChange 
       transition={{ duration: 0.4, ease: 'easeOut' }}
     >
       <div className="px-6 flex items-center justify-between gap-4">
-        {/* Left: Workspace dropdown (acts as Role Switcher) */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <motion.div 
-              whileHover={{ scale: 1.01 }} 
-              whileTap={{ scale: 0.99 }}
-              className="cursor-pointer flex flex-col items-start select-none group shrink-0"
-            >
-              <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none">WORKSPACE</span>
-              <div className="flex items-center gap-1 mt-1 text-slate-800 dark:text-foreground">
-                <span className="text-sm font-semibold group-hover:text-primary transition-colors">
-                  {ROLE_LABELS[currentRole]}
-                </span>
-                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-              </div>
-            </motion.div>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56 mt-1">
-            {(['sale', 'order'] as UserRole[]).map((role) => (
-              <DropdownMenuItem 
-                key={role} 
-                onClick={() => onRoleChange(role)} 
-                className="cursor-pointer flex items-center justify-between"
-              >
-                <div>
-                  <p className="font-semibold text-xs text-foreground">{ROLE_LABELS[role]}</p>
-                  <p className="text-[10px] text-muted-foreground">
-                    {role === 'sale' ? 'Chỉ xem giá bán' : 'Báo giá & Quản trị hệ thống'}
-                  </p>
-                </div>
-                {currentRole === role && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-                )}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Left: Workspace display from authenticated account */}
+        <motion.div 
+          whileHover={{ scale: 1.01 }} 
+          className="flex flex-col items-start select-none shrink-0"
+        >
+          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest leading-none">WORKSPACE</span>
+          <div className="flex items-center gap-2 mt-1 text-slate-800 dark:text-foreground">
+            <span className="text-sm font-semibold">
+              {ROLE_LABELS[currentRole]}
+            </span>
+            <Badge className={cn('h-5 rounded-full px-2 text-[10px]', ROLE_COLORS[currentRole])}>
+              {currentRole === 'sale' ? 'Sale' : 'Order'}
+            </Badge>
+          </div>
+        </motion.div>
 
         {/* Middle: Rounded Pill Search input */}
         <div className="flex-1 max-w-sm md:max-w-md relative hidden sm:block">
@@ -210,13 +189,13 @@ export function Header({ currentRole, onRoleChange, search = '', onSearchChange 
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
               <div className="px-3 py-2">
-                <p className="text-sm font-semibold">Nguyễn Văn Sale</p>
-                <p className="text-xs text-muted-foreground">sale.vietnam@jewelry.vn</p>
+                <p className="text-sm font-semibold">{currentUserName}</p>
+                <p className="text-xs text-muted-foreground">{ROLE_LABELS[currentRole]}</p>
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem><Settings className="mr-2 h-4 w-4" />Cài đặt</DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive"><LogOut className="mr-2 h-4 w-4" />Đăng xuất</DropdownMenuItem>
+              <DropdownMenuItem className="text-destructive" onClick={onLogout}><LogOut className="mr-2 h-4 w-4" />Đăng xuất</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -225,3 +204,4 @@ export function Header({ currentRole, onRoleChange, search = '', onSearchChange 
     </motion.header>
   )
 }
+

@@ -4,7 +4,7 @@ import { notificationsService, TargetRole } from '../services/notifications.serv
 export class NotificationsController {
   stream(req: Request, res: Response, next: NextFunction) {
     const roleQuery = req.query.role as string | undefined
-    const role = (['sale', 'order', 'admin', 'all'].includes(roleQuery || '')
+    const role = (['sale', 'order', 'all'].includes(roleQuery || '')
       ? roleQuery
       : 'all') as TargetRole
 

@@ -17,7 +17,7 @@ interface SilverCalculatorProps {
 }
 
 // ── Currency input hook (same pattern as gold-calculator) ────────────────────
-const parseRaw = (s: string) => parseFloat(s.replace(/[^\d.]/g, '')) || 0
+const parseRaw = (s: string) => parseFloat(s.replace(/\D/g, '')) || 0
 
 function useCurrencyInput() {
   const [display, setDisplay] = useState('')

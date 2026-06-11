@@ -6,11 +6,52 @@ import { GoldPrice } from './models/GoldPrice'
 import { MaterialRatio } from './models/MaterialRatio'
 import { StonePrice } from './models/StonePrice'
 import { PricingConfig } from './models/PricingConfig'
+import { User } from './models/User'
+import { hashPassword } from './utils/password'
 
 async function seed() {
   const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/Jewelry-Pricing-Tool'
   await mongoose.connect(uri)
   console.log('✅ Connected to MongoDB for seeding:', uri)
+
+  // 0. Users
+  const defaultUsers = [
+    {
+      username: 'sale',
+      fullName: 'Nguyễn Văn Sale',
+      email: 'sale@jewelry.local',
+      role: 'sale' as const,
+      password: process.env.SEED_SALE_PASSWORD || 'sale123456',
+    },
+    {
+      username: 'order',
+      fullName: 'Báo giá viên',
+      email: 'order@jewelry.local',
+      role: 'order' as const,
+      password: process.env.SEED_ORDER_PASSWORD || 'order123456',
+    },
+  ]
+
+  for (const item of defaultUsers) {
+    await User.updateOne(
+      { username: item.username },
+      {
+        $set: {
+          fullName: item.fullName,
+          username: item.username,
+          email: item.email,
+          role: item.role,
+          status: 'active',
+          passwordHash: await hashPassword(item.password),
+          mustChangePassword: false,
+          failedLoginAttempts: 0,
+          lockedUntil: null,
+        },
+      },
+      { upsert: true }
+    )
+    console.log(`  ✅ User ${item.username} seeded/updated`)
+  }
 
   // 1. Gold Price
   const goldCount = await GoldPrice.countDocuments()

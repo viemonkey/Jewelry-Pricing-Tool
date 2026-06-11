@@ -5,7 +5,7 @@ const notifications_service_1 = require("../services/notifications.service");
 class NotificationsController {
     stream(req, res, next) {
         const roleQuery = req.query.role;
-        const role = (['sale', 'order', 'admin', 'all'].includes(roleQuery || '')
+        const role = (['sale', 'order', 'all'].includes(roleQuery || '')
             ? roleQuery
             : 'all');
         res.writeHead(200, {

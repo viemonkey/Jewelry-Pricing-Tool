@@ -4,6 +4,18 @@
 
 export type UserRole = 'sale' | 'order'
 
+export interface AuthUser {
+  id: string
+  fullName: string
+  username: string
+  email?: string
+  phone?: string
+  role: UserRole
+  status: string
+  mustChangePassword: boolean
+  lastLoginAt?: string | null
+}
+
 export type QuoteStatus =
   | 'PENDING'           // Chờ báo giá
   | 'NEED_MORE_INFO'    // NV order trả lại — Sale cần bổ sung

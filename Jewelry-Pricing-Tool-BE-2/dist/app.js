@@ -13,6 +13,7 @@ app.use((0, cors_1.default)({
     origin: process.env.FE_URL || 'http://localhost:3001',
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
 }));
 // Body parsers
 app.use(express_1.default.json());
