@@ -6,7 +6,6 @@ import { Header, type UserRole } from '@/components/header'
 import { cn } from '@/lib/utils'
 import { GoldCalculator } from '@/components/gold-calculator'
 import { StatsCards } from '@/components/stats-cards'
-import { RecentQuotes } from '@/components/recent-quotes'
 import { Tabs, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -18,10 +17,11 @@ import { authApi, pricingConfigApi, type GoldRatioConfig } from '@/lib/api'
 import type { AuthUser } from '@/lib/types'
 import { useSseNotifications } from '@/lib/use-sse-notifications'
 import { useNotifications } from '@/lib/notifications'
-import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, Save, Loader2 } from 'lucide-react'
+import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, Save, Loader2, BarChart3 } from 'lucide-react'
 import { QuoteRequestModal } from '@/components/quote-request-modal'
 import { QuoteListPricer } from '@/components/quote-list-pricer'
 import { SaleDashboard } from '@/components/sale-dashboard'
+import { BusinessAnalytics } from '@/components/business-analytics'
 
 const tabContentVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -179,6 +179,7 @@ export default function Home() {
             {[
               { value: 'dashboard', icon: LayoutDashboard, label: 'Bảng điều khiển', show: true },
               { value: 'quotes', icon: ClipboardList, label: 'Danh sách báo giá', show: true },
+              { value: 'analytics', icon: BarChart3, label: 'Phân tích kinh doanh', show: currentRole === 'order' },
               { value: 'calculator', icon: Calculator, label: 'Máy tính giá', show: canViewCalculator },
               { value: 'settings', icon: Settings, label: 'Cấu hình & Cài đặt', show: canViewSettings },
             ].filter(item => item.show).map((item) => {
@@ -316,7 +317,6 @@ export default function Home() {
                       </motion.div>
 
                       <StatsCards />
-                      <RecentQuotes currentRole={currentRole} />
                     </div>
                   )}
                 </motion.div>
@@ -348,6 +348,23 @@ export default function Home() {
                 />
               </motion.div>
             </TabsContent>
+
+
+            {/* Business Analytics Tab */}
+            {currentRole === 'order' && (
+              <TabsContent value="analytics" className="space-y-6 mt-0">
+                <motion.div
+                  key="analytics"
+                  variants={tabContentVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  className="space-y-6"
+                >
+                  <BusinessAnalytics />
+                </motion.div>
+              </TabsContent>
+            )}
 
 
             {/* Calculator Tab */}
@@ -787,4 +804,3 @@ function AuthScreen({ onAuthenticated }: { onAuthenticated: (user: AuthUser) => 
     </div>
   )
 }
-

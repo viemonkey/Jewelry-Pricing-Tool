@@ -178,6 +178,7 @@ export interface QuoteStats {
   total: number
   pending: number
   quoted: number
+  pricedTotal: number
   confirmed: number
   confirmedRevenue: number
 }

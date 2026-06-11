@@ -265,10 +265,17 @@ export class QuotesService {
   }
 
   async getStats() {
-    const [total, pending, quoted, confirmed, revenueResult] = await Promise.all([
+    const [total, pending, quoted, pricedTotal, confirmed, revenueResult] = await Promise.all([
       Quote.countDocuments(),
       Quote.countDocuments({ status: QuoteStatus.PENDING }),
       Quote.countDocuments({ status: QuoteStatus.QUOTED }),
+      Quote.countDocuments({
+        $or: [
+          { quotedBy: { $exists: true, $ne: '' } },
+          { sellingPrice: { $gt: 0 } },
+          { options: { $elemMatch: { sellingPrice: { $gt: 0 } } } },
+        ],
+      }),
       Quote.countDocuments({ status: QuoteStatus.CONFIRMED }),
       Quote.aggregate([
         { $match: { status: QuoteStatus.CONFIRMED } },
@@ -288,7 +295,7 @@ export class QuotesService {
       ]),
     ])
     const confirmedRevenue = revenueResult[0]?.totalRevenue || 0
-    return { total, pending, quoted, confirmed, confirmedRevenue }
+    return { total, pending, quoted, pricedTotal, confirmed, confirmedRevenue }
   }
 }
 
