@@ -88,8 +88,12 @@ function hasPricedData(q: Quote) {
 }
 
 function getQuoteValue(q: Quote) {
+  const confirmedOptionsTotal = q.options
+    ?.filter((opt) => opt.isConfirmed)
+    .reduce((sum, opt) => sum + (Number(opt.sellingPrice) || 0), 0) ?? 0
+  const anyQuote = q as any
   const optionPrice = q.options?.find((opt) => (opt.sellingPrice ?? 0) > 0)?.sellingPrice
-  return q.sellingPrice || optionPrice || 0
+  return confirmedOptionsTotal || Number(anyQuote.confirmedPrice) || q.sellingPrice || optionPrice || 0
 }
 
 const MATERIAL_COLORS = ['#D4AF37', '#B4904C', '#64748B', '#0F766E', '#E11D48', '#7C3AED', '#F59E0B']

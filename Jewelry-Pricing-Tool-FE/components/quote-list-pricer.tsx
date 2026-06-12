@@ -1259,6 +1259,18 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     return Number(opt?.sellingPrice) || 0
   }
 
+  const getConfirmedOptions = (quote: Quote) => (
+    quote.options?.filter((opt) => opt.isConfirmed || (quote.status === 'CONFIRMED' && opt.materialType === quote.materialType)) ?? []
+  )
+
+  const getOptionsSellingTotal = (options: any[]) => (
+    options.reduce((sum, opt) => sum + getOptionSellingPrice(opt), 0)
+  )
+
+  const getOptionsCostTotal = (options: any[]) => (
+    options.reduce((sum, opt) => sum + getOptionCostPrice(opt), 0)
+  )
+
   const getOptionSummaryMeta = (opt: any, canSeeCost: boolean) => {
     if (opt?.materialType === 'SILVER') {
       if (!canSeeCost) return null
@@ -1999,9 +2011,9 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
-          <CardTitle>Danh sách yêu cầu báo giá</CardTitle>
+          <CardTitle>Xử lý báo giá</CardTitle>
           <CardDescription>
-            {isPricer ? 'Xử lý và hoàn thành báo giá cho các yêu cầu từ Sale' : 'Theo dõi trạng thái và xác nhận báo giá'}
+            {isPricer ? 'Tiếp nhận, định giá và theo dõi phản hồi của từng yêu cầu' : 'Tạo yêu cầu, theo dõi báo giá và cập nhật phản hồi khách'}
           </CardDescription>
         </div>
         <div className="flex items-center gap-2">
@@ -2027,24 +2039,9 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
           </TabsList>
         </Tabs>
 
-        <div className="rounded-lg border overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-[#F8F9FA] border-b border-slate-200">
-                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Mã</TableHead>
-                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Sản phẩm</TableHead>
-                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Chất liệu</TableHead>
-                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Người yêu cầu</TableHead>
-                {canViewCost && <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider text-right h-11">Giá vốn</TableHead>}
-                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider text-right h-11">Giá bán</TableHead>
-                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Ngày tạo</TableHead>
-                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider h-11">Trạng thái</TableHead>
-                <TableHead className="font-bold text-slate-800 text-xs uppercase tracking-wider text-right h-11">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <AnimatePresence>
-                {paginated.map((q, i) => {
+        <div className="space-y-4">
+          <AnimatePresence>
+            {paginated.map((q, i) => {
                   // Lấy danh sách phân loại (options), nếu không có options thì tự tạo 1 option từ thông tin chính của quote
                   const options = q.options && q.options.length > 0 ? q.options : [{
                     materialType: q.materialType,
@@ -2061,174 +2058,153 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                     isConfirmed: false,
                     budget: '',
                   }]
+                  const quoteStatus = STATUS_CONFIG[q.status] ?? { label: q.status, color: 'border-gray-400/60 text-gray-600 bg-gray-50', dot: 'bg-gray-400' }
                   
                   return (
-                    <motion.tr key={q._id}
+                    <motion.div key={q._id}
                       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0 }} transition={{ delay: i * 0.05 }}
-                      className="border-b hover:bg-muted/30 transition-colors"
+                      className="overflow-hidden rounded-2xl border border-[#E6DFD0] bg-white shadow-sm transition-shadow hover:shadow-md"
                     >
-                      <TableCell className="font-mono text-xs align-middle py-3">{q.quoteCode}</TableCell>
-                      <TableCell className="font-medium align-middle py-3">{q.productName}</TableCell>
-                      
-                      {/* Cột Chất liệu */}
-                      <TableCell className="p-0 align-middle">
-                        <div className="flex flex-col gap-1 py-2">
-                          {options.map((opt, idx) => (
-                            <div key={idx} className="px-4 py-1 flex items-center min-h-[40px] justify-start">
-                              <Badge variant="outline" className={opt.isCancelled ? 'line-through text-muted-foreground opacity-60 bg-muted/40' : ''}>
-                                {opt.materialType.replace(/_/g, ' ')}
+                      <div className="border-b border-[#EDE8DE] bg-[#FFF9EC] px-4 py-3">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="min-w-0 space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-lg border border-[#D8C48A] bg-white px-2.5 py-1 font-mono text-xs font-bold text-[#6B5E4C]">
+                                {q.quoteCode}
+                              </span>
+                              <Badge variant="outline" className={`${quoteStatus.color} gap-1.5 pl-2 whitespace-nowrap font-semibold`}>
+                                <span className={`inline-block h-1.5 w-1.5 rounded-full ${quoteStatus.dot}`} />
+                                {quoteStatus.label}
                               </Badge>
+                              <span className="text-xs font-semibold text-muted-foreground">{formatDate(q.createdAt)}</span>
                             </div>
-                          ))}
-                        </div>
-                      </TableCell>
-                      
-                      <TableCell className="text-muted-foreground text-sm align-middle py-3 px-4">{q.requestedBy}</TableCell>
-                      
-                      {/* Cột Giá vốn */}
-                      {canViewCost && (
-                        <TableCell className="p-0 align-middle text-right">
-                          <div className="flex flex-col gap-1 py-2">
-                            {options.map((opt, idx) => (
-                              <div key={idx} className={`px-4 py-1 flex items-center justify-end min-h-[40px] font-medium text-right tabular-nums ${opt.isCancelled ? 'line-through text-muted-foreground opacity-50' : ''}`}>
-                                {getOptionCostPrice(opt) ? formatCurrency(getOptionCostPrice(opt)) : '—'}
+                            <div>
+                              <div className="min-w-0">
+                                <h3 className="text-base font-bold leading-6 text-foreground">{q.productName}</h3>
+                                <p className="text-xs text-muted-foreground">Sale: {q.requestedBy} · {options.length} phân loại</p>
                               </div>
-                            ))}
-                          </div>
-                        </TableCell>
-                      )}
-                      
-                      {/* Cột Giá bán */}
-                      <TableCell className="p-0 align-middle text-right">
-                        <div className="flex flex-col gap-1 py-2">
-                          {options.map((opt, idx) => (
-                            <div key={idx} className={`px-4 py-1 flex items-center justify-end min-h-[40px] font-bold text-primary text-right tabular-nums ${opt.isCancelled ? 'line-through text-muted-foreground opacity-50' : ''}`}>
-                              {getOptionSellingPrice(opt) ? formatCurrency(getOptionSellingPrice(opt)) : '—'}
                             </div>
-                          ))}
+                          </div>
                         </div>
-                      </TableCell>
+                      </div>
 
-                      {/* Cột Ngày tạo */}
-                      <TableCell className="text-muted-foreground text-sm align-middle py-3 px-4">
-                        {formatDate(q.createdAt)}
-                      </TableCell>
-                      
-                      {/* Cột Trạng thái */}
-                      <TableCell className="p-0 align-middle">
-                        <div className="flex flex-col gap-1 py-2">
+                      <div className="overflow-x-auto">
+                        <div className={`grid min-w-[760px] items-center border-b border-[#EDE8DE] bg-[#FAFAF8] px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-[#7A6F5F] ${canViewCost ? 'grid-cols-[2.2fr_1.1fr_1.1fr_1.2fr_1.9fr]' : 'grid-cols-[2.2fr_1.1fr_1.2fr_1.9fr]'}`}>
+                          <span>Phân loại</span>
+                          {canViewCost && <span className="text-right">Giá vốn</span>}
+                          <span className="text-right">Giá bán</span>
+                          <span className="text-center">Trạng thái</span>
+                          <span className="text-right">Thao tác</span>
+                        </div>
+                        <div className="divide-y divide-[#EDE8DE]">
                           {options.map((opt, idx) => {
                             const optionStatus = getOptionStatusInfo(q, opt)
+                            const isConfirmedOption = opt.isConfirmed || (q.status === 'CONFIRMED' && opt.materialType === q.materialType)
                             return (
-                              <div key={idx} className="px-4 py-1 flex items-center min-h-[40px]">
-                                <Badge variant="outline" className={`${optionStatus.className} gap-1.5 pl-2 whitespace-nowrap font-semibold`}>
-                                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${optionStatus.dot}`} />
-                                  {optionStatus.label}
-                                </Badge>
+                              <div key={idx} className={`grid min-w-[760px] items-center gap-3 px-4 py-3 ${canViewCost ? 'grid-cols-[2.2fr_1.1fr_1.1fr_1.2fr_1.9fr]' : 'grid-cols-[2.2fr_1.1fr_1.2fr_1.9fr]'}`}>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#E6DFD0] bg-[#FBF6E9] text-xs font-extrabold text-[#8C6D1F]">
+                                      {idx + 1}
+                                    </span>
+                                    <div className="min-w-0">
+                                      <p className={`truncate text-sm font-bold ${opt.isCancelled ? 'line-through text-muted-foreground opacity-60' : 'text-[#3A352E]'}`}>
+                                        {MATERIAL_LABEL_MAP[opt.materialType] || opt.materialType.replace(/_/g, ' ')}
+                                      </p>
+                                      <p className="text-[10px] font-medium text-muted-foreground">{getOptionWeightText(opt)}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                {canViewCost && (
+                                  <p className={`text-right text-sm font-semibold tabular-nums ${opt.isCancelled ? 'line-through text-muted-foreground opacity-50' : 'text-[#3A352E]'}`}>
+                                    {getOptionCostPrice(opt) ? formatCurrency(getOptionCostPrice(opt)) : '—'}
+                                  </p>
+                                )}
+                                <p className={`text-right text-sm font-extrabold tabular-nums ${opt.isCancelled ? 'line-through text-muted-foreground opacity-50' : 'text-[#A97800]'}`}>
+                                  {getOptionSellingPrice(opt) ? formatCurrency(getOptionSellingPrice(opt)) : '—'}
+                                </p>
+                                <div className="flex justify-center">
+                                  <Badge variant="outline" className={`${optionStatus.className} gap-1.5 pl-2 whitespace-nowrap font-semibold`}>
+                                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${optionStatus.dot}`} />
+                                    {optionStatus.label}
+                                  </Badge>
+                                </div>
+                                <div className="flex justify-end gap-1.5">
+                                  {(!isPricer && (q.status === 'SENT_TO_CUSTOMER' || q.status === 'CONFIRMED')) ? (
+                                    isConfirmedOption ? (
+                                      <Badge className="bg-emerald-600 text-white border-transparent h-7 text-xs font-semibold px-2">
+                                        Đã chốt
+                                      </Badge>
+                                    ) : opt.isCancelled ? (
+                                      <Badge variant="outline" className="bg-[#95A5A6]/10 text-[#7F8C8D] border-[#95A5A6]/30 h-7 text-xs font-semibold px-2">
+                                        Đã huỷ
+                                      </Badge>
+                                    ) : (
+                                      <>
+                                        <Button size="sm" className="gap-1 h-7 text-xs px-2" onClick={() => handleConfirm(q._id, opt)}>
+                                          <ShoppingCart className="h-3 w-3" /> Chốt
+                                        </Button>
+                                        <Button size="sm" variant="destructive" className="gap-1 h-7 text-xs px-2" onClick={() => handleCancel(q._id, opt.materialType)}>
+                                          <Ban className="h-3 w-3" /> Huỷ
+                                        </Button>
+                                      </>
+                                    )
+                                  ) : idx === 0 ? (
+                                    <>
+                                      {isPricer && (q.status === 'PENDING' || q.status === 'QUOTING') && (
+                                        <Button size="sm" onClick={() => openDetail(q, 'pricing')} className="gap-1 h-7 text-xs px-2">
+                                          <Calculator className="h-3 w-3" /> Tính giá
+                                        </Button>
+                                      )}
+                                      {!isPricer && q.status === 'PENDING' && (
+                                        <Button size="sm" onClick={() => openDetail(q)} className="gap-1 h-7 text-xs px-2 bg-[#8C6D1F] hover:bg-[#735A19] text-white">
+                                          Sửa
+                                        </Button>
+                                      )}
+                                      {!isPricer && q.status === 'NEED_MORE_INFO' && (
+                                        <Button size="sm" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs px-2 bg-orange-500 hover:bg-orange-600">
+                                          <AlertCircle className="h-3 w-3" /> Bổ sung
+                                        </Button>
+                                      )}
+                                      {!isPricer && q.status === 'QUOTED' && (
+                                        <>
+                                          <Button size="sm" variant="outline" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs px-2">
+                                            <Eye className="h-3 w-3" /> Xem giá
+                                          </Button>
+                                          <Button size="sm" onClick={() => handleSentToCustomer(q._id)} className="gap-1 h-7 text-xs px-2 bg-violet-600 hover:bg-violet-700">
+                                            <Send className="h-3 w-3" /> Gửi
+                                          </Button>
+                                        </>
+                                      )}
+                                      {!isPricer && q.status === 'CANCELLED' && (
+                                        <Badge variant="outline" className="bg-[#95A5A6]/10 text-[#7F8C8D] border-[#95A5A6]/30 h-7 text-xs font-semibold px-2">
+                                          Đã huỷ
+                                        </Badge>
+                                      )}
+                                      {isPricer && (q.status === 'CONFIRMED' || q.status === 'CANCELLED' || q.status === 'QUOTED' || q.status === 'SENT_TO_CUSTOMER') && (
+                                        <Button size="sm" variant="outline" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs px-2">
+                                          <Eye className="h-3 w-3" /> Xem
+                                        </Button>
+                                      )}
+                                    </>
+                                  ) : null}
+                                </div>
                               </div>
                             )
                           })}
                         </div>
-                      </TableCell>
-                      
-                      {/* Cột Thao tác */}
-                      {(!isPricer && (q.status === 'SENT_TO_CUSTOMER' || q.status === 'CONFIRMED')) ? (
-                        <TableCell className="p-0 align-middle text-right">
-                          <div className="flex flex-col gap-1 py-2">
-                            {options.map((opt, idx) => {
-                              const isConfirmedOption = opt.isConfirmed || (q.status === 'CONFIRMED' && opt.materialType === q.materialType);
-                              return (
-                                <div key={idx} className="px-4 py-1 flex items-center justify-end min-h-[40px] gap-1">
-                                  {isConfirmedOption ? (
-                                    <Badge className="bg-emerald-600 text-white border-transparent h-7 text-xs font-semibold px-2">
-                                      Đã chốt
-                                    </Badge>
-                                  ) : opt.isCancelled ? (
-                                    <Badge variant="outline" className="bg-[#95A5A6]/10 text-[#7F8C8D] border-[#95A5A6]/30 h-7 text-xs font-semibold px-2">
-                                      Đã huỷ
-                                    </Badge>
-                                  ) : (
-                                    <>
-                                      <Button size="sm" className="gap-1 h-7 text-xs px-2" onClick={() => handleConfirm(q._id, opt)}>
-                                        <ShoppingCart className="h-3 w-3" /> Khách chốt
-                                      </Button>
-                                      <Button size="sm" variant="destructive" className="gap-1 h-7 text-xs px-2" onClick={() => handleCancel(q._id, opt.materialType)}>
-                                        <Ban className="h-3 w-3" /> Khách huỷ
-                                      </Button>
-                                    </>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </TableCell>
-                      ) : (
-                        <TableCell className="align-middle text-right px-4 py-3">
-                          <div className="flex items-center justify-end gap-1.5">
-                            {/* NV order: PENDING / QUOTING → Tính giá */}
-                            {isPricer && (q.status === 'PENDING' || q.status === 'QUOTING') && (
-                              <Button size="sm" onClick={() => openDetail(q, 'pricing')} className="gap-1 h-7 text-xs">
-                                <Calculator className="h-3 w-3" /> Tính giá
-                              </Button>
-                            )}
-                            
-                            {/* Sale: PENDING → Sửa */}
-                            {!isPricer && q.status === 'PENDING' && (
-                              <Button size="sm" onClick={() => openDetail(q)} className="gap-1 h-7 text-xs bg-[#8C6D1F] hover:bg-[#735A19] text-white">
-                                ✏️ Sửa
-                              </Button>
-                            )}
-                            
-                            {/* Sale: NEED_MORE_INFO → Bổ sung */}
-                            {!isPricer && q.status === 'NEED_MORE_INFO' && (
-                              <Button size="sm" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs bg-orange-500 hover:bg-orange-600">
-                                <AlertCircle className="h-3 w-3" /> Bổ sung
-                              </Button>
-                            )}
-                            
-                            {/* Sale: QUOTED → Xem giá, Gửi khách */}
-                            {!isPricer && q.status === 'QUOTED' && (
-                              <>
-                                <Button size="sm" variant="outline" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs px-2">
-                                  <Eye className="h-3 w-3" /> Xem giá
-                                </Button>
-                                <Button size="sm" onClick={() => handleSentToCustomer(q._id)} className="gap-1 h-7 text-xs bg-violet-600 hover:bg-violet-700 px-2">
-                                  <Send className="h-3 w-3" /> Gửi khách
-                                </Button>
-                              </>
-                            )}
-                            
-                            {/* Sale: CANCELLED → Đã huỷ */}
-                            {!isPricer && q.status === 'CANCELLED' && (
-                              <Badge variant="outline" className="bg-[#95A5A6]/10 text-[#7F8C8D] border-[#95A5A6]/30 h-7 text-xs font-semibold px-2">
-                                Đã huỷ
-                              </Badge>
-                            )}
-                            
-                            {/* Pricer: CONFIRMED/CANCELLED/QUOTED/SENT_TO_CUSTOMER → Xem */}
-                            {isPricer && (q.status === 'CONFIRMED' || q.status === 'CANCELLED' || q.status === 'QUOTED' || q.status === 'SENT_TO_CUSTOMER') && (
-                              <Button size="sm" variant="ghost" onClick={() => openDetail(q, 'view')} className="gap-1 h-7 text-xs">
-                                <Eye className="h-3 w-3" /> Xem
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      )}
-                    </motion.tr>
+                      </div>
+                    </motion.div>
                    )
                  })}
-               </AnimatePresence>
-               {filtered.length === 0 && (
-                 <TableRow>
-                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                     Không có yêu cầu nào
-                   </TableCell>
-                 </TableRow>
-               )}
-             </TableBody>
-           </Table>
-         </div>
+              </AnimatePresence>
+              {filtered.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-[#E6DFD0] bg-white py-10 text-center text-sm text-muted-foreground">
+                  Không có yêu cầu nào
+                </div>
+              )}
+        </div>
 
         {/* Phân trang (Pagination) */}
         {totalPages > 1 && (
@@ -3408,7 +3384,12 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                       {selected.status !== 'PENDING' && selected.status !== 'QUOTING' && selected.sellingPrice > 0 ? (
                         <div className="space-y-4">
                           
-                          {selected.options && selected.options.length > 1 ? (
+                          {selected.options && selected.options.length > 1 ? (() => {
+                            const confirmedOptions = getConfirmedOptions(selected)
+                            const totalOptions = confirmedOptions.length > 0 ? confirmedOptions : selected.options ?? []
+                            const confirmedSellingTotal = getOptionsSellingTotal(totalOptions)
+                            const confirmedCostTotal = getOptionsCostTotal(totalOptions)
+                            return (
                             <div className="rounded-2xl border border-[#EDE8DE] bg-[#FFFDF9] p-4 shadow-sm space-y-3">
                               <div className="flex items-center justify-between border-b border-[#EDE8DE]/80 pb-2.5">
                                 <span className="text-[10px] text-[#9E8E7A] font-bold tracking-wider uppercase flex items-center gap-1.5">
@@ -3425,6 +3406,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                   const optionMeta = getOptionSummaryMeta(opt, canViewCost)
                                   const optionSellingPrice = getOptionSellingPrice(opt)
                                   const optionCostPrice = getOptionCostPrice(opt)
+                                  const statusInfo = getOptionStatusInfo(selected, opt)
                                   return (
                                     <div key={idx} className="rounded-xl border border-[#EDE8DE]/80 bg-white px-3 py-2.5 flex items-center justify-between gap-4 shadow-[0_1px_3px_rgba(60,48,32,0.04)]">
                                       <div className="flex items-center gap-3">
@@ -3432,7 +3414,13 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                           {idx + 1}
                                         </div>
                                         <div className="space-y-0.5">
-                                          <p className="text-xs font-bold text-[#3A352E]">{materialLabel}</p>
+                                          <div className="flex flex-wrap items-center gap-1.5">
+                                            <p className="text-xs font-bold text-[#3A352E]">{materialLabel}</p>
+                                            <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[9px] font-bold ${statusInfo.className}`}>
+                                              <span className={`h-1.5 w-1.5 rounded-full ${statusInfo.dot}`} />
+                                              {statusInfo.label}
+                                            </span>
+                                          </div>
                                           {optionMeta && (
                                             <p className="text-[10px] text-[#9E8E7A] font-medium">{optionMeta.label}: {optionMeta.value}</p>
                                           )}
@@ -3453,6 +3441,24 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                 })}
                               </div>
 
+                              <div className="rounded-xl border border-[#C9981A]/25 bg-[#FBF6E9] px-3.5 py-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <p className="text-xs font-bold uppercase tracking-wider text-[#8C6D1F]">
+                                      {confirmedOptions.length > 0 ? `Tổng đã chốt (${confirmedOptions.length} phân loại)` : 'Tổng các phương án'}
+                                    </p>
+                                    {canViewCost && (
+                                      <p className="mt-1 text-xs font-semibold text-[#6B5E4C]">
+                                        Tổng vốn: {formatCurrency(confirmedCostTotal)}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <p className="text-right text-xl font-extrabold text-[#A97800] font-lora tabular-nums">
+                                    {formatCurrency(confirmedSellingTotal)}
+                                  </p>
+                                </div>
+                              </div>
+
                               <div className="border-t border-[#EDE8DE]/80 pt-2.5 flex items-center justify-between text-[10px] text-[#9E8E7A]">
                                 <span>Mã yêu cầu: <strong className="font-mono text-[#6B5E4C]">{selected.quoteCode}</strong></span>
                                 <span>
@@ -3460,7 +3466,8 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                 </span>
                               </div>
                             </div>
-                          ) : (
+                            )
+                          })() : (
                             (() => {
                               const option = selected.options?.[0] || {
                                 materialType: selected.materialType,
@@ -3518,14 +3525,14 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                               </p>
                               {selected.options && selected.options.length > 1 ? (
                                 <Tabs defaultValue="opt-0" className="w-full">
-                                  <TabsList className="grid w-full mb-3 bg-[#FBF6E9] p-1 h-9 rounded-lg" style={{ gridTemplateColumns: `repeat(${selected.options.length}, minmax(0, 1fr))` }}>
+                                  <TabsList className="mb-3 flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-lg bg-[#FBF6E9] p-1">
                                     {selected.options.map((opt, idx) => {
                                       const label = MATERIAL_LABEL_MAP[opt.materialType] || opt.materialType
                                       return (
                                         <TabsTrigger
                                           key={idx}
                                           value={`opt-${idx}`}
-                                          className="text-xs py-1 px-2.5 rounded-md data-[state=active]:bg-white data-[state=active]:text-[#8C6D1F] data-[state=active]:shadow-sm font-semibold transition-all text-[#6B5E4C]"
+                                          className="shrink-0 whitespace-nowrap text-xs py-1 px-2.5 rounded-md data-[state=active]:bg-white data-[state=active]:text-[#8C6D1F] data-[state=active]:shadow-sm font-semibold transition-all text-[#6B5E4C]"
                                         >
                                           {label}
                                         </TabsTrigger>

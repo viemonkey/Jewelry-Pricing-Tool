@@ -66,10 +66,13 @@ function formatMaterialType(type: string) {
 
 function getQuoteValue(q: Quote) {
   const anyQuote = q as any
+  const confirmedOptionsTotal = q.options
+    ?.filter((opt) => opt.isConfirmed)
+    .reduce((sum, opt) => sum + (Number(opt.sellingPrice) || 0), 0) ?? 0
   const confirmedPrice = Number(anyQuote.confirmedPrice) || 0
   const optionPrice = q.options?.find((opt) => opt.isConfirmed && (opt.sellingPrice ?? 0) > 0)?.sellingPrice
   const fallbackOption = q.options?.find((opt) => (opt.sellingPrice ?? 0) > 0)?.sellingPrice
-  return confirmedPrice || q.sellingPrice || optionPrice || fallbackOption || 0
+  return confirmedOptionsTotal || confirmedPrice || q.sellingPrice || optionPrice || fallbackOption || 0
 }
 
 function getQuoteQuantity(q: Quote) {
@@ -143,6 +146,59 @@ export function BusinessAnalytics() {
       if (q.status === 'CANCELLED') salesMap[name].cancelled += 1
     })
 
+    const detailRows = resolved
+      .filter((q) => q.status === 'CONFIRMED' || q.status === 'CANCELLED')
+      .flatMap((q) => {
+        const isConfirmed = q.status === 'CONFIRMED'
+        const optionRows = isConfirmed
+          ? (q.options?.filter((opt) => opt.isConfirmed) ?? [])
+          : (q.options?.filter((opt) => opt.isCancelled) ?? [])
+        const rows = optionRows.length
+          ? optionRows
+          : [{ materialType: q.materialType, sellingPrice: getQuoteValue(q) }]
+
+        return rows.map((item: any, index) => ({
+          id: `${q._id}-${q.status}-${item.materialType ?? index}`,
+          quoteCode: q.quoteCode,
+          requestedBy: q.requestedBy,
+          materialType: item.materialType ?? q.materialType,
+          value: (Number(item.sellingPrice) || getQuoteValue(q)) * getQuoteQuantity(q),
+          status: q.status,
+          date: q.updatedAt,
+          optionIndex: index + 1,
+          optionCount: rows.length,
+        }))
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 12)
+
+    const detailGroups = Object.values(
+      detailRows.reduce((groups: Record<string, {
+        quoteCode: string
+        requestedBy: string
+        date: string
+        totalValue: number
+        successCount: number
+        cancelCount: number
+        rows: typeof detailRows
+      }>, row) => {
+        groups[row.quoteCode] = groups[row.quoteCode] || {
+          quoteCode: row.quoteCode,
+          requestedBy: row.requestedBy,
+          date: row.date,
+          totalValue: 0,
+          successCount: 0,
+          cancelCount: 0,
+          rows: [],
+        }
+        groups[row.quoteCode].totalValue += row.value
+        groups[row.quoteCode].successCount += row.status === 'CONFIRMED' ? 1 : 0
+        groups[row.quoteCode].cancelCount += row.status === 'CANCELLED' ? 1 : 0
+        groups[row.quoteCode].rows.push(row)
+        return groups
+      }, {})
+    ).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
     return {
       requests,
       confirmed,
@@ -157,10 +213,8 @@ export function BusinessAnalytics() {
         { name: 'Hủy', value: cancelled.length, color: '#E11D48' },
       ],
       topSales: Object.values(salesMap).sort((a, b) => b.requests - a.requests).slice(0, 5),
-      detailRows: resolved
-        .filter((q) => q.status === 'CONFIRMED' || q.status === 'CANCELLED')
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        .slice(0, 12),
+      detailRows,
+      detailGroups,
     }
   }, [quotes, selectedMonth, selectedYear])
 
@@ -211,13 +265,13 @@ export function BusinessAnalytics() {
         <div>
           <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-[#D4AF37]/25 bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[#9B7630] shadow-sm">
             <Gem className="h-3.5 w-3.5" />
-            Monthly business analytics
+            Monthly report
           </div>
           <h1 className="font-serif text-2xl font-semibold tracking-wide text-foreground sm:text-3xl">
-            Phân tích kinh doanh
+            Báo cáo kinh doanh
           </h1>
           <p className="mt-1 text-sm font-medium text-muted-foreground">
-            Báo cáo hiệu suất theo tháng: chất liệu khách chốt, đơn hủy, đơn thành công và top Sale.
+            Tổng hợp kết quả theo tháng: doanh thu, tỷ lệ chốt, chất liệu và hiệu suất Sale.
           </p>
         </div>
 
@@ -398,16 +452,64 @@ export function BusinessAnalytics() {
               <CalendarDays className="h-4 w-4 text-primary" />
               Chi tiết báo cáo tháng
             </CardTitle>
-            <CardDescription>Các báo giá đã chốt hoặc hủy trong tháng được chọn</CardDescription>
+            <CardDescription>Nhóm theo từng mã báo giá, hiển thị các phân loại đã chốt hoặc hủy</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
               <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Đang tải dữ liệu...</div>
-            ) : analytics.detailRows.length === 0 ? (
+            ) : analytics.detailGroups.length === 0 ? (
               <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">Chưa có dữ liệu chi tiết.</div>
             ) : (
+              <>
+              <div className="max-h-[420px] overflow-auto">
+                {analytics.detailGroups.map((group) => (
+                  <div key={group.quoteCode} className="border-b border-[#E6DFD0] last:border-b-0">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 bg-[#FFF9EC] px-4 py-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-[#6B5E4C]">{group.quoteCode}</span>
+                          <span className="text-xs text-muted-foreground">{formatDate(group.date)}</span>
+                          <span className="text-xs text-muted-foreground">Sale: {group.requestedBy}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="mr-2 text-[10px] font-bold uppercase tracking-wider text-[#9E8E7A]">Tổng</span>
+                        <span className="font-serif text-base font-extrabold text-[#A97800] tabular-nums">{formatCurrency(group.totalValue)}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      {group.rows.map((row) => (
+                        <div key={row.id} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 border-t border-[#F0E8DA] px-4 py-2.5">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-bold text-foreground">{formatMaterialType(row.materialType)}</p>
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  'rounded-full text-[10px] font-bold',
+                                  row.status === 'CONFIRMED'
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : 'border-rose-200 bg-rose-50 text-rose-700',
+                                )}
+                              >
+                                {row.status === 'CONFIRMED' ? 'Thành công' : 'Hủy'}
+                              </Badge>
+                            </div>
+                            <p className="mt-0.5 text-[10px] font-medium text-muted-foreground">Phân loại #{row.optionIndex}</p>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{formatDate(row.date)}</span>
+                          <p className="text-right text-sm font-extrabold text-foreground tabular-nums">{formatCurrency(row.value)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {false && (
+              <div className="max-h-[360px] overflow-auto">
               <Table>
-                <TableHeader>
+                <TableHeader className="sticky top-0 z-10">
                   <TableRow className="bg-[#F8F9FA]">
                     <TableHead className="text-xs font-bold uppercase tracking-wider">Mã</TableHead>
                     <TableHead className="text-xs font-bold uppercase tracking-wider">Sale</TableHead>
@@ -418,30 +520,38 @@ export function BusinessAnalytics() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {analytics.detailRows.map((quote) => (
-                    <TableRow key={quote._id}>
-                      <TableCell className="font-mono text-xs font-semibold">{quote.quoteCode}</TableCell>
-                      <TableCell className="text-sm">{quote.requestedBy}</TableCell>
-                      <TableCell className="text-sm">{formatMaterialType(quote.materialType)}</TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(getQuoteValue(quote) * getQuoteQuantity(quote))}</TableCell>
+                  {analytics.detailRows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="font-mono text-xs font-semibold">
+                        {row.quoteCode}
+                        {row.optionCount > 1 && (
+                          <span className="ml-1 font-sans text-[10px] text-muted-foreground">#{row.optionIndex}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">{row.requestedBy}</TableCell>
+                      <TableCell className="text-sm">{formatMaterialType(row.materialType)}</TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(row.value)}</TableCell>
                       <TableCell>
                         <Badge
                           variant="outline"
                           className={cn(
                             'rounded-full text-[10px] font-bold',
-                            quote.status === 'CONFIRMED'
+                            row.status === 'CONFIRMED'
                               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                               : 'border-rose-200 bg-rose-50 text-rose-700',
                           )}
                         >
-                          {quote.status === 'CONFIRMED' ? 'Thành công' : 'Hủy'}
+                          {row.status === 'CONFIRMED' ? 'Thành công' : 'Hủy'}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{formatDate(quote.updatedAt)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{formatDate(row.date)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+              </div>
+              )}
+              </>
             )}
           </CardContent>
         </Card>

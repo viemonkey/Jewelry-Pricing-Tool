@@ -162,8 +162,6 @@ export class QuotesService {
       throw err
     }
 
-    quote.confirmedPrice = selectedOption ? selectedOption.sellingPrice : (quote.sellingPrice || 0)
-
     if (selectedOption) {
       quote.materialType = selectedOption.materialType
       quote.weightChi = selectedOption.weightChi
@@ -185,6 +183,11 @@ export class QuotesService {
         }
         ;(quote as any).markModified('options')
 
+        const confirmedOptionsTotal = quote.options
+          .filter(o => o.isConfirmed)
+          .reduce((sum, o) => sum + (Number(o.sellingPrice) || 0), 0)
+        quote.confirmedPrice = confirmedOptionsTotal || selectedOption.sellingPrice || quote.sellingPrice || 0
+
         const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled)
         const hasConfirmed = quote.options.some(o => o.isConfirmed)
         if (allResolved && hasConfirmed) {
@@ -193,9 +196,11 @@ export class QuotesService {
           quote.status = QuoteStatus.SENT_TO_CUSTOMER
         }
       } else {
+        quote.confirmedPrice = selectedOption.sellingPrice || quote.sellingPrice || 0
         quote.status = QuoteStatus.CONFIRMED
       }
     } else {
+      quote.confirmedPrice = quote.sellingPrice || 0
       quote.status = QuoteStatus.CONFIRMED
     }
 
@@ -265,7 +270,7 @@ export class QuotesService {
   }
 
   async getStats() {
-    const [total, pending, quoted, pricedTotal, confirmed, revenueResult] = await Promise.all([
+    const [total, pending, quoted, pricedTotal, confirmed, confirmedQuotes] = await Promise.all([
       Quote.countDocuments(),
       Quote.countDocuments({ status: QuoteStatus.PENDING }),
       Quote.countDocuments({ status: QuoteStatus.QUOTED }),
@@ -277,24 +282,18 @@ export class QuotesService {
         ],
       }),
       Quote.countDocuments({ status: QuoteStatus.CONFIRMED }),
-      Quote.aggregate([
-        { $match: { status: QuoteStatus.CONFIRMED } },
-        {
-          $group: {
-            _id: null,
-            totalRevenue: {
-              $sum: {
-                $multiply: [
-                  { $ifNull: ['$confirmedPrice', '$sellingPrice'] },
-                  '$quantity',
-                ],
-              },
-            },
-          },
-        },
-      ]),
+      Quote.find({ status: QuoteStatus.CONFIRMED }).lean(),
     ])
-    const confirmedRevenue = revenueResult[0]?.totalRevenue || 0
+    const confirmedRevenue = confirmedQuotes.reduce((sum: number, quote: any) => {
+      const quantity = Number(quote.quantity) || 1
+      const confirmedOptionsTotal = Array.isArray(quote.options)
+        ? quote.options
+            .filter((option: any) => option?.isConfirmed)
+            .reduce((optionSum: number, option: any) => optionSum + (Number(option?.sellingPrice) || 0), 0)
+        : 0
+      const quoteRevenue = confirmedOptionsTotal || Number(quote.confirmedPrice) || Number(quote.sellingPrice) || 0
+      return sum + quoteRevenue * quantity
+    }, 0)
     return { total, pending, quoted, pricedTotal, confirmed, confirmedRevenue }
   }
 }

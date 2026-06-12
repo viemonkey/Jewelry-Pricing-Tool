@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mockup v2 - Báo cáo kinh doanh</title>
+  <style>
+    :root {
+      --bg: #f6f4ef;
+      --panel: #ffffff;
+      --soft: #fbf8f1;
+      --line: #e6ded1;
+      --text: #201a13;
+      --muted: #766b5f;
+      --faint: #a99d8f;
+      --gold: #a87300;
+      --gold-soft: #f5ead0;
+      --green: #07845c;
+      --green-soft: #e7f8f1;
+      --red: #c93b3b;
+      --red-soft: #fff0f0;
+      --blue: #50657f;
+      --teal: #0b7f73;
+      --purple: #7046cf;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, Arial, sans-serif;
+    }
+
+    .page {
+      max-width: 1260px;
+      margin: 0 auto;
+      padding: 30px;
+    }
+
+    .header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 20px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+
+    .label {
+      color: var(--gold);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      margin-top: 8px;
+      font-family: Georgia, serif;
+      font-size: 32px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .desc {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .select {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      padding: 10px 14px;
+      color: var(--text);
+      font-size: 14px;
+      font-weight: 750;
+      box-shadow: 0 8px 22px rgba(42, 31, 18, .05);
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: 1.35fr repeat(3, minmax(0, .75fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--panel);
+      box-shadow: 0 12px 30px rgba(42, 31, 18, .06);
+    }
+
+    .metric {
+      min-height: 122px;
+      padding: 18px;
+    }
+
+    .metric.primary {
+      background: linear-gradient(135deg, #fff, #fff8ea);
+    }
+
+    .metric-title {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      margin-top: 10px;
+      font-family: Georgia, serif;
+      font-size: 28px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .metric.primary .metric-value {
+      color: var(--gold);
+      font-size: 36px;
+    }
+
+    .metric-note {
+      margin-top: 10px;
+      color: var(--faint);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(360px, .8fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--line);
+      padding: 17px 18px 14px;
+    }
+
+    .panel-title {
+      font-family: Georgia, serif;
+      font-size: 20px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .panel-sub {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .tag {
+      height: fit-content;
+      border-radius: 999px;
+      border: 1px solid #ead9ad;
+      background: #fff9e8;
+      padding: 6px 10px;
+      color: var(--gold);
+      font-size: 11px;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .material-list {
+      padding: 14px 18px 18px;
+    }
+
+    .material-row {
+      display: grid;
+      grid-template-columns: 112px minmax(0, 1fr) 72px;
+      gap: 14px;
+      align-items: center;
+      padding: 11px 0;
+      border-bottom: 1px solid #f0e9df;
+    }
+
+    .material-row:last-child { border-bottom: 0; }
+
+    .material-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .swatch {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--gold);
+    }
+
+    .track {
+      height: 10px;
+      border-radius: 999px;
+      background: #eee7db;
+      overflow: hidden;
+    }
+
+    .fill {
+      height: 100%;
+      border-radius: 999px;
+      background: var(--gold);
+    }
+
+    .material-count {
+      text-align: right;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .material-count span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .side-stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .conversion-body {
+      padding: 18px;
+    }
+
+    .conversion-top {
+      display: grid;
+      grid-template-columns: 142px 1fr;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .donut {
+      width: 142px;
+      height: 142px;
+      border-radius: 50%;
+      background: conic-gradient(var(--green) 0 75%, #ece8df 75% 100%);
+      display: grid;
+      place-items: center;
+    }
+
+    .donut-inner {
+      width: 98px;
+      height: 98px;
+      border-radius: 50%;
+      background: #fff;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      box-shadow: inset 0 0 0 1px #efe7db;
+    }
+
+    .donut-inner strong {
+      display: block;
+      font-family: Georgia, serif;
+      font-size: 29px;
+      line-height: 1;
+    }
+
+    .donut-inner span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 850;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .status-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .status-box {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .status-box.success { background: var(--green-soft); border-color: #c6ecdc; }
+    .status-box.cancel { background: var(--red-soft); border-color: #f0cccc; }
+
+    .status-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 850;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .status-value {
+      margin-top: 6px;
+      font-family: Georgia, serif;
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    .sales-list {
+      padding: 8px 18px 16px;
+    }
+
+    .sale-row {
+      display: grid;
+      grid-template-columns: 34px minmax(0,1fr) auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0e9df;
+    }
+
+    .sale-row:last-child { border-bottom: 0; }
+
+    .rank {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      background: var(--gold-soft);
+      color: var(--gold);
+      font-family: Georgia, serif;
+      font-weight: 800;
+    }
+
+    .sale-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .sale-meta {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .sale-total {
+      text-align: right;
+      font-size: 13px;
+      font-weight: 850;
+    }
+
+    .ledger {
+      margin-top: 16px;
+      overflow: hidden;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      background: var(--soft);
+      color: var(--muted);
+      padding: 12px 18px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 850;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--line);
+    }
+
+    td {
+      padding: 14px 18px;
+      border-bottom: 1px solid #f0e9df;
+      vertical-align: middle;
+      font-size: 13px;
+    }
+
+    tr:last-child td { border-bottom: 0; }
+
+    .code {
+      display: inline-flex;
+      border: 1px solid #e7d4a5;
+      border-radius: 999px;
+      padding: 5px 9px;
+      color: #7a5a00;
+      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .small {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .badge {
+      display: inline-flex;
+      border-radius: 999px;
+      padding: 5px 9px;
+      background: var(--green-soft);
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 850;
+    }
+
+    .money {
+      color: var(--gold);
+      font-family: Georgia, serif;
+      font-size: 17px;
+      font-weight: 850;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .right { text-align: right; }
+
+    @media (max-width: 980px) {
+      .page { padding: 18px; }
+      .header,
+      .summary,
+      .main-grid,
+      .conversion-top {
+        grid-template-columns: 1fr;
+      }
+      .material-row {
+        grid-template-columns: 96px minmax(0, 1fr) 54px;
+      }
+      .right, .money { text-align: left; }
+      table, thead, tbody, th, td, tr { display: block; }
+      thead { display: none; }
+      tr { border-bottom: 1px solid var(--line); }
+      td { border-bottom: 0; padding: 8px 18px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="header">
+      <div>
+        <div class="label">Báo cáo tháng</div>
+        <h1>Báo cáo kinh doanh</h1>
+        <p class="desc">Gọn hơn dashboard, tập trung vào kết quả đã chốt và hiệu suất trong tháng được chọn.</p>
+      </div>
+      <div class="select">Tháng 6 / 2026</div>
+    </header>
+
+    <section class="summary">
+      <article class="card metric primary">
+        <p class="metric-title">Doanh thu đã chốt</p>
+        <p class="metric-value">115.964.000 đ</p>
+        <p class="metric-note">Tổng giá bán của các phân loại khách đã chốt</p>
+      </article>
+      <article class="card metric">
+        <p class="metric-title">Phân loại chốt</p>
+        <p class="metric-value">9</p>
+        <p class="metric-note">Tính theo từng phương án</p>
+      </article>
+      <article class="card metric">
+        <p class="metric-title">Phân loại hủy</p>
+        <p class="metric-value">3</p>
+        <p class="metric-note">Khách từ chối hoặc hủy</p>
+      </article>
+      <article class="card metric">
+        <p class="metric-title">Tỷ lệ chốt</p>
+        <p class="metric-value">75%</p>
+        <p class="metric-note">Chốt / chốt + hủy</p>
+      </article>
+    </section>
+
+    <section class="main-grid">
+      <article class="card">
+        <div class="panel-head">
+          <div>
+            <h2 class="panel-title">Chất liệu khách đã chốt</h2>
+            <p class="panel-sub">Xếp hạng theo số phân loại đã chốt, không dùng biểu đồ cột để tránh trống và rối.</p>
+          </div>
+          <span class="tag">7 chất liệu</span>
+        </div>
+
+        <div class="material-list">
+          <div class="material-row">
+            <div class="material-name"><span class="swatch"></span>Vàng 24K</div>
+            <div class="track"><div class="fill" style="width:100%"></div></div>
+            <div class="material-count">2 <span>chốt</span></div>
+          </div>
+          <div class="material-row">
+            <div class="material-name"><span class="swatch" style="background:#bd9850"></span>Bạch kim</div>
+            <div class="track"><div class="fill" style="width:100%;background:#bd9850"></div></div>
+            <div class="material-count">2 <span>chốt</span></div>
+          </div>
+          <div class="material-row">
+            <div class="material-name"><span class="swatch" style="background:var(--blue)"></span>Vàng 14K</div>
+            <div class="track"><div class="fill" style="width:50%;background:var(--blue)"></div></div>
+            <div class="material-count">1 <span>chốt</span></div>
+          </div>
+          <div class="material-row">
+            <div class="material-name"><span class="swatch" style="background:var(--teal)"></span>Vàng 10K</div>
+            <div class="track"><div class="fill" style="width:50%;background:var(--teal)"></div></div>
+            <div class="material-count">1 <span>chốt</span></div>
+          </div>
+          <div class="material-row">
+            <div class="material-name"><span class="swatch" style="background:var(--purple)"></span>Vàng 18K</div>
+            <div class="track"><div class="fill" style="width:50%;background:var(--purple)"></div></div>
+            <div class="material-count">1 <span>chốt</span></div>
+          </div>
+          <div class="material-row">
+            <div class="material-name"><span class="swatch" style="background:#d23b61"></span>Vàng 610</div>
+            <div class="track"><div class="fill" style="width:50%;background:#d23b61"></div></div>
+            <div class="material-count">1 <span>chốt</span></div>
+          </div>
+          <div class="material-row">
+            <div class="material-name"><span class="swatch" style="background:#ed9a10"></span>Bạc 925</div>
+            <div class="track"><div class="fill" style="width:50%;background:#ed9a10"></div></div>
+            <div class="material-count">1 <span>chốt</span></div>
+          </div>
+        </div>
+      </article>
+
+      <aside class="side-stack">
+        <article class="card">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Kết quả báo giá</h2>
+              <p class="panel-sub">Tỷ lệ chốt trong tháng.</p>
+            </div>
+          </div>
+          <div class="conversion-body">
+            <div class="conversion-top">
+              <div class="donut">
+                <div class="donut-inner">
+                  <div>
+                    <strong>75%</strong>
+                    <span>tỷ lệ chốt</span>
+                  </div>
+                </div>
+              </div>
+              <div class="status-grid">
+                <div class="status-box success">
+                  <p class="status-label">Thành công</p>
+                  <p class="status-value">9</p>
+                </div>
+                <div class="status-box cancel">
+                  <p class="status-label">Đã hủy</p>
+                  <p class="status-value">3</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Top Sale</h2>
+              <p class="panel-sub">Theo số yêu cầu trong tháng.</p>
+            </div>
+          </div>
+          <div class="sales-list">
+            <div class="sale-row">
+              <span class="rank">1</span>
+              <div>
+                <p class="sale-name">Nguyễn Văn Sale</p>
+                <p class="sale-meta">9 chốt, 3 hủy</p>
+              </div>
+              <p class="sale-total">12 yêu cầu</p>
+            </div>
+            <div class="sale-row">
+              <span class="rank">2</span>
+              <div>
+                <p class="sale-name">Sale Demo</p>
+                <p class="sale-meta">2 chốt, 1 hủy</p>
+              </div>
+              <p class="sale-total">3 yêu cầu</p>
+            </div>
+          </div>
+        </article>
+      </aside>
+    </section>
+
+    <section class="card ledger">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Chi tiết báo cáo tháng</h2>
+          <p class="panel-sub">Hiển thị theo từng mã báo giá để không kéo dài quá nhiều khi một báo giá có nhiều phân loại.</p>
+        </div>
+        <span class="tag">12 báo giá gần nhất</span>
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Báo giá</th>
+            <th>Sale</th>
+            <th>Ngày</th>
+            <th>Trạng thái</th>
+            <th class="right">Giá trị</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>
+              <span class="code">QT-2026-0002</span>
+              <p class="small">ádasdasdas, 7 phân loại đã chốt</p>
+            </td>
+            <td><strong>Nguyễn Văn Sale</strong></td>
+            <td>12/6/2026</td>
+            <td><span class="badge">Thành công</span></td>
+            <td class="money">90.464.000 đ</td>
+          </tr>
+          <tr>
+            <td>
+              <span class="code">QT-2026-0001</span>
+              <p class="small">Nhẫn hành tinh, 2 chốt, 2 hủy</p>
+            </td>
+            <td><strong>Nguyễn Văn Sale</strong></td>
+            <td>12/6/2026</td>
+            <td><span class="badge">Thành công</span></td>
+            <td class="money">25.500.000 đ</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

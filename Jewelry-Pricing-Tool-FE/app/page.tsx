@@ -177,11 +177,11 @@ export default function Home() {
           {/* Navigation Items */}
           <nav className="p-4 space-y-1.5 flex-1">
             {[
-              { value: 'dashboard', icon: LayoutDashboard, label: 'Bảng điều khiển', show: true },
-              { value: 'quotes', icon: ClipboardList, label: 'Danh sách báo giá', show: true },
-              { value: 'analytics', icon: BarChart3, label: 'Phân tích kinh doanh', show: currentRole === 'order' },
+              { value: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', show: true },
+              { value: 'quotes', icon: ClipboardList, label: 'Xử lý báo giá', show: true },
+              { value: 'analytics', icon: BarChart3, label: 'Báo cáo', show: currentRole === 'order' },
               { value: 'calculator', icon: Calculator, label: 'Máy tính giá', show: canViewCalculator },
-              { value: 'settings', icon: Settings, label: 'Cấu hình & Cài đặt', show: canViewSettings },
+              { value: 'settings', icon: Settings, label: 'Cấu hình giá', show: canViewSettings },
             ].filter(item => item.show).map((item) => {
               const isActive = activeTab === item.value
               const Icon = item.icon
@@ -244,77 +244,12 @@ export default function Home() {
                     <div className="space-y-6">
                       <div>
                         <h1 className="text-2xl sm:text-3xl font-serif font-semibold bg-gradient-to-r from-primary via-amber-600 to-primary bg-clip-text text-transparent tracking-wide">
-                          Bảng điều khiển quản trị
+                          Tổng quan vận hành
                         </h1>
                         <p className="text-xs text-muted-foreground sm:text-sm font-medium mt-1">
-                          Giám sát thống kê kinh doanh và quy trình báo giá của tiệm
+                          Theo dõi nhanh tình trạng báo giá, doanh thu và các việc cần ưu tiên
                         </p>
                       </div>
-
-                      {/* Gold Price Quick Update Widget for Manager */}
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.4, delay: 0.05 }}
-                      >
-                        <Card className="border-primary/20 bg-gradient-to-r from-amber-500/10 via-primary/5 to-transparent relative overflow-hidden shadow-sm hover:shadow-md transition-all">
-                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_-20%,rgba(212,175,55,0.1),transparent_60%)] pointer-events-none" />
-                          <CardContent className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-                            <div className="flex items-center gap-4">
-                              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-lg text-primary-foreground">
-                                <TrendingUp className="h-6 w-6" />
-                              </div>
-                              <div>
-                                <h3 className="font-serif text-lg font-semibold text-foreground tracking-wide flex items-center gap-2">
-                                  Giá vàng 24K nguyên liệu hôm nay
-                                  <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary text-[10px] uppercase font-mono tracking-widest px-2 py-0">
-                                    Hệ thống
-                                  </Badge>
-                                </h3>
-                                <p className="text-xs text-muted-foreground mt-0.5">
-                                  Dùng để tự động tính toán giá vốn nguyên liệu vàng cho tất cả các bản báo giá.
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
-                              <div className="relative">
-                                <Input
-                                  type="text"
-                                  className="w-48 font-medium text-sm transition-all focus:ring-2 focus:ring-primary/50 text-right pr-14"
-                                  value={goldPriceInputDisplay}
-                                  onChange={(e) => {
-                                    const raw = e.target.value.replace(/\D/g, '')
-                                    setGoldPriceInputDisplay(raw ? new Intl.NumberFormat('vi-VN').format(Number(raw)) : '')
-                                  }}
-                                  placeholder="9,000,000"
-                                />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground pointer-events-none">
-                                  đ/chỉ
-                                </span>
-                              </div>
-                              
-                              <Button
-                                onClick={() => handleSaveGoldPrice(goldPriceInputDisplay)}
-                                disabled={isUpdatingGoldPrice}
-                                className="bg-gold-gradient hover:opacity-95 text-primary-foreground font-semibold text-xs px-4 shadow active:scale-98 transition-all shrink-0"
-                              >
-                                {isUpdatingGoldPrice ? (
-                                  <>
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                                    Đang lưu...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Save className="h-3.5 w-3.5 mr-1.5" />
-                                    Cập nhật giá
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
 
                       <StatsCards />
                     </div>
@@ -458,10 +393,10 @@ export default function Home() {
                 >
                   <div>
                     <h1 className="text-2xl sm:text-3xl font-serif font-semibold bg-gradient-to-r from-primary via-amber-600 to-primary bg-clip-text text-transparent tracking-wide">
-                      Cấu hình & Cài đặt hệ thống
+                      Cấu hình giá
                     </h1>
                     <p className="text-xs text-muted-foreground sm:text-sm font-medium mt-1">
-                      Thiết lập bảng tỷ lệ tuổi vàng, phân chia biên lợi nhuận và quy tắc bán lẻ
+                      Thiết lập giá vàng, tỷ lệ tuổi vàng, biên lợi nhuận và quy tắc bán lẻ
                     </p>
                   </div>
 

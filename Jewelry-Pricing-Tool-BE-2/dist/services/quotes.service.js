@@ -128,7 +128,6 @@ class QuotesService {
             err.statusCode = 404;
             throw err;
         }
-        quote.confirmedPrice = selectedOption ? selectedOption.sellingPrice : (quote.sellingPrice || 0);
         if (selectedOption) {
             quote.materialType = selectedOption.materialType;
             quote.weightChi = selectedOption.weightChi;
@@ -149,6 +148,10 @@ class QuotesService {
                 }
                 ;
                 quote.markModified('options');
+                const confirmedOptionsTotal = quote.options
+                    .filter(o => o.isConfirmed)
+                    .reduce((sum, o) => sum + (Number(o.sellingPrice) || 0), 0);
+                quote.confirmedPrice = confirmedOptionsTotal || selectedOption.sellingPrice || quote.sellingPrice || 0;
                 const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled);
                 const hasConfirmed = quote.options.some(o => o.isConfirmed);
                 if (allResolved && hasConfirmed) {
@@ -159,10 +162,12 @@ class QuotesService {
                 }
             }
             else {
+                quote.confirmedPrice = selectedOption.sellingPrice || quote.sellingPrice || 0;
                 quote.status = Quote_1.QuoteStatus.CONFIRMED;
             }
         }
         else {
+            quote.confirmedPrice = quote.sellingPrice || 0;
             quote.status = Quote_1.QuoteStatus.CONFIRMED;
         }
         const saved = await quote.save();
@@ -217,7 +222,7 @@ class QuotesService {
         return quote;
     }
     async getStats() {
-        const [total, pending, quoted, pricedTotal, confirmed, revenueResult] = await Promise.all([
+        const [total, pending, quoted, pricedTotal, confirmed, confirmedQuotes] = await Promise.all([
             Quote_1.Quote.countDocuments(),
             Quote_1.Quote.countDocuments({ status: Quote_1.QuoteStatus.PENDING }),
             Quote_1.Quote.countDocuments({ status: Quote_1.QuoteStatus.QUOTED }),
@@ -229,24 +234,18 @@ class QuotesService {
                 ],
             }),
             Quote_1.Quote.countDocuments({ status: Quote_1.QuoteStatus.CONFIRMED }),
-            Quote_1.Quote.aggregate([
-                { $match: { status: Quote_1.QuoteStatus.CONFIRMED } },
-                {
-                    $group: {
-                        _id: null,
-                        totalRevenue: {
-                            $sum: {
-                                $multiply: [
-                                    { $ifNull: ['$confirmedPrice', '$sellingPrice'] },
-                                    '$quantity',
-                                ],
-                            },
-                        },
-                    },
-                },
-            ]),
+            Quote_1.Quote.find({ status: Quote_1.QuoteStatus.CONFIRMED }).lean(),
         ]);
-        const confirmedRevenue = revenueResult[0]?.totalRevenue || 0;
+        const confirmedRevenue = confirmedQuotes.reduce((sum, quote) => {
+            const quantity = Number(quote.quantity) || 1;
+            const confirmedOptionsTotal = Array.isArray(quote.options)
+                ? quote.options
+                    .filter((option) => option?.isConfirmed)
+                    .reduce((optionSum, option) => optionSum + (Number(option?.sellingPrice) || 0), 0)
+                : 0;
+            const quoteRevenue = confirmedOptionsTotal || Number(quote.confirmedPrice) || Number(quote.sellingPrice) || 0;
+            return sum + quoteRevenue * quantity;
+        }, 0);
         return { total, pending, quoted, pricedTotal, confirmed, confirmedRevenue };
     }
 }
