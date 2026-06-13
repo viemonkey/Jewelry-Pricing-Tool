@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -30,6 +30,7 @@ import type { PricingConfig } from '@/lib/api'
 import { formatCurrency, calculateGoldProductPrice, calculateSilverProductPrice, getProfitDivisor } from '@/lib/pricing'
 import { useNotifications } from '@/lib/notifications'
 import type { Quote, QuoteStatus, UserRole } from '@/lib/types'
+import { useSseNotifications } from '@/lib/use-sse-notifications'
 
 // ── Multi-material types & helpers ─────────────────────────────────────────
 
@@ -1502,6 +1503,10 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   }
 
   useEffect(() => { fetchQuotes() }, [filterStatus])
+
+  useSseNotifications(currentRole, () => {
+    fetchQuotes()
+  })
 
   const openDetail = (q: Quote, mode?: 'review' | 'pricing' | 'view') => {
     setSelected(q)

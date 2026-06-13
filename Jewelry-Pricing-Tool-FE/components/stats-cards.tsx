@@ -119,31 +119,78 @@ const itemVariants = {
 }
 
 export function StatsCards() {
-  const [stats, setStats] = useState<QuoteStats | null>(null)
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      statsApi.get().catch(() => null),
-      quotesApi.list().catch(() => []),
-    ])
-      .then(([s, q]) => {
-        setStats(s)
+    quotesApi.list()
+      .then((q) => {
         setQuotes(q)
       })
+      .catch(() => {})
       .finally(() => {
         setLoading(false)
         setMounted(true)
       })
   }, [])
 
-  const conversionRate = useMemo(() => {
-    const completed = quotes.filter((q) => q.status === 'CONFIRMED' || q.status === 'CANCELLED').length
-    if (!completed) return 0
-    return Math.round((quotes.filter((q) => q.status === 'CONFIRMED').length / completed) * 100)
+  const computedStats = useMemo(() => {
+    const total = quotes.length
+    const pending = quotes.filter((q) => q.status === 'PENDING').length
+    const needMoreInfo = quotes.filter((q) => q.status === 'NEED_MORE_INFO').length
+    const quoting = quotes.filter((q) => q.status === 'QUOTING').length
+    const quoted = quotes.filter((q) => q.status === 'QUOTED' || q.status === 'SENT_TO_CUSTOMER').length
+    const pricedTotal = quotes.filter(hasPricedData).length
+
+    const confirmedCount = quotes.flatMap((q) => {
+      if (q.options && q.options.length > 0) {
+        return q.options.filter((opt) => opt.isConfirmed)
+      } else if (q.status === 'CONFIRMED') {
+        return [q]
+      }
+      return []
+    }).length
+
+    const cancelledCount = quotes.flatMap((q) => {
+      if (q.options && q.options.length > 0) {
+        return q.options.filter((opt) => opt.isCancelled)
+      } else if (q.status === 'CANCELLED') {
+        return [q]
+      }
+      return []
+    }).length
+
+    const confirmedRevenue = quotes.reduce((sum, q) => {
+      const quantity = Number((q as any).quantity) || 1
+      if (q.options && q.options.length > 0) {
+        const confirmedOptionsTotal = q.options
+          .filter((opt) => opt.isConfirmed)
+          .reduce((s, opt) => s + (Number(opt.sellingPrice) || 0), 0)
+        return sum + confirmedOptionsTotal * quantity
+      } else if (q.status === 'CONFIRMED') {
+        return sum + getQuoteValue(q) * quantity
+      }
+      return sum
+    }, 0)
+
+    const resolvedCount = confirmedCount + cancelledCount
+    const conversionRate = resolvedCount > 0 ? Math.round((confirmedCount / resolvedCount) * 100) : 0
+
+    return {
+      total,
+      pending,
+      needMoreInfo,
+      quoting,
+      quoted,
+      pricedTotal,
+      confirmed: confirmedCount,
+      confirmedRevenue,
+      conversionRate,
+    }
   }, [quotes])
+
+  const conversionRate = computedStats.conversionRate
 
   const avgQuoteValue = useMemo(() => {
     const pricedQuotes = quotes.filter(hasPricedData)
@@ -217,6 +264,13 @@ export function StatsCards() {
       .slice(0, 5)
   }, [quotes])
 
+  // Tính toán các insight không trùng lặp
+
+  const trendingMaterial = useMemo(() => {
+    if (!materialChartData.length) return null
+    return [...materialChartData].sort((a, b) => b.value - a.value)[0]
+  }, [materialChartData])
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -239,42 +293,10 @@ export function StatsCards() {
     )
   }
 
-  if (!stats) {
-    return (
-      <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
-        Không thể tải thống kê. Vui lòng kiểm tra kết nối backend.
-      </div>
-    )
-  }
-
-  const insightItems = [
-    {
-      icon: AlertTriangle,
-      title: `${stats.pending} yêu cầu chờ xử lý`,
-      description: stats.pending > 0 ? 'Ưu tiên báo giá các yêu cầu mới để giảm thời gian chờ.' : 'Pipeline hiện không có yêu cầu mới tồn đọng.',
-      tone: 'text-amber-700',
-      bg: 'bg-amber-500/10',
-    },
-    {
-      icon: Calculator,
-      title: `${stats.pricedTotal} lượt đã tính giá`,
-      description: avgQuoteValue > 0 ? `Giá trị báo giá trung bình khoảng ${formatCurrency(avgQuoteValue)}.` : 'Chưa đủ dữ liệu để tính giá trị trung bình.',
-      tone: 'text-sky-700',
-      bg: 'bg-sky-500/10',
-    },
-    {
-      icon: CheckCircle2,
-      title: `${conversionRate}% tỉ lệ chốt`,
-      description: stats.quoted > 0 ? 'Có báo giá đang chờ Sale gửi khách, nên theo dõi sát phần này.' : 'Không có báo giá nào đang bị treo ở bước gửi khách.',
-      tone: 'text-emerald-700',
-      bg: 'bg-emerald-500/10',
-    },
-  ]
-
   const statsItems = [
     {
       title: 'Tổng yêu cầu',
-      value: stats.total,
+      value: computedStats.total,
       icon: FileText,
       tone: 'text-amber-700',
       badge: 'bg-amber-500/10',
@@ -283,7 +305,7 @@ export function StatsCards() {
     },
     {
       title: 'Chờ xử lý',
-      value: stats.pending,
+      value: computedStats.pending,
       icon: Clock,
       tone: 'text-orange-600',
       badge: 'bg-orange-500/10',
@@ -292,7 +314,7 @@ export function StatsCards() {
     },
     {
       title: 'Đang chờ gửi khách',
-      value: stats.quoted,
+      value: computedStats.quoted,
       icon: CheckCircle2,
       tone: 'text-emerald-600',
       badge: 'bg-emerald-500/10',
@@ -301,7 +323,7 @@ export function StatsCards() {
     },
     {
       title: 'Lượt admin báo giá',
-      value: stats.pricedTotal,
+      value: computedStats.pricedTotal,
       icon: Calculator,
       tone: 'text-sky-700',
       badge: 'bg-sky-500/10',
@@ -310,7 +332,7 @@ export function StatsCards() {
     },
     {
       title: 'Đã đặt hàng',
-      value: stats.confirmed,
+      value: computedStats.confirmed,
       icon: ShoppingCart,
       tone: 'text-teal-700',
       badge: 'bg-teal-500/10',
@@ -319,7 +341,7 @@ export function StatsCards() {
     },
     {
       title: 'Doanh thu',
-      value: stats.confirmedRevenue,
+      value: computedStats.confirmedRevenue,
       icon: TrendingUp,
       tone: 'text-[#B4904C]',
       badge: 'bg-[#D4AF37]/10',
@@ -335,7 +357,7 @@ export function StatsCards() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="grid grid-cols-1 gap-5 xl:grid-cols-[1.15fr_0.85fr]"
+        className="w-full"
       >
         <motion.div variants={itemVariants}>
           <Card className="relative overflow-hidden border-[#D4AF37]/25 bg-[linear-gradient(135deg,rgba(255,255,255,0.96),rgba(251,246,233,0.82))] shadow-sm">
@@ -364,35 +386,6 @@ export function StatsCards() {
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div variants={itemVariants}>
-          <Card className="relative h-full overflow-hidden border-sky-200/60 bg-white shadow-sm">
-            <Brain className="pointer-events-none absolute -right-2 -top-3 h-24 w-24 text-sky-500 opacity-[0.07]" />
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Brain className="h-4 w-4 text-sky-700" />
-                AI Insights
-              </CardTitle>
-              <CardDescription>Gợi ý nhanh từ dữ liệu hiện tại</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-1">
-              {insightItems.map((item) => {
-                const Icon = item.icon
-                return (
-                  <div key={item.title} className="flex gap-3 rounded-xl border border-border/60 bg-muted/20 p-3">
-                    <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', item.bg, item.tone)}>
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                      <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{item.description}</p>
-                    </div>
-                  </div>
-                )
-              })}
             </CardContent>
           </Card>
         </motion.div>

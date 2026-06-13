@@ -251,7 +251,7 @@ export default function Home() {
                         </p>
                       </div>
 
-                      <StatsCards />
+                      <StatsCards currentRole={currentRole} />
                     </div>
                   )}
                 </motion.div>
@@ -296,7 +296,7 @@ export default function Home() {
                   exit="exit"
                   className="space-y-6"
                 >
-                  <BusinessAnalytics />
+                  <BusinessAnalytics currentRole={currentRole} />
                 </motion.div>
               </TabsContent>
             )}
