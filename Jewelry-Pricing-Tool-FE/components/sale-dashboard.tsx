@@ -127,7 +127,17 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
   // 1. Pipeline performance metrics
   const performanceMetrics = useMemo(() => {
     const confirmedQuotes = quotes.filter((q) => q.status === 'CONFIRMED')
-    const totalSalesVal = confirmedQuotes.reduce((sum, q) => sum + (q.sellingPrice || 0), 0)
+    
+    const totalSalesVal = confirmedQuotes.reduce((sum, q) => {
+      const quantity = Number(q.quantity) || 1
+      if (q.options && q.options.length > 0) {
+        const confirmedOptionsTotal = q.options
+          .filter((opt) => opt.isConfirmed)
+          .reduce((s, opt) => s + (Number(opt.sellingPrice) || 0), 0)
+        return sum + confirmedOptionsTotal * quantity
+      }
+      return sum + (q.confirmedPrice || q.sellingPrice || 0) * quantity
+    }, 0)
     
     const urgentCount = quotes.filter((q) => q.status === 'NEED_MORE_INFO').length
     
@@ -161,7 +171,11 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
       const key = q.createdAt.split('T')[0]
       if (datesMap[key]) {
         datesMap[key].count += 1
-        datesMap[key].value += (q.sellingPrice || 0)
+        let val = q.sellingPrice || 0
+        if (q.options && q.options.length > 0) {
+          val = q.options.reduce((s, opt) => s + (Number(opt.sellingPrice) || 0), 0)
+        }
+        datesMap[key].value += val
       }
     })
 
@@ -172,7 +186,13 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
   const materialChartData = useMemo(() => {
     const counts: Record<string, number> = {}
     quotes.forEach((q) => {
-      counts[q.materialType] = (counts[q.materialType] || 0) + 1
+      if (q.options && q.options.length > 0) {
+        q.options.forEach((opt) => {
+          counts[opt.materialType] = (counts[opt.materialType] || 0) + 1
+        })
+      } else {
+        counts[q.materialType] = (counts[q.materialType] || 0) + 1
+      }
     })
 
     return Object.entries(counts).map(([type, value]) => ({

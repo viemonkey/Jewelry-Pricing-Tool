@@ -6,16 +6,51 @@ const notifications_service_1 = require("./notifications.service");
 class QuotesService {
     async findAll(status) {
         const filter = status ? { status } : {};
-        return Quote_1.Quote.find(filter).sort({ createdAt: -1 }).lean();
+        const quotes = await Quote_1.Quote.find(filter).sort({ createdAt: -1 });
+        let changed = false;
+        for (const quote of quotes) {
+            if (quote.status === Quote_1.QuoteStatus.SENT_TO_CUSTOMER && quote.options && quote.options.length > 0) {
+                const allCancelled = quote.options.every(o => o.isCancelled);
+                const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled);
+                const hasConfirmed = quote.options.some(o => o.isConfirmed);
+                if (allCancelled) {
+                    quote.status = Quote_1.QuoteStatus.CANCELLED;
+                    await quote.save();
+                    changed = true;
+                }
+                else if (allResolved && hasConfirmed) {
+                    quote.status = Quote_1.QuoteStatus.CONFIRMED;
+                    await quote.save();
+                    changed = true;
+                }
+            }
+        }
+        if (changed && status) {
+            return Quote_1.Quote.find(filter).sort({ createdAt: -1 }).lean();
+        }
+        return quotes.map(q => q.toObject());
     }
     async findOne(id) {
-        const quote = await Quote_1.Quote.findById(id).lean();
+        const quote = await Quote_1.Quote.findById(id);
         if (!quote) {
             const err = new Error(`Quote ${id} không tồn tại`);
             err.statusCode = 404;
             throw err;
         }
-        return quote;
+        if (quote.status === Quote_1.QuoteStatus.SENT_TO_CUSTOMER && quote.options && quote.options.length > 0) {
+            const allCancelled = quote.options.every(o => o.isCancelled);
+            const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled);
+            const hasConfirmed = quote.options.some(o => o.isConfirmed);
+            if (allCancelled) {
+                quote.status = Quote_1.QuoteStatus.CANCELLED;
+                await quote.save();
+            }
+            else if (allResolved && hasConfirmed) {
+                quote.status = Quote_1.QuoteStatus.CONFIRMED;
+                await quote.save();
+            }
+        }
+        return quote.toObject();
     }
     async create(dto, imageUrls) {
         const year = new Date().getFullYear();
@@ -145,6 +180,7 @@ class QuotesService {
                 const option = quote.options.find(o => o.materialType === selectedOption.materialType);
                 if (option) {
                     option.isConfirmed = true;
+                    option.isCancelled = false;
                 }
                 ;
                 quote.markModified('options');
@@ -186,12 +222,18 @@ class QuotesService {
             const option = quote.options.find(o => o.materialType === materialType);
             if (option) {
                 option.isCancelled = true;
+                option.isConfirmed = false;
             }
             ;
             quote.markModified('options');
             const allCancelled = quote.options.every(o => o.isCancelled);
+            const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled);
+            const hasConfirmed = quote.options.some(o => o.isConfirmed);
             if (allCancelled) {
                 quote.status = Quote_1.QuoteStatus.CANCELLED;
+            }
+            else if (allResolved && hasConfirmed) {
+                quote.status = Quote_1.QuoteStatus.CONFIRMED;
             }
             else {
                 quote.status = Quote_1.QuoteStatus.SENT_TO_CUSTOMER;
@@ -202,6 +244,7 @@ class QuotesService {
             if (quote.options && quote.options.length > 0) {
                 quote.options.forEach(o => {
                     o.isCancelled = true;
+                    o.isConfirmed = false;
                 });
             }
         }
@@ -209,6 +252,9 @@ class QuotesService {
         const result = saved.toObject();
         if (result.status === Quote_1.QuoteStatus.CANCELLED) {
             notifications_service_1.notificationsService.notifyQuoteCancelled(result.quoteCode || '', result.productName, String(result._id));
+        }
+        else if (result.status === Quote_1.QuoteStatus.CONFIRMED) {
+            notifications_service_1.notificationsService.notifyQuoteConfirmed(result.quoteCode || '', result.productName, String(result._id));
         }
         return result;
     }

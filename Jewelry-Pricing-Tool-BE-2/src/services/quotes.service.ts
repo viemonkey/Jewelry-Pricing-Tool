@@ -4,17 +4,57 @@ import { notificationsService } from './notifications.service'
 export class QuotesService {
   async findAll(status?: QuoteStatus) {
     const filter = status ? { status } : {}
-    return Quote.find(filter).sort({ createdAt: -1 }).lean()
+    const quotes = await Quote.find(filter).sort({ createdAt: -1 })
+    
+    let changed = false
+    for (const quote of quotes) {
+      if (quote.status === QuoteStatus.SENT_TO_CUSTOMER && quote.options && quote.options.length > 0) {
+        const allCancelled = quote.options.every(o => o.isCancelled)
+        const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled)
+        const hasConfirmed = quote.options.some(o => o.isConfirmed)
+        
+        if (allCancelled) {
+          quote.status = QuoteStatus.CANCELLED
+          await quote.save()
+          changed = true
+        } else if (allResolved && hasConfirmed) {
+          quote.status = QuoteStatus.CONFIRMED
+          await quote.save()
+          changed = true
+        }
+      }
+    }
+    
+    if (changed && status) {
+      return Quote.find(filter).sort({ createdAt: -1 }).lean()
+    }
+    
+    return quotes.map(q => q.toObject())
   }
 
   async findOne(id: string) {
-    const quote = await Quote.findById(id).lean()
+    const quote = await Quote.findById(id)
     if (!quote) {
       const err = new Error(`Quote ${id} không tồn tại`)
       ;(err as any).statusCode = 404
       throw err
     }
-    return quote
+    
+    if (quote.status === QuoteStatus.SENT_TO_CUSTOMER && quote.options && quote.options.length > 0) {
+      const allCancelled = quote.options.every(o => o.isCancelled)
+      const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled)
+      const hasConfirmed = quote.options.some(o => o.isConfirmed)
+      
+      if (allCancelled) {
+        quote.status = QuoteStatus.CANCELLED
+        await quote.save()
+      } else if (allResolved && hasConfirmed) {
+        quote.status = QuoteStatus.CONFIRMED
+        await quote.save()
+      }
+    }
+    
+    return quote.toObject()
   }
 
   async create(dto: any, imageUrls: string[]) {
@@ -180,6 +220,7 @@ export class QuotesService {
         const option = quote.options.find(o => o.materialType === selectedOption.materialType)
         if (option) {
           option.isConfirmed = true
+          option.isCancelled = false
         }
         ;(quote as any).markModified('options')
 
@@ -227,11 +268,17 @@ export class QuotesService {
       const option = quote.options.find(o => o.materialType === materialType)
       if (option) {
         option.isCancelled = true
+        option.isConfirmed = false
       }
       ;(quote as any).markModified('options')
       const allCancelled = quote.options.every(o => o.isCancelled)
+      const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled)
+      const hasConfirmed = quote.options.some(o => o.isConfirmed)
+      
       if (allCancelled) {
         quote.status = QuoteStatus.CANCELLED
+      } else if (allResolved && hasConfirmed) {
+        quote.status = QuoteStatus.CONFIRMED
       } else {
         quote.status = QuoteStatus.SENT_TO_CUSTOMER
       }
@@ -240,6 +287,7 @@ export class QuotesService {
       if (quote.options && quote.options.length > 0) {
         quote.options.forEach(o => {
           o.isCancelled = true
+          o.isConfirmed = false
         })
       }
     }
@@ -253,11 +301,15 @@ export class QuotesService {
         result.productName,
         String(result._id)
       )
+    } else if (result.status === QuoteStatus.CONFIRMED) {
+      notificationsService.notifyQuoteConfirmed(
+        result.quoteCode || '',
+        result.productName,
+        String(result._id)
+      )
     }
     return result
   }
-
-
 
   private async updateStatus(id: string, status: QuoteStatus) {
     const quote = await Quote.findByIdAndUpdate(id, { status }, { new: true }).lean()

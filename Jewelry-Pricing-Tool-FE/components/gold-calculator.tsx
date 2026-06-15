@@ -254,7 +254,6 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="gold">Vàng</SelectItem>
-                  <SelectItem value="silver">Bạc</SelectItem>
                 </SelectContent>
               </Select>
             </div>

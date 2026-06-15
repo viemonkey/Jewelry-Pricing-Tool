@@ -317,7 +317,7 @@ export default function Home() {
                       Máy tính giá trang sức
                     </h1>
                     <p className="text-xs text-muted-foreground sm:text-sm font-medium mt-1">
-                      Công cụ tính nhanh giá vốn và đề xuất giá bán lẻ trang sức vàng, bạc
+                      Công cụ tính nhanh giá vốn và đề xuất giá bán lẻ trang sức vàng
                     </p>
                   </div>
 
