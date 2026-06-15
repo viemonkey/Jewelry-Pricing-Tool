@@ -44,7 +44,7 @@ import {
 } from '@/components/ui/select'
 import { quotesApi } from '@/lib/api'
 import { formatCurrency } from '@/lib/pricing'
-import type { Quote } from '@/lib/types'
+import type { Quote, QuoteStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 const MATERIAL_COLORS = [
@@ -136,7 +136,7 @@ export function BusinessAnalytics() {
   const [loading, setLoading] = useState(true)
   const [month, setMonth] = useState(String(now.getMonth() + 1))
   const [year, setYear] = useState(String(now.getFullYear()))
-  
+
   // Tab điều khiển danh sách đơn thành công / đơn hủy
   const [activeListTab, setActiveListTab] = useState<'success' | 'cancelled'>('success')
 
@@ -153,10 +153,10 @@ export function BusinessAnalytics() {
   const analytics = useMemo(() => {
     // 1. Tất cả quotes được tạo trong tháng (được Sale hỏi giá)
     const requests = quotes.filter((q) => isInSelectedMonth(q.createdAt, selectedMonth, selectedYear))
-    
+
     // 2. Tất cả quotes được cập nhật/hoàn thành trong tháng
     const resolved = quotes.filter((q) => isInSelectedMonth(q.updatedAt, selectedMonth, selectedYear))
-    
+
     // 3. Đơn chốt thành công và đơn hủy trong tháng (tính theo phân loại/option)
     const confirmed = resolved.flatMap((q) => {
       if (q.options && q.options.length > 0) {
@@ -189,7 +189,7 @@ export function BusinessAnalytics() {
       }
       return []
     })
-    
+
     // 4. Số lần Admin ĐÃ BÁO GIÁ trong tháng
     const adminPricedList = resolved.filter(
       (q) => q.quotedBy || ['QUOTED', 'SENT_TO_CUSTOMER', 'CONFIRMED', 'CANCELLED'].includes(q.status)
@@ -506,7 +506,7 @@ export function BusinessAnalytics() {
               )}>
                 <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-bl from-amber-500/5 to-transparent rounded-full blur-lg group-hover:scale-125 transition-transform duration-500" />
                 <Icon className={cn('pointer-events-none absolute right-3 bottom-3 h-14 w-14 opacity-[0.04] group-hover:scale-110 transition-transform duration-500', kpi.tone)} />
-                
+
                 <div className="flex items-start gap-2.5">
                   <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-inner border border-[#EBE6DA] dark:border-[#383126]/20', kpi.bg, kpi.tone)}>
                     <Icon className="h-5 w-5" />

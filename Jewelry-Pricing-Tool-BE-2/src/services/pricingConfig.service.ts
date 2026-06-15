@@ -1,18 +1,29 @@
+import mongoose from 'mongoose'
 import { PricingConfig } from '../models/PricingConfig'
 import { Quote } from '../models/Quote'
+import { GoldPrice } from '../models/GoldPrice'
 
 export class PricingConfigService {
   async get() {
     return PricingConfig.findOne().lean()
   }
 
-  async update(data: any) {
+  async update(data: any, userId?: string) {
     const config = await PricingConfig.findOneAndUpdate({}, data, { new: true, upsert: true }).lean()
-    
+
     // If goldPrice24K is updated, recalculate all quotes in the database
     if (data.goldPrice24K !== undefined) {
       const newGoldPrice = Number(data.goldPrice24K)
       await this.recalculateQuotes(newGoldPrice, config)
+
+      // Record to GoldPrice history
+      await GoldPrice.create({
+        pricePerChi: newGoldPrice,
+        pricePerGram: Math.round(newGoldPrice / 3.75),
+        effectiveDate: new Date(),
+        source: 'manual',
+        updatedBy: userId ? new mongoose.Types.ObjectId(userId) : null,
+      })
     }
 
     return config
@@ -21,7 +32,7 @@ export class PricingConfigService {
   private async recalculateQuotes(newGoldPrice: number, config: any) {
     // Get all quotes
     const quotes = await Quote.find({})
-    
+
     // Load gold ratios and profit margins
     const ratiosMap: Record<string, number> = {}
     if (config.goldRatios) {

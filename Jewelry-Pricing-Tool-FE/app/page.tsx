@@ -22,6 +22,7 @@ import { QuoteRequestModal } from '@/components/quote-request-modal'
 import { QuoteListPricer } from '@/components/quote-list-pricer'
 import { SaleDashboard } from '@/components/sale-dashboard'
 import { BusinessAnalytics } from '@/components/business-analytics'
+import { PricingSettings } from '@/components/pricing-settings'
 
 const tabContentVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -81,7 +82,7 @@ export default function Home() {
           setGoldPriceInputDisplay(new Intl.NumberFormat('vi-VN').format(config.goldPrice24K))
         }
       }
-    }).catch(() => {})
+    }).catch(() => { })
   }, [])
 
   const handleSaveGoldPrice = async (priceStr: string) => {
@@ -125,7 +126,7 @@ export default function Home() {
       QUOTE_COMPLETED: 'success',
       QUOTE_CONFIRMED: 'success',
       QUOTE_CANCELLED: 'warning',
-      QUOTE_REJECTED:  'warning',
+      QUOTE_REJECTED: 'warning',
     }
     addNotification({
       type: typeMap[event.type] ?? 'info',
@@ -135,7 +136,7 @@ export default function Home() {
   })
 
   const handleLogout = async () => {
-    await authApi.logout().catch(() => {})
+    await authApi.logout().catch(() => { })
     setAuthUser(null)
   }
 
@@ -181,6 +182,7 @@ export default function Home() {
               { value: 'quotes', icon: ClipboardList, label: 'Xử lý báo giá', show: true },
               { value: 'analytics', icon: BarChart3, label: 'Báo cáo', show: currentRole === 'order' },
               { value: 'calculator', icon: Calculator, label: 'Máy tính giá', show: canViewCalculator },
+              { value: 'settings', icon: Settings, label: 'Cấu hình', show: currentRole === 'order' },
             ].filter(item => item.show).map((item) => {
               const isActive = activeTab === item.value
               const Icon = item.icon
@@ -209,8 +211,8 @@ export default function Home() {
       {/* Vùng nội dung chính bên phải */}
       <div className="flex-1 flex flex-col min-w-0 min-h-screen">
         {/* Topbar thay thế Header cũ */}
-        <Header 
-          currentRole={currentRole} 
+        <Header
+          currentRole={currentRole}
           currentUserName={currentUserName}
           onLogout={handleLogout}
           search={search}
@@ -220,7 +222,7 @@ export default function Home() {
         {/* Main Content Area */}
         <main className="flex-1 p-6 overflow-y-auto max-w-[1600px] w-full mx-auto">
           <Tabs value={activeTab} className="space-y-6">
-            
+
             {/* Dashboard Tab */}
             <AnimatePresence mode="wait">
               <TabsContent value="dashboard" className="space-y-6 mt-0">
@@ -250,7 +252,7 @@ export default function Home() {
                         </p>
                       </div>
 
-                      <StatsCards currentRole={currentRole} />
+                      <StatsCards />
                     </div>
                   )}
                 </motion.div>
@@ -295,7 +297,23 @@ export default function Home() {
                   exit="exit"
                   className="space-y-6"
                 >
-                  <BusinessAnalytics currentRole={currentRole} />
+                  <BusinessAnalytics />
+                </motion.div>
+              </TabsContent>
+            )}
+
+            {/* Settings Tab */}
+            {currentRole === 'order' && (
+              <TabsContent value="settings" className="space-y-6 mt-0">
+                <motion.div
+                  key="settings"
+                  variants={tabContentVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  className="space-y-6"
+                >
+                  <PricingSettings />
                 </motion.div>
               </TabsContent>
             )}
