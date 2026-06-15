@@ -29,7 +29,7 @@ import {
   Package, Zap, Send, ShoppingCart, ImageIcon, X, Layers, FileText,
   ChevronLeft, ChevronRight, Plus, Minus, CalendarIcon, ChevronDown, Check,
 } from 'lucide-react'
-import { quotesApi, pricingConfigApi } from '@/lib/api'
+import { quotesApi, pricingConfigApi, BASE_URL } from '@/lib/api'
 import type { PricingConfig } from '@/lib/api'
 import { formatCurrency, calculateGoldProductPrice, calculateSilverProductPrice, getProfitDivisor } from '@/lib/pricing'
 import { useNotifications } from '@/lib/notifications'
@@ -521,9 +521,9 @@ function PricingDialogTabs({
                 <p className="text-xs text-muted-foreground mb-2">🖼 Hình ảnh sản phẩm</p>
                 <div className="flex flex-wrap gap-2">
                   {selected.images.map((img, i) => (
-                    <a key={i} href={`http://localhost:3000${img}`} target="_blank" rel="noreferrer"
+                    <a key={i} href={`${BASE_URL}${img}`} target="_blank" rel="noreferrer"
                       className="block rounded-xl border overflow-hidden hover:opacity-80 hover:scale-105 transition-all duration-200 shadow-sm">
-                      <img src={`http://localhost:3000${img}`} alt={`Ảnh ${i + 1}`} className="h-20 w-20 object-cover" />
+                      <img src={`${BASE_URL}${img}`} alt={`Ảnh ${i + 1}`} className="h-20 w-20 object-cover" />
                     </a>
                   ))}
                 </div>
@@ -2621,9 +2621,9 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         <p className="text-xs text-muted-foreground mb-2">🖼 Hình ảnh sản phẩm</p>
                         <div className="flex flex-wrap gap-2">
                           {selected.images.map((img, i) => (
-                            <a key={i} href={`http://localhost:3000${img}`} target="_blank" rel="noreferrer"
+                            <a key={i} href={`${BASE_URL}${img}`} target="_blank" rel="noreferrer"
                               className="block rounded-xl border overflow-hidden hover:opacity-80 hover:scale-105 transition-all duration-200 shadow-sm">
-                              <img src={`http://localhost:3000${img}`} alt={`Ảnh ${i + 1}`} className="h-20 w-20 object-cover" />
+                              <img src={`${BASE_URL}${img}`} alt={`Ảnh ${i + 1}`} className="h-20 w-20 object-cover" />
                             </a>
                           ))}
                         </div>
@@ -3126,7 +3126,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           {/* Current images in keepImages */}
                           {keepImages.map((img, i) => (
                             <div key={`keep-${img}`} className="relative aspect-square rounded-xl border border-[#EDE8DE] overflow-hidden group p-0.5 bg-white shadow-sm hover:scale-[1.03] transition-all duration-200">
-                              <img src={`http://localhost:3000${img}`} alt="" className="h-full w-full object-cover rounded-lg" />
+                              <img src={`${BASE_URL}${img}`} alt="" className="h-full w-full object-cover rounded-lg" />
                               <button
                                 type="button"
                                 onClick={() => setKeepImages(prev => prev.filter((_, idx) => idx !== i))}
@@ -4082,9 +4082,9 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                             <span className="text-[9px] text-[#9E8E7A] font-bold tracking-wider uppercase block">Hình ảnh sản phẩm ({selected.images.length})</span>
                             <div className="grid grid-cols-4 gap-2">
                               {selected.images.map((img, i) => (
-                                <a key={i} href={`http://localhost:3000${img}`} target="_blank" rel="noreferrer"
+                                <a key={i} href={`${BASE_URL}${img}`} target="_blank" rel="noreferrer"
                                   className="relative block rounded-lg overflow-hidden border border-[#EDE8DE] hover:border-[#C9981A] hover:scale-[1.03] transition-all duration-200 shadow-sm group">
-                                  <img src={`http://localhost:3000${img}`} alt={`Ảnh ${i + 1}`}
+                                  <img src={`${BASE_URL}${img}`} alt={`Ảnh ${i + 1}`}
                                     className="h-16 w-full object-cover" />
                                   <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                     <Eye className="h-4 w-4 text-white" />
