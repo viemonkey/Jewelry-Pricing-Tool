@@ -18,6 +18,7 @@ export interface IPricingConfig extends Document {
   profitMargins: IProfitMargin[]
   silverMultiplier: number
   goldPrice24K: number
+  platinumPrice: number
   createdAt: Date
   updatedAt: Date
 }
@@ -49,6 +50,7 @@ const PricingConfigSchema = new Schema<IPricingConfig>(
     },
     silverMultiplier: { type: Number, required: true, default: 3 },
     goldPrice24K: { type: Number, required: true, default: 9000000 },
+    platinumPrice: { type: Number, required: true, default: 0 },
   },
   { timestamps: true, collection: 'pricing_config' }
 )

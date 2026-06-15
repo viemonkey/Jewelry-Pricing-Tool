@@ -24,7 +24,9 @@ async function calculateQuoteOption(option: any, config: any, isMulti: boolean, 
   if (isSilver) {
     materialCost = parseFloat(option.materialCost) || 0
   } else if (isPlatinum) {
-    materialCost = parseFloat(option.materialCost) || 0
+    const platinumPrice = parseFloat(option.platinumPrice) || config.platinumPrice || 0
+    const weight = parseFloat(option.weightChi || option.weightGram || '0') || 0
+    materialCost = parseFloat(option.materialCost) || Math.round(platinumPrice * weight)
   } else {
     // Gold
     const goldPrice24K = parseFloat(option.goldPrice24K) || config.goldPrice24K || 9000000

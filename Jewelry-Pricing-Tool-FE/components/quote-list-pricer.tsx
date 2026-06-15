@@ -1760,6 +1760,11 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     const systemGoldPrice = pricingConfig?.goldPrice24K?.toString() || ''
     const goldPriceToLoad = savedGoldPrice || systemGoldPrice
 
+    // Pre-fill giá bạch kim: ưu tiên giá đã lưu trong quote, fallback về giá hệ thống hôm nay
+    const savedPlatinumPrice = (q as any).platinumPrice?.toString() || ''
+    const systemPlatinumPrice = pricingConfig?.platinumPrice?.toString() || ''
+    const platinumPriceToLoad = savedPlatinumPrice || systemPlatinumPrice
+
     let finalRows: GoldRow[] = []
 
     if (q.options && q.options.length > 0) {
@@ -1774,7 +1779,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
         const weightUnit = isPlatinum ? 'chi' : (opt.weightGram !== undefined && opt.weightGram !== null ? 'gram' : 'chi')
 
         const finalPrice = opt.goldPrice24K?.toString() || goldPriceToLoad
-        const platinumPrice = opt.platinumPrice?.toString() || ''
+        const platinumPrice = opt.platinumPrice?.toString() || platinumPriceToLoad
         const g = parseFloat(finalPrice) || 0
         let w = parseFloat(weight) || 0
         let cost = 0
@@ -1805,7 +1810,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     } else {
       finalRows = parsedRows.map(row => {
         const finalPrice = row.goldPrice24K || goldPriceToLoad
-        const platinumPrice = (row as any).platinumPrice || ''
+        const platinumPrice = (row as any).platinumPrice || platinumPriceToLoad
         const g = parseFloat(finalPrice) || 0
         let w = parseFloat(row.weightChi) || 0
         let cost = 0

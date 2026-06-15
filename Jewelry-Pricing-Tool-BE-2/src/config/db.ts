@@ -16,6 +16,7 @@ const DEFAULT_CONFIG = {
   ],
   silverMultiplier: 3,
   goldPrice24K: 9_000_000,
+  platinumPrice: 0,
 }
 
 export const connectDB = async () => {
@@ -31,10 +32,20 @@ export const connectDB = async () => {
       console.log('  ✅ Default PricingConfig seeded')
     } else {
       const config = await PricingConfig.findOne()
-      if (config && config.goldPrice24K === undefined) {
-        config.goldPrice24K = 9_000_000
-        await config.save()
-        console.log('  ✅ Updated PricingConfig with default goldPrice24K')
+      if (config) {
+        let changed = false
+        if (config.goldPrice24K === undefined) {
+          config.goldPrice24K = 9_000_000
+          changed = true
+        }
+        if (config.platinumPrice === undefined) {
+          config.platinumPrice = 0
+          changed = true
+        }
+        if (changed) {
+          await config.save()
+          console.log('  ✅ Updated PricingConfig with default pricing configurations')
+        }
       }
     }
   } catch (error) {

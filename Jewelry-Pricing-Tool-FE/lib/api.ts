@@ -208,6 +208,7 @@ export interface PricingConfig {
   profitMargins: ProfitMarginConfig[]
   silverMultiplier: number
   goldPrice24K: number
+  platinumPrice: number
 }
 
 export const pricingConfigApi = {

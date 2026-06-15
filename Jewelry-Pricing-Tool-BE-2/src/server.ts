@@ -1,4 +1,6 @@
 import * as dotenv from 'dotenv'
+import dns from 'dns'
+dns.setServers(['8.8.8.8'])
 dotenv.config()
 
 import app from './app'

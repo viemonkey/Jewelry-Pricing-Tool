@@ -11,25 +11,29 @@ export class PricingConfigService {
   async update(data: any, userId?: string) {
     const config = await PricingConfig.findOneAndUpdate({}, data, { new: true, upsert: true }).lean()
 
-    // If goldPrice24K is updated, recalculate all quotes in the database
-    if (data.goldPrice24K !== undefined) {
-      const newGoldPrice = Number(data.goldPrice24K)
-      await this.recalculateQuotes(newGoldPrice, config)
+    // If goldPrice24K or platinumPrice is updated, recalculate all quotes in the database
+    if (data.goldPrice24K !== undefined || data.platinumPrice !== undefined) {
+      const newGoldPrice = data.goldPrice24K !== undefined ? Number(data.goldPrice24K) : config.goldPrice24K
+      const newPlatinumPrice = data.platinumPrice !== undefined ? Number(data.platinumPrice) : config.platinumPrice
+      await this.recalculateQuotes(newGoldPrice, newPlatinumPrice, config)
 
       // Record to GoldPrice history
-      await GoldPrice.create({
-        pricePerChi: newGoldPrice,
-        pricePerGram: Math.round(newGoldPrice / 3.75),
-        effectiveDate: new Date(),
-        source: 'manual',
-        updatedBy: userId ? new mongoose.Types.ObjectId(userId) : null,
-      })
+      if (data.goldPrice24K !== undefined) {
+        const newGoldPriceNum = Number(data.goldPrice24K)
+        await GoldPrice.create({
+          pricePerChi: newGoldPriceNum,
+          pricePerGram: Math.round(newGoldPriceNum / 3.75),
+          effectiveDate: new Date(),
+          source: 'manual',
+          updatedBy: userId ? new mongoose.Types.ObjectId(userId) : null,
+        })
+      }
     }
 
     return config
   }
 
-  private async recalculateQuotes(newGoldPrice: number, config: any) {
+  private async recalculateQuotes(newGoldPrice: number, newPlatinumPrice: number, config: any) {
     // Chỉ tính toán lại các báo giá đang xử lý (chờ báo giá, cần bổ sung, đang báo giá)
     // Các đơn đã báo giá (QUOTED, SENT_TO_CUSTOMER) sẽ được khóa giá tương tự đơn CONFIRMED/CANCELLED
     const quotes = await Quote.find({
@@ -91,6 +95,22 @@ export class PricingConfigService {
             opt.costPrice = costWithVAT
             opt.sellingPrice = sellingPrice
             isModified = true
+          } else if (opt.materialType === 'PLATINUM') {
+            const weightChi = getWeightChi(opt)
+            const stoneCost = opt.stoneCost || 0
+
+            const materialCost = newPlatinumPrice * weightChi
+            const costBeforeVAT = materialCost + stoneCost
+            const costWithVAT = costBeforeVAT
+            const sellingPrice = costWithVAT
+
+            opt.platinumPrice = newPlatinumPrice
+            opt.materialCost = materialCost
+            opt.costBeforeVAT = costBeforeVAT
+            opt.costWithVAT = costWithVAT
+            opt.costPrice = costWithVAT
+            opt.sellingPrice = sellingPrice
+            isModified = true
           }
           return opt
         })
@@ -113,7 +133,7 @@ export class PricingConfigService {
           isModified = true
         }
       } else {
-        // Fallback: If quote has no options but is a gold product, recalculate top-level directly
+        // Fallback: If quote has no options but is a gold/platinum product, recalculate top-level directly
         if (quote.materialType && quote.materialType.startsWith('GOLD_')) {
           const ratio = getRatio(quote.materialType)
           const weightChi = getWeightChi(quote)
@@ -139,6 +159,22 @@ export class PricingConfigService {
 
           quote.goldPrice24K = newGoldPrice
           quote.materialCost = goldCost
+          quote.costBeforeVAT = costBeforeVAT
+          quote.costWithVAT = costWithVAT
+          quote.costPrice = costWithVAT
+          quote.sellingPrice = sellingPrice
+          isModified = true
+        } else if (quote.materialType === 'PLATINUM') {
+          const weightChi = getWeightChi(quote)
+          const stoneCost = quote.stoneCost || 0
+
+          const materialCost = newPlatinumPrice * weightChi
+          const costBeforeVAT = materialCost + stoneCost
+          const costWithVAT = costBeforeVAT
+          const sellingPrice = costWithVAT
+
+          quote.platinumPrice = newPlatinumPrice
+          quote.materialCost = materialCost
           quote.costBeforeVAT = costBeforeVAT
           quote.costWithVAT = costWithVAT
           quote.costPrice = costWithVAT
