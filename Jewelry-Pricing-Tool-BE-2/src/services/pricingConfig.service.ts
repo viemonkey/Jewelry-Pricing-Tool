@@ -30,9 +30,10 @@ export class PricingConfigService {
   }
 
   private async recalculateQuotes(newGoldPrice: number, config: any) {
-    // Chỉ tính toán lại các báo giá chưa hoàn thành (chưa chốt hoặc chưa hủy)
+    // Chỉ tính toán lại các báo giá đang xử lý (chờ báo giá, cần bổ sung, đang báo giá)
+    // Các đơn đã báo giá (QUOTED, SENT_TO_CUSTOMER) sẽ được khóa giá tương tự đơn CONFIRMED/CANCELLED
     const quotes = await Quote.find({
-      status: { $nin: ['CONFIRMED', 'CANCELLED'] }
+      status: { $in: ['PENDING', 'NEED_MORE_INFO', 'QUOTING'] }
     })
 
     // Load gold ratios and profit margins
