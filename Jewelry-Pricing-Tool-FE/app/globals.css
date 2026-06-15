@@ -5,7 +5,7 @@
 
 :root {
   /* Warm Alabaster & Premium Gold theme for Light Mode with High Contrast */
-  --background: oklch(0.975 0.003 75); /* Luxury light ivory background */
+  --background: oklch(0.932 0.008 75); /* Deeper warm luxury sandstone background (#ECE8DE) */
   --foreground: oklch(0.12 0.01 250); /* Darker slate-black for high text contrast */
   --card: oklch(1 0 0); /* Crisp white cards */
   --card-foreground: oklch(0.12 0.01 250);
@@ -13,16 +13,16 @@
   --popover-foreground: oklch(0.12 0.01 250);
   --primary: oklch(0.52 0.12 75); /* Richer gold/brass with superior contrast on light background */
   --primary-foreground: oklch(0.99 0.002 75);
-  --secondary: oklch(0.94 0.005 75);
+  --secondary: oklch(0.90 0.012 75);
   --secondary-foreground: oklch(0.20 0.015 250);
-  --muted: oklch(0.94 0.005 75);
-  --muted-foreground: oklch(0.40 0.01 250); /* Darker gray for readable subtext */
+  --muted: oklch(0.90 0.012 75);
+  --muted-foreground: oklch(0.38 0.012 250); /* Darker gray for readable subtext */
   --accent: oklch(0.58 0.12 70);
   --accent-foreground: oklch(1 0 0);
   --destructive: oklch(0.55 0.22 25);
   --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.91 0.005 75); /* Soft, elegant warm border lines */
-  --input: oklch(0.92 0.005 75); /* Defined inputs */
+  --border: oklch(0.855 0.016 75); /* Much more defined, elegant warm border lines (#DDD8CE) */
+  --input: oklch(0.865 0.016 75); /* Defined inputs */
   --ring: oklch(0.52 0.12 75);
   --chart-1: oklch(0.52 0.12 75);
   --chart-2: oklch(0.50 0.12 250);
@@ -32,13 +32,13 @@
   --radius: 0.75rem;
   
   /* Sidebar design: Elegant Light Ivory with Champagne Gold accents */
-  --sidebar: oklch(0.985 0.003 75);
+  --sidebar: oklch(0.962 0.005 75); /* Distinct light sand sidebar (#F3F1EB) */
   --sidebar-foreground: oklch(0.12 0.01 250);
   --sidebar-primary: oklch(0.52 0.12 75);
   --sidebar-primary-foreground: oklch(0.99 0.002 75);
-  --sidebar-accent: oklch(0.94 0.005 75);
+  --sidebar-accent: oklch(0.90 0.01 75);
   --sidebar-accent-foreground: oklch(0.12 0.01 250);
-  --sidebar-border: oklch(0.91 0.005 75);
+  --sidebar-border: oklch(0.855 0.016 75);
   --sidebar-ring: oklch(0.52 0.12 75);
   
   /* Custom tokens for jewelry app */
@@ -268,12 +268,15 @@ html {
 
 .border-luxury {
   border: 1px solid var(--border);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.03), 0 2px 8px -1px rgba(0, 0, 0, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow: 
+    0 12px 36px -4px rgba(139, 115, 60, 0.12), 
+    0 4px 16px -2px rgba(0, 0, 0, 0.06), 
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
 .dark .border-luxury {
   border: 1px solid var(--border);
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow: 0 10px 35px -10px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 /* Luxury card with top-left golden spotlight reflecting effect */

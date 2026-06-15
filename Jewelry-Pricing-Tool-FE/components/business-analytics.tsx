@@ -500,7 +500,7 @@ export function BusinessAnalytics() {
               className="relative group"
             >
               <Card className={cn(
-                'relative overflow-hidden bg-white/85 dark:bg-[#12110F]/85 border backdrop-blur-md transition-all duration-300 rounded-[20px] p-4.5 min-h-[132px] flex flex-col justify-between hover:border-[#D4AF37]/40 hover:shadow-md dark:hover:shadow-[0_0_15px_rgba(212,175,55,0.06)]',
+                'relative overflow-hidden bg-white dark:bg-[#12110F]/85 border-luxury transition-all duration-300 rounded-[20px] p-4.5 min-h-[132px] flex flex-col justify-between hover:border-[#D4AF37]/40 hover:shadow-md dark:hover:shadow-[0_0_15px_rgba(212,175,55,0.06)]',
                 kpi.border,
                 kpi.glow
               )}>
@@ -537,7 +537,7 @@ export function BusinessAnalytics() {
         className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_0.85fr]"
       >
         {/* Material Bar Chart Card (Chi tiết chất liệu đã chốt) */}
-        <Card className="border-[#E5DFD0] dark:border-[#332A1C]/60 bg-white/85 dark:bg-[#12110F]/85 backdrop-blur-md shadow-sm rounded-[24px] overflow-hidden hover:shadow-md transition-shadow">
+        <Card className="border-luxury bg-white dark:bg-[#12110F]/85 rounded-[24px] overflow-hidden hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2.5">
               <span className="flex h-8.5 w-8.5 items-center justify-center rounded-xl bg-gradient-to-br from-[#D4AF37]/10 to-[#D4AF37]/5 border border-[#D4AF37]/20 text-[#9B7630] dark:text-[#E6C687]">
@@ -643,7 +643,7 @@ export function BusinessAnalytics() {
         </Card>
 
         {/* Conversion Rate Card */}
-        <Card className="border-[#E5DFD0] dark:border-[#332A1C]/60 bg-white/85 dark:bg-[#12110F]/85 backdrop-blur-md shadow-sm rounded-[24px] overflow-hidden hover:shadow-md transition-shadow">
+        <Card className="border-luxury bg-white dark:bg-[#12110F]/85 rounded-[24px] overflow-hidden hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2.5">
               <span className="flex h-8.5 w-8.5 items-center justify-center rounded-xl bg-gradient-to-br from-[#D4AF37]/10 to-[#D4AF37]/5 border border-[#D4AF37]/20 text-[#9B7630] dark:text-[#E6C687]">
@@ -721,7 +721,7 @@ export function BusinessAnalytics() {
         className="grid grid-cols-1 gap-6 xl:grid-cols-[0.9fr_1.1fr]"
       >
         {/* Top Sales Leaderboard (Ai hỏi nhiều nhất / tạo yêu cầu nhiều nhất) */}
-        <Card className="border-[#E5DFD0] dark:border-[#332A1C]/60 bg-white/85 dark:bg-[#12110F]/85 backdrop-blur-md shadow-sm rounded-[24px] overflow-hidden hover:shadow-md transition-shadow">
+        <Card className="border-luxury bg-white dark:bg-[#12110F]/85 rounded-[24px] overflow-hidden hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2.5">
               <span className="flex h-8.5 w-8.5 items-center justify-center rounded-xl bg-gradient-to-br from-[#D4AF37]/10 to-[#D4AF37]/5 border border-[#D4AF37]/20 text-[#9B7630] dark:text-[#E6C687]">
@@ -803,7 +803,7 @@ export function BusinessAnalytics() {
         </Card>
 
         {/* Detailed Success / Cancelled Transactions Tabbed Card */}
-        <Card className="overflow-hidden border-[#E5DFD0] dark:border-[#332A1C]/60 bg-white/85 dark:bg-[#12110F]/85 backdrop-blur-md shadow-sm rounded-[24px] hover:shadow-md transition-shadow">
+        <Card className="overflow-hidden border-luxury bg-white dark:bg-[#12110F]/85 rounded-[24px] hover:shadow-md transition-shadow">
           <CardHeader className="p-0 border-b border-[#EBE6DA]/85 dark:border-[#383126]/60 bg-[#FAFAF8]/70 dark:bg-[#12110F]/40">
             {/* Header Tabs */}
             <div className="flex border-b border-[#EBE6DA]/60 dark:border-[#383126]/30">

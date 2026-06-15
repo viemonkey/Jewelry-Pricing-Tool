@@ -19,11 +19,15 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
+import { format, addYears } from 'date-fns'
+import { vi } from 'date-fns/locale'
 import {
   Calculator, CheckCircle, Eye, Loader2, RefreshCw,
   ThumbsUp, Ban, Gem, Hammer, Sparkles, TrendingUp, AlertCircle,
   Package, Zap, Send, ShoppingCart, ImageIcon, X, Layers, FileText,
-  ChevronLeft, ChevronRight, Plus, Minus,
+  ChevronLeft, ChevronRight, Plus, Minus, CalendarIcon, ChevronDown, Check,
 } from 'lucide-react'
 import { quotesApi, pricingConfigApi } from '@/lib/api'
 import type { PricingConfig } from '@/lib/api'
@@ -33,6 +37,31 @@ import type { Quote, QuoteStatus, UserRole } from '@/lib/types'
 import { useSseNotifications } from '@/lib/use-sse-notifications'
 
 // ── Multi-material types & helpers ─────────────────────────────────────────
+
+type ProductCategory = 'NHAN' | 'DAY_CHUYEN' | 'VONG_LAC_TAY' | 'LAC_CHAN'
+
+const PRODUCT_CATEGORIES: { value: ProductCategory; label: string; icon: string }[] = [
+  { value: 'NHAN',         label: 'Nhẫn',           icon: '💍' },
+  { value: 'DAY_CHUYEN',   label: 'Dây chuyền',     icon: '📿' },
+  { value: 'VONG_LAC_TAY', label: 'Vòng / Lắc tay', icon: '⌚' },
+  { value: 'LAC_CHAN',     label: 'Lắc chân',        icon: '✨' },
+]
+
+const RING_SIZES     = ['5', '6', '7', '8', '9', '10']
+const BRACELET_SIZES = ['15cm', '16cm', '17cm', '18cm']
+const ANKLET_SIZES   = ['21cm', '22cm', '23cm', '24cm']
+const NECKLACE_SIZES = ['40cm', '42cm', '45cm']
+
+const STONE_OPTIONS = [
+  { value: 'kim-cuong-lab',         label: 'Kim cương lab',         color: 'linear-gradient(135deg, #e2f1ff 0%, #a5d3ff 100%)', border: '#a5d3ff88' },
+  { value: 'kim-cuong-thien-nhien', label: 'Kim cương thiên nhiên', color: 'linear-gradient(135deg, #ffffff 0%, #d4e8fc 100%)', border: '#d4e8fc88' },
+  { value: 'da-moissanite',         label: 'Đá Moissanite',         color: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)', border: '#fcb69f88' },
+  { value: 'da-cz',                 label: 'Đá CZ',                 color: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)', border: '#c3cfe288' },
+  { value: 'da-mau',                label: 'Đá màu',                color: 'linear-gradient(135deg, #f857a6 0%, #ff5858 100%)', border: '#ff585888' },
+]
+
+const MAX_DEADLINE = addYears(new Date(), 1)
+
 
 export interface GoldRow {
   id: string
@@ -95,7 +124,27 @@ export function parseMaterialsFromQuote(quote: {
   materialType: string
   dimensions?: string
   notes?: string
+  options?: any[]
 }): GoldRow[] {
+  // 0. Ưu tiên tuyệt đối parse từ quote.options
+  if (quote.options && quote.options.length > 0) {
+    return quote.options.map((opt: any) => {
+      const type = opt.materialType
+      const isSilver = type === 'SILVER'
+      const isPlatinum = type === 'PLATINUM'
+      const weightVal = isSilver
+        ? undefined
+        : (opt.weightChi !== undefined && opt.weightChi !== null ? opt.weightChi : (opt.weightGram !== undefined && opt.weightGram !== null ? opt.weightGram : undefined))
+      const weight = weightVal !== undefined ? String(weightVal) : ''
+      const weightUnit = isPlatinum ? 'chi' : (opt.weightGram !== undefined && opt.weightGram !== null ? 'gram' : 'chi')
+      
+      const row = makeGoldRow(type, weight)
+      row.weightUnit = weightUnit as any
+      row.budget = opt.budget ? String(opt.budget) : undefined
+      return row
+    })
+  }
+
   // 1. Thử parse từ dimensions
   if (quote.dimensions) {
     const rows: GoldRow[] = []
@@ -431,11 +480,7 @@ function PricingDialogTabs({
               ))}
               {/* Chất liệu — full width, multi-row badges */}
               {(() => {
-                const parsed = parseMaterialsFromQuote({
-                  materialType: selected.materialType,
-                  dimensions: (selected as any).dimensions,
-                  notes: selected.notes,
-                })
+                const parsed = parseMaterialsFromQuote(selected)
                 return (
                   <div className="rounded-xl bg-muted/40 border border-border/50 px-4 py-3 col-span-2">
                     <p className="text-xs text-muted-foreground mb-1.5">⚙️ Chất liệu</p>
@@ -445,6 +490,7 @@ function PricingDialogTabs({
                           <Layers className="h-3 w-3" />
                           {row.label}
                           {row.weightChi && <span className="opacity-60 font-normal">· {row.weightChi} {row.weightUnit === 'gram' ? 'g' : 'chỉ'}</span>}
+                          {row.materialType === 'SILVER' && row.budget && <span className="opacity-60 font-normal">· {row.budget}</span>}
                         </span>
                       ))}
                     </div>
@@ -455,7 +501,7 @@ function PricingDialogTabs({
 
             {/* Full-width detail blocks */}
             {([
-              { label: 'Kích thước / Trọng lượng', value: (selected as any).dimensions, icon: '📐' },
+              { label: 'Kích thước / Trọng lượng', value: formatDimensionsForDisplay((selected as any).dimensions), icon: '📐' },
               { label: 'Yêu cầu đá / phụ kiện',   value: (selected as any).stoneRequirements, icon: '💎' },
               { label: 'Mô tả sản phẩm',           value: selected.productDescription, icon: '📝' },
             ] as { label: string; value: string; icon: string }[]).filter(x => x.value).map(({ label, value, icon }) => (
@@ -635,6 +681,21 @@ function formatInputNumber(raw: string | undefined | null): string {
 }
 function parseInputNumber(formatted: string): string {
   return formatted.replace(/\./g, '').replace(/,/g, '')
+}
+
+const formatBudgetValue = (val: string): string => {
+  const raw = val.replace(/\./g, '')
+  if (/^\d+$/.test(raw)) {
+    return Number(raw).toLocaleString('vi-VN')
+  }
+  const rangeMatch = raw.match(/^(\d+)(\s*-\s*)(\d+)$/)
+  if (rangeMatch) {
+    const num1 = Number(rangeMatch[1]).toLocaleString('vi-VN')
+    const separator = rangeMatch[2]
+    const num2 = Number(rangeMatch[3]).toLocaleString('vi-VN')
+    return `${num1}${separator}${num2}`
+  }
+  return val
 }
 
 // ─── Small helpers ──────────────────────────────────────────
@@ -1200,6 +1261,16 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('vi-VN')
 }
 
+function formatDimensionsForDisplay(dimensionsStr: string | undefined): string {
+  if (!dimensionsStr) return '—'
+  const parts = dimensionsStr.split('|').map(s => s.trim())
+  const cleanParts = parts.filter(p => {
+    const isMaterialPart = p.startsWith('Vàng') || p.startsWith('Bạc') || p.startsWith('Bạch kim')
+    return !isMaterialPart
+  })
+  return cleanParts.join(' | ')
+}
+
 export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá', newQuote, action }: QuoteListPricerProps) {
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(false)
@@ -1223,9 +1294,144 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
     quantity: 1,
     deadline: '',
   })
+  const [editCategory, setEditCategory] = useState<ProductCategory | ''>('')
+  const [editRingSize, setEditRingSize] = useState('')
+  const [editRingSizeCustom, setEditRingSizeCustom] = useState('')
+  const [editNecklaceSize, setEditNecklaceSize] = useState('')
+  const [editNecklaceSizeCustom, setEditNecklaceSizeCustom] = useState('')
+  const [editBraceletSize, setEditBraceletSize] = useState('')
+  const [editBraceletSizeCustom, setEditBraceletSizeCustom] = useState('')
+  const [editAnkletSize, setEditAnkletSize] = useState('')
+  const [editAnkletSizeCustom, setEditAnkletSizeCustom] = useState('')
+  const [editStoneType, setEditStoneType] = useState('')
+  const [editStoneNote, setEditStoneNote] = useState('')
+  const [editStonePopoverOpen, setEditStonePopoverOpen] = useState(false)
+  const [editCalendarOpen, setEditCalendarOpen] = useState(false)
+
+  const parseDimensionsAndStonesForEdit = (dimensionsStr: string, stoneReqStr: string) => {
+    let categoryVal: ProductCategory | '' = ''
+    let ringSz = ''
+    let ringSzCust = ''
+    let neckSz = ''
+    let neckSzCust = ''
+    let braceSz = ''
+    let braceSzCust = ''
+    let anklSz = ''
+    let anklSzCust = ''
+
+    if (dimensionsStr) {
+      const parts = dimensionsStr.split('|').map(s => s.trim())
+      const catPart = parts.find(p => p.startsWith('Loại:'))
+      if (catPart) {
+        const catLabel = catPart.replace('Loại:', '').trim()
+        const foundCat = PRODUCT_CATEGORIES.find(c => c.label === catLabel)
+        if (foundCat) {
+          categoryVal = foundCat.value
+        }
+      }
+
+      if (!categoryVal) {
+        if (parts.some(p => p.startsWith('Size nhẫn:'))) {
+          categoryVal = 'NHAN'
+        } else if (parts.some(p => p.startsWith('Dài:') || p.startsWith('Chiều dài:'))) {
+          categoryVal = 'DAY_CHUYEN'
+        } else if (parts.some(p => p.startsWith('Chu vi:'))) {
+          const sizePart = parts.find(p => p.startsWith('Chu vi:'))
+          const val = sizePart ? sizePart.replace('Chu vi:', '').trim() : ''
+          if (val.includes('cm') && parseInt(val) >= 20) {
+            categoryVal = 'LAC_CHAN'
+          } else {
+            categoryVal = 'VONG_LAC_TAY'
+          }
+        }
+      }
+
+      if (categoryVal === 'NHAN') {
+        const sizePart = parts.find(p => p.startsWith('Size nhẫn:'))
+        if (sizePart) {
+          const val = sizePart.replace('Size nhẫn:', '').trim()
+          if (RING_SIZES.includes(val)) {
+            ringSz = val
+          } else {
+            ringSz = 'other'
+            ringSzCust = val
+          }
+        }
+      } else if (categoryVal === 'DAY_CHUYEN') {
+        const sizePart = parts.find(p => p.startsWith('Dài:') || p.startsWith('Chiều dài:'))
+        if (sizePart) {
+          const val = sizePart.replace(/^(Dài|Chiều dài):/, '').trim()
+          if (NECKLACE_SIZES.includes(val)) {
+            neckSz = val
+          } else {
+            neckSz = 'other'
+            neckSzCust = val
+          }
+        }
+      } else if (categoryVal === 'VONG_LAC_TAY') {
+        const sizePart = parts.find(p => p.startsWith('Chu vi:'))
+        if (sizePart) {
+          const val = sizePart.replace('Chu vi:', '').trim()
+          if (BRACELET_SIZES.includes(val)) {
+            braceSz = val
+          } else {
+            braceSz = 'other'
+            braceSzCust = val
+          }
+        }
+      } else if (categoryVal === 'LAC_CHAN') {
+        const sizePart = parts.find(p => p.startsWith('Chu vi:'))
+        if (sizePart) {
+          const val = sizePart.replace('Chu vi:', '').trim()
+          if (ANKLET_SIZES.includes(val)) {
+            anklSz = val
+          } else {
+            anklSz = 'other'
+            anklSzCust = val
+          }
+        }
+      }
+    }
+
+    let stoneTypeVal = ''
+    let stoneNoteVal = ''
+    if (stoneReqStr) {
+      const foundOption = STONE_OPTIONS.find(opt => stoneReqStr.includes(opt.label))
+      if (foundOption) {
+        stoneTypeVal = foundOption.value
+        const regex = new RegExp(`^${foundOption.label}\\s*[-–]\\s*(.*)$`, 'i')
+        const match = stoneReqStr.match(regex)
+        if (match) {
+          stoneNoteVal = match[1].trim()
+        } else {
+          if (stoneReqStr.trim() === foundOption.label) {
+            stoneNoteVal = ''
+          } else {
+            stoneNoteVal = stoneReqStr.replace(foundOption.label, '').trim()
+          }
+        }
+      } else {
+        stoneTypeVal = ''
+        stoneNoteVal = stoneReqStr
+      }
+    }
+
+    setEditCategory(categoryVal)
+    setEditRingSize(ringSz)
+    setEditRingSizeCustom(ringSzCust)
+    setEditNecklaceSize(neckSz)
+    setEditNecklaceSizeCustom(neckSzCust)
+    setEditBraceletSize(braceSz)
+    setEditBraceletSizeCustom(braceSzCust)
+    setEditAnkletSize(anklSz)
+    setEditAnkletSizeCustom(anklSzCust)
+    setEditStoneType(stoneTypeVal)
+    setEditStoneNote(stoneNoteVal)
+  }
+
   const [editImages, setEditImages] = useState<{ file: File; url: string }[]>([])
   const [keepImages, setKeepImages] = useState<string[]>([])
-  const [editMaterialRows, setEditMaterialRows] = useState<{ id: string; materialType: string; weight: string; unit: 'chi' | 'gram' }[]>([])
+  const [editMaterialRows, setEditMaterialRows] = useState<{ id: string; materialType: string; weight: string; unit: 'chi' | 'gram'; budget?: string }[]>([])
   const editFileRef = useRef<HTMLInputElement>(null)
 
   const [pricingConfig, setPricingConfig] = useState<PricingConfig | null>(null)
@@ -1518,10 +1724,11 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
         dimensions: (q as any).dimensions || '',
         stoneRequirements: (q as any).stoneRequirements || '',
         productDescription: q.productDescription || '',
-        notes: q.notes || '',
+        notes: (q.notes || '').replace(/^Chất liệu:[^\n]*\n?/m, '').trim(),
         quantity: (q as any).quantity || 1,
         deadline: (q as any).deadline || '',
       })
+      parseDimensionsAndStonesForEdit((q as any).dimensions || '', (q as any).stoneRequirements || '')
       setKeepImages(q.images || [])
       setEditImages([])
       setShowEditForm(true)
@@ -1640,14 +1847,16 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       ? q.options.map((opt: any) => ({
           id: `${opt.materialType}-${Date.now()}-${Math.random()}`,
           materialType: opt.materialType,
-          weight: opt.weightChi ? String(opt.weightChi) : (opt.weightGram ? String(opt.weightGram) : ''),
-          unit: opt.materialType === 'PLATINUM' ? 'chi' as const : (opt.weightGram ? 'gram' as const : 'chi' as const)
+          weight: opt.materialType === 'SILVER' ? (opt.budget ? String(opt.budget) : '') : (opt.weightChi ? String(opt.weightChi) : (opt.weightGram ? String(opt.weightGram) : '')),
+          unit: opt.materialType === 'PLATINUM' ? 'chi' as const : (opt.weightGram ? 'gram' as const : 'chi' as const),
+          budget: opt.budget ? String(opt.budget) : '',
         }))
       : parsedRows.map(row => ({
           id: row.id,
           materialType: row.materialType as any,
-          weight: row.weightChi,
-          unit: (row.weightUnit || 'chi') as 'chi' | 'gram'
+          weight: row.materialType === 'SILVER' ? (row.budget || row.weightChi || '') : row.weightChi,
+          unit: (row.weightUnit || 'chi') as 'chi' | 'gram',
+          budget: (row as any).budget || '',
         }))
     setEditMaterialRows(initialMaterials)
 
@@ -1873,24 +2082,58 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       const filledRows = editMaterialRows.filter((r) => r.materialType)
       const materialSummary = filledRows.map((r) => {
         const label = MATERIAL_LABEL_MAP[r.materialType] || r.materialType
+        if (r.materialType === 'SILVER') {
+          const budgetVal = r.budget || r.weight
+          return `${label}${budgetVal ? ` (Khoảng giá: ${budgetVal})` : ''}`
+        }
         const unit = r.materialType === 'PLATINUM' ? 'chi' : r.unit
         return `${label}${r.weight ? ` – ${r.weight} ${unit}` : ''}`
       }).join('; ')
 
       const primaryMaterial = filledRows[0]?.materialType as Quote['materialType']
-      const weightNotes = filledRows.filter((r) => r.weight).map((r) => {
+      const weightNotes = filledRows.filter((r) => r.materialType !== 'SILVER' && r.weight).map((r) => {
         const label = MATERIAL_LABEL_MAP[r.materialType] || r.materialType
         const unit = r.materialType === 'PLATINUM' ? 'chi' : r.unit
         return `${label}: ${r.weight} ${unit}`
       }).join(', ')
 
-      const oldCatLabel = editForm.dimensions.split('|')[0]?.trim() || 'Loại: Nhẫn'
-      const newDimensions = [oldCatLabel, weightNotes].filter(Boolean).join(' | ')
+      const budgetNotes = filledRows.filter((r) => r.materialType === 'SILVER' && (r.budget || r.weight)).map((r) => {
+        const optLabel = MATERIAL_LABEL_MAP[r.materialType] || r.materialType
+        return `${optLabel}: ${r.budget || r.weight}`
+      }).join(', ')
+
+      const buildEditSizeString = (): string => {
+        if (editCategory === 'NHAN') {
+          const s = editRingSize === 'other' ? editRingSizeCustom : editRingSize
+          return s ? `Size nhẫn: ${s}` : ''
+        }
+        if (editCategory === 'DAY_CHUYEN') {
+          const s = editNecklaceSize === 'other' ? editNecklaceSizeCustom : editNecklaceSize
+          return s ? `Dài: ${s}` : ''
+        }
+        if (editCategory === 'VONG_LAC_TAY') {
+          const s = editBraceletSize === 'other' ? editBraceletSizeCustom : editBraceletSize
+          return s ? `Chu vi: ${s}` : ''
+        }
+        if (editCategory === 'LAC_CHAN') {
+          const s = editAnkletSize === 'other' ? editAnkletSizeCustom : editAnkletSize
+          return s ? `Chu vi: ${s}` : ''
+        }
+        return ''
+      }
+
+      const catLabel = PRODUCT_CATEGORIES.find((c) => c.value === editCategory)?.label ?? ''
+      const sizeStr = buildEditSizeString()
+      const newDimensions = [catLabel && `Loại: ${catLabel}`, sizeStr, weightNotes, budgetNotes].filter(Boolean).join(' | ')
+
+      const stoneLabel = STONE_OPTIONS.find((s) => s.value === editStoneType)?.label ?? ''
+      const stoneReq = [stoneLabel, editStoneNote].filter(Boolean).join(' – ')
 
       const options = filledRows.map((r) => ({
         materialType: r.materialType,
-        weightChi: r.materialType === 'PLATINUM' || r.unit === 'chi' ? (parseFloat(r.weight) || undefined) : undefined,
-        weightGram: r.materialType !== 'PLATINUM' && r.unit === 'gram' ? (parseFloat(r.weight) || undefined) : undefined,
+        weightChi: r.materialType === 'SILVER' ? undefined : (r.materialType === 'PLATINUM' || r.unit === 'chi' ? (parseFloat(r.weight) || undefined) : undefined),
+        weightGram: r.materialType === 'SILVER' || r.materialType === 'PLATINUM' ? undefined : (r.unit === 'gram' ? (parseFloat(r.weight) || undefined) : undefined),
+        budget: r.materialType === 'SILVER' ? (r.budget || r.weight || undefined) : undefined,
       }))
 
       // Tự động cập nhật notes nếu có chất liệu được chỉnh sửa
@@ -1900,7 +2143,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
       await quotesApi.updateInfo(selected._id, {
         productName: editForm.productName || selected.productName,
         dimensions: newDimensions,
-        stoneRequirements: editForm.stoneRequirements,
+        stoneRequirements: stoneReq,
         productDescription: editForm.productDescription,
         notes: newNotes,
         quantity: editForm.quantity,
@@ -2337,12 +2580,8 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         </div>
                       ))}
                       {/* Chất liệu — hiển thị đầy đủ multi-row */}
-                      {(() => {
-                        const parsed = parseMaterialsFromQuote({
-                          materialType: selected.materialType,
-                          dimensions: (selected as any).dimensions,
-                          notes: selected.notes,
-                        })
+                       {(() => {
+                        const parsed = parseMaterialsFromQuote(selected)
                         return (
                           <div className="rounded-xl bg-background border border-border/60 px-3 py-2.5 col-span-2">
                             <p className="text-xs text-muted-foreground mb-1.5">⚙️ Chất liệu</p>
@@ -2352,6 +2591,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                   <Layers className="h-3 w-3" />
                                   {row.label}
                                   {row.weightChi && <span className="opacity-60 font-normal">· {row.weightChi} {row.weightUnit === 'gram' ? 'g' : 'chỉ'}</span>}
+                                  {row.materialType === 'SILVER' && row.budget && <span className="opacity-60 font-normal">· {row.budget}</span>}
                                 </span>
                               ))}
                             </div>
@@ -2362,7 +2602,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
 
                     {/* Full-width detail blocks */}
                     {([
-                      { label: 'Kích thước / Trọng lượng', value: (selected as any).dimensions, icon: '📐' },
+                      { label: 'Kích thước / Trọng lượng', value: formatDimensionsForDisplay((selected as any).dimensions), icon: '📐' },
                       { label: 'Yêu cầu đá / phụ kiện',   value: (selected as any).stoneRequirements, icon: '💎' },
                       { label: 'Mô tả sản phẩm',           value: selected.productDescription, icon: '📝' },
                     ] as { label: string; value: string; icon: string }[]).filter(x => x.value).map(({ label, value, icon }) => (
@@ -3021,15 +3261,36 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           </div>
                         </div>
 
-                        {/* Thời hạn hoàn thành */}
+                         {/* Thời hạn hoàn thành */}
                         <div className="space-y-2 col-span-1">
                           <Label className="text-[10px] font-bold text-[#6B5E4C] uppercase tracking-wider">Thời hạn hoàn thành</Label>
-                          <Input
-                            type="date"
-                            value={editForm.deadline ? editForm.deadline.substring(0, 10) : ''}
-                            onChange={(e) => setEditForm(f => ({ ...f, deadline: e.target.value }))}
-                            className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
-                          />
+                          <Popover open={editCalendarOpen} onOpenChange={setEditCalendarOpen}>
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                className={`flex items-center gap-2 w-full h-10 px-3.5 border border-[#E6DFD0] rounded-xl bg-white hover:border-[#C9981A] transition-colors text-xs text-left ${
+                                  editForm.deadline ? 'text-foreground' : 'text-muted-foreground'
+                                }`}
+                              >
+                                <CalendarIcon className="h-4 w-4 text-[#C9981A] shrink-0" />
+                                <span className="truncate">
+                                  {editForm.deadline ? format(new Date(editForm.deadline), 'dd/MM/yyyy', { locale: vi }) : 'Chọn ngày...'}
+                                </span>
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0 z-50" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={editForm.deadline ? new Date(editForm.deadline) : undefined}
+                                onSelect={(d) => {
+                                  setEditForm(f => ({ ...f, deadline: d ? format(d, 'yyyy-MM-dd') : '' }))
+                                  setEditCalendarOpen(false)
+                                }}
+                                disabled={(d) => d < new Date(new Date().setHours(0, 0, 0, 0)) || d > MAX_DEADLINE}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
                         </div>
                       </div>
                     </div>
@@ -3075,27 +3336,39 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                               </Select>
                             </div>
 
-                            {/* Trọng lượng */}
-                            <div className="flex-1 flex items-center">
-                              <Input
-                                type="text"
-                                placeholder="Trọng lượng..."
-                                value={row.weight}
-                                onChange={(e) => setEditMaterialRows(prev => prev.map(r => r.id === row.id ? { ...r, weight: e.target.value.replace(/[^0-9.]/g, '') } : r))}
-                                className="h-9 border-[#E6DFD0] rounded-l-lg border-r-0 text-xs bg-white text-right font-medium pr-3"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (row.materialType === 'SILVER' || row.materialType === 'PLATINUM') return
-                                  setEditMaterialRows(prev => prev.map(r => r.id === row.id ? { ...r, unit: r.unit === 'chi' ? 'gram' : 'chi' } : r))
-                                }}
-                                className="h-9 px-3 border border-[#E6DFD0] rounded-r-lg bg-muted/40 hover:bg-muted text-xs font-bold text-[#6B5E4C] transition-colors shrink-0"
-                                disabled={row.materialType === 'SILVER' || row.materialType === 'PLATINUM'}
-                              >
-                                {row.unit}
-                              </button>
-                            </div>
+                            {/* Trọng lượng / Giá mong muốn */}
+                            {row.materialType === 'SILVER' ? (
+                              <div className="flex-1 flex items-center">
+                                <Input
+                                  type="text"
+                                  placeholder="Giá mong muốn..."
+                                  value={row.budget || row.weight || ''}
+                                  onChange={(e) => setEditMaterialRows(prev => prev.map(r => r.id === row.id ? { ...r, budget: formatBudgetValue(e.target.value), weight: formatBudgetValue(e.target.value) } : r))}
+                                  className="h-9 border-[#E6DFD0] rounded-lg text-xs bg-white text-right font-medium pr-3"
+                                />
+                              </div>
+                            ) : (
+                              <div className="flex-1 flex items-center">
+                                <Input
+                                  type="text"
+                                  placeholder={row.materialType === 'PLATINUM' ? "Có thể để trống" : "Trọng lượng..."}
+                                  value={row.weight}
+                                  onChange={(e) => setEditMaterialRows(prev => prev.map(r => r.id === row.id ? { ...r, weight: e.target.value.replace(/[^0-9.]/g, '') } : r))}
+                                  className="h-9 border-[#E6DFD0] rounded-l-lg border-r-0 text-xs bg-white text-right font-medium pr-3"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (row.materialType === 'SILVER' || row.materialType === 'PLATINUM') return
+                                    setEditMaterialRows(prev => prev.map(r => r.id === row.id ? { ...r, unit: r.unit === 'chi' ? 'gram' : 'chi' } : r))
+                                  }}
+                                  className="h-9 px-3 border border-[#E6DFD0] rounded-r-lg bg-muted/40 hover:bg-muted text-xs font-bold text-[#6B5E4C] transition-colors shrink-0"
+                                  disabled={row.materialType === 'SILVER' || row.materialType === 'PLATINUM'}
+                                >
+                                  {row.unit}
+                                </button>
+                              </div>
+                            )}
 
                             {/* Nút xóa dòng */}
                             {editMaterialRows.length > 1 && (
@@ -3114,35 +3387,200 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                       </div>
                     </div>
 
-                    {/* SECTION 2: Thông số kỹ thuật */}
+                     {/* SECTION 2: Thông số kỹ thuật */}
                     <div className="rounded-xl border border-border bg-card p-4 space-y-4 shadow-sm">
                       <p className="text-[10px] font-bold text-[#A07810] tracking-wider uppercase border-b pb-1.5 flex items-center gap-1.5">
                         <Gem className="h-3.5 w-3.5" /> Thông số & Yêu cầu kỹ thuật
                       </p>
 
                       <div className="grid grid-cols-2 gap-4">
-                        {/* Kích thước / Trọng lượng */}
+                        {/* Loại sản phẩm */}
                         <div className="space-y-2 col-span-2">
-                          <Label className="text-[10px] font-bold text-[#6B5E4C] uppercase tracking-wider">Kích thước / Trọng lượng</Label>
-                          <Input
-                            value={editForm.dimensions}
-                            onChange={(e) => setEditForm(f => ({ ...f, dimensions: e.target.value }))}
-                            placeholder="VD: Size 12, khoảng 3 chỉ..."
-                            className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
-                          />
+                          <Label className="text-[10px] font-bold text-[#6B5E4C] uppercase tracking-wider">Loại sản phẩm</Label>
+                          <div className="flex gap-2" role="group" aria-label="Loại sản phẩm">
+                            {PRODUCT_CATEGORIES.map((cat) => {
+                              const isSelected = editCategory === cat.value
+                              return (
+                                <button
+                                  type="button"
+                                  key={cat.value}
+                                  onClick={() => {
+                                    setEditCategory(cat.value)
+                                    setEditRingSize(''); setEditRingSizeCustom('')
+                                    setEditNecklaceSize(''); setEditNecklaceSizeCustom('')
+                                    setEditBraceletSize(''); setEditBraceletSizeCustom('')
+                                    setEditAnkletSize(''); setEditAnkletSizeCustom('')
+                                  }}
+                                  className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-2.5 rounded-xl border transition-all ${
+                                    isSelected 
+                                      ? 'border-[#C9981A] bg-[#FBF6E9] text-[#A07810] font-bold ring-2 ring-[#C9981A]/20' 
+                                      : 'border-[#E6DFD0] bg-white text-[#6B5E4C] hover:bg-muted/30'
+                                  }`}
+                                >
+                                  <span className="text-xl leading-none">{cat.icon}</span>
+                                  <span className="text-[10.5px] tracking-wide whitespace-nowrap">{cat.label}</span>
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
+
+                        {/* Size theo loại */}
+                        {editCategory && (
+                          <div className="col-span-2 rounded-xl border border-[#C9981A]/30 bg-[#FBF6E9]/50 p-3.5 space-y-2.5">
+                            <Label className="text-[10px] font-bold text-[#A07810] uppercase tracking-wider block">
+                              {editCategory === 'NHAN' && 'Size nhẫn'}
+                              {editCategory === 'DAY_CHUYEN' && 'Chiều dài dây chuyền'}
+                              {editCategory === 'VONG_LAC_TAY' && 'Chu vi vòng / lắc tay'}
+                              {editCategory === 'LAC_CHAN' && 'Chu vi lắc chân'}
+                            </Label>
+                            <div className="flex flex-wrap gap-1.5">
+                              {(editCategory === 'NHAN' ? RING_SIZES
+                                : editCategory === 'DAY_CHUYEN' ? NECKLACE_SIZES
+                                : editCategory === 'VONG_LAC_TAY' ? BRACELET_SIZES
+                                : ANKLET_SIZES
+                              ).map((s) => {
+                                const cur = editCategory === 'NHAN' ? editRingSize : editCategory === 'DAY_CHUYEN' ? editNecklaceSize : editCategory === 'VONG_LAC_TAY' ? editBraceletSize : editAnkletSize
+                                const setCur = editCategory === 'NHAN' ? setEditRingSize : editCategory === 'DAY_CHUYEN' ? setEditNecklaceSize : editCategory === 'VONG_LAC_TAY' ? setEditBraceletSize : setEditAnkletSize
+                                const setCustom = editCategory === 'NHAN' ? setEditRingSizeCustom : editCategory === 'DAY_CHUYEN' ? setEditNecklaceSizeCustom : editCategory === 'VONG_LAC_TAY' ? setEditBraceletSizeCustom : setEditAnkletSizeCustom
+                                const isSelected = cur === s
+                                return (
+                                  <button
+                                    type="button"
+                                    key={s}
+                                    onClick={() => { setCur(s); setCustom('') }}
+                                    className={`px-3 py-1.5 rounded-lg border text-xs transition-all ${
+                                      isSelected
+                                        ? 'border-[#C9981A] bg-[#FBF6E9] text-[#A07810] font-semibold'
+                                        : 'border-[#E6DFD0] bg-white text-[#6B5E4C] hover:bg-muted/30'
+                                    }`}
+                                  >
+                                    {s}
+                                  </button>
+                                )
+                              })}
+                              {(() => {
+                                const cur = editCategory === 'NHAN' ? editRingSize : editCategory === 'DAY_CHUYEN' ? editNecklaceSize : editCategory === 'VONG_LAC_TAY' ? editBraceletSize : editAnkletSize
+                                const setCur = editCategory === 'NHAN' ? setEditRingSize : editCategory === 'DAY_CHUYEN' ? setEditNecklaceSize : editCategory === 'VONG_LAC_TAY' ? setEditBraceletSize : setEditAnkletSize
+                                const customVal = editCategory === 'NHAN' ? editRingSizeCustom : editCategory === 'DAY_CHUYEN' ? editNecklaceSizeCustom : editCategory === 'VONG_LAC_TAY' ? editBraceletSizeCustom : editAnkletSizeCustom
+                                const setCustom = editCategory === 'NHAN' ? setEditRingSizeCustom : editCategory === 'DAY_CHUYEN' ? setEditNecklaceSizeCustom : editCategory === 'VONG_LAC_TAY' ? setEditBraceletSizeCustom : setEditAnkletSizeCustom
+                                const isSelected = cur === 'other'
+                                return (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => setCur('other')}
+                                      className={`px-3 py-1.5 rounded-lg border text-xs transition-all ${
+                                        isSelected
+                                          ? 'border-[#C9981A] bg-[#FBF6E9] text-[#A07810] font-semibold'
+                                          : 'border-[#E6DFD0] bg-white text-[#6B5E4C] hover:bg-muted/30'
+                                      }`}
+                                    >
+                                      Khác
+                                    </button>
+                                    {isSelected && (
+                                      <Input
+                                        placeholder="Nhập kích thước..."
+                                        value={customVal}
+                                        onChange={(e) => setCustom(e.target.value)}
+                                        className="h-8 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-lg bg-white text-xs w-full mt-2"
+                                      />
+                                    )}
+                                  </>
+                                )
+                              })()}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Yêu cầu đá / phụ kiện */}
                         <div className="space-y-2 col-span-2">
                           <Label className="text-[10px] font-bold text-[#6B5E4C] uppercase tracking-wider">Yêu cầu đá / phụ kiện</Label>
-                          <div className="relative">
+                          <div className="space-y-2">
+                            <Popover open={editStonePopoverOpen} onOpenChange={setEditStonePopoverOpen}>
+                              <PopoverTrigger asChild>
+                                <button
+                                  type="button"
+                                  className="flex items-center justify-between w-full h-10 px-3.5 border border-[#E6DFD0] rounded-xl bg-white hover:border-[#C9981A] transition-colors text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-[#C9981A]/20"
+                                >
+                                  {(() => {
+                                    const activeOption = STONE_OPTIONS.find((s) => s.value === editStoneType)
+                                    return (
+                                      <div className="flex items-center gap-2">
+                                        {activeOption ? (
+                                          <>
+                                            <div
+                                              className="w-4.5 h-4.5 rounded-full border"
+                                              style={{
+                                                width: '18px',
+                                                height: '18px',
+                                                background: activeOption.color,
+                                                borderColor: activeOption.border,
+                                              }}
+                                            />
+                                            <span className="font-semibold text-[#A07810]">{activeOption.label}</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <div className="w-[18px] h-[18px] rounded-full bg-muted border border-border flex items-center justify-center text-[9px] text-[#9E8E7A] font-bold">✕</div>
+                                            <span className="text-[#9E8E7A]">Không đính đá (Trang sức trơn)</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    )
+                                  })()}
+                                  <ChevronDown className={`h-4 w-4 text-[#9E8E7A] transition-transform duration-200 ${editStonePopoverOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-1 rounded-xl bg-white border border-[#E6DFD0] shadow-lg flex flex-col gap-1 z-50">
+                                <button
+                                  type="button"
+                                  onClick={() => { setEditStoneType(''); setEditStonePopoverOpen(false) }}
+                                  className={`flex items-center justify-between w-full p-2 rounded-lg text-left text-xs transition-colors ${
+                                    !editStoneType ? 'bg-[#FBF6E9] text-[#A07810] font-semibold' : 'text-[#6B5E4C] hover:bg-[#FBF6E9]/50'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-[18px] h-[18px] rounded-full bg-muted border border-border flex items-center justify-center text-[9px] text-[#9E8E7A] font-bold">✕</div>
+                                    <span>Không đính đá (Trang sức trơn)</span>
+                                  </div>
+                                  {!editStoneType && <Check className="h-3.5 w-3.5 text-[#C9981A]" />}
+                                </button>
+
+                                {STONE_OPTIONS.map((s) => {
+                                  const isSelected = editStoneType === s.value
+                                  return (
+                                    <button
+                                      key={s.value}
+                                      type="button"
+                                      onClick={() => { setEditStoneType(s.value); setEditStonePopoverOpen(false) }}
+                                      className={`flex items-center justify-between w-full p-2 rounded-lg text-left text-xs transition-colors ${
+                                        isSelected ? 'bg-[#FBF6E9] text-[#A07810] font-semibold' : 'text-[#6B5E4C] hover:bg-[#FBF6E9]/50'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <div
+                                          className="w-[18px] h-[18px] rounded-full border"
+                                          style={{
+                                            background: s.color,
+                                            borderColor: s.border,
+                                          }}
+                                        />
+                                        <span>{s.label}</span>
+                                      </div>
+                                      {isSelected && <Check className="h-3.5 w-3.5 text-[#C9981A]" />}
+                                    </button>
+                                  )
+                                })}
+                              </PopoverContent>
+                            </Popover>
+
                             <Input
-                              value={editForm.stoneRequirements}
-                              onChange={(e) => setEditForm(f => ({ ...f, stoneRequirements: e.target.value }))}
-                              placeholder="VD: 1 viên kim cương 0.3ct..."
-                              className="h-10 pl-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white"
+                              value={editStoneNote}
+                              onChange={(e) => setEditStoneNote(e.target.value)}
+                              placeholder="Ghi chú đá (VD: 0.3ct, màu D, VS1...)"
+                              className="h-10 border-[#E6DFD0] focus-visible:ring-[#C9981A]/30 focus-visible:border-[#C9981A] rounded-xl bg-white text-xs"
                             />
-                            <Gem className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           </div>
                         </div>
 
@@ -3263,11 +3701,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
 
                       {/* Chất liệu yêu cầu */}
                       {(() => {
-                        const parsed = parseMaterialsFromQuote({
-                          materialType: selected.materialType,
-                          dimensions: (selected as any).dimensions,
-                          notes: selected.notes,
-                        })
+                        const parsed = parseMaterialsFromQuote(selected)
                         return (
                           <div className="rounded-xl border border-[#EDE8DE] bg-white px-4 py-3 shadow-sm transition-all duration-200 hover:shadow-md">
                             <span className="text-[9px] text-[#9E8E7A] font-bold tracking-wider uppercase flex items-center gap-1.5 mb-2">⚙️ Chất liệu yêu cầu</span>
@@ -3277,6 +3711,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                                   <Layers className="h-3 w-3" />
                                   {row.label}
                                   {row.weightChi && <span className="opacity-75 font-normal">· {row.weightChi} {row.weightUnit === 'gram' ? 'g' : 'chỉ'}</span>}
+                                  {row.materialType === 'SILVER' && row.budget && <span className="opacity-75 font-normal">· {row.budget}</span>}
                                 </span>
                               ))}
                             </div>
@@ -3726,10 +4161,11 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                             dimensions: (selected as any).dimensions || '',
                             stoneRequirements: (selected as any).stoneRequirements || '',
                             productDescription: selected.productDescription || '',
-                            notes: selected.notes || '',
+                            notes: (selected.notes || '').replace(/^Chất liệu:[^\n]*\n?/m, '').trim(),
                             quantity: (selected as any).quantity || 1,
                             deadline: (selected as any).deadline || '',
                           })
+                          parseDimensionsAndStonesForEdit((selected as any).dimensions || '', (selected as any).stoneRequirements || '')
                           const parsedRowsForEdit = parseMaterialsFromQuote({
                             materialType: selected.materialType,
                             dimensions: (selected as any).dimensions,
@@ -3739,14 +4175,16 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                             ? selected.options.map((opt: any) => ({
                                 id: `${opt.materialType}-${Date.now()}-${Math.random()}`,
                                 materialType: opt.materialType,
-                                weight: opt.weightChi ? String(opt.weightChi) : (opt.weightGram ? String(opt.weightGram) : ''),
-                                unit: opt.materialType === 'PLATINUM' ? 'chi' as const : (opt.weightGram ? 'gram' as const : 'chi' as const)
+                                weight: opt.materialType === 'SILVER' ? (opt.budget ? String(opt.budget) : '') : (opt.weightChi ? String(opt.weightChi) : (opt.weightGram ? String(opt.weightGram) : '')),
+                                unit: opt.materialType === 'PLATINUM' ? 'chi' as const : (opt.weightGram ? 'gram' as const : 'chi' as const),
+                                budget: opt.budget ? String(opt.budget) : '',
                               }))
                             : parsedRowsForEdit.map(row => ({
                                 id: row.id,
                                 materialType: row.materialType as any,
-                                weight: row.weightChi,
-                                unit: (row.weightUnit || 'chi') as 'chi' | 'gram'
+                                weight: row.materialType === 'SILVER' ? (row.budget || row.weightChi || '') : row.weightChi,
+                                unit: (row.weightUnit || 'chi') as 'chi' | 'gram',
+                                budget: (row as any).budget || '',
                               }))
                           setEditMaterialRows(initialMaterialsForEdit)
                           setKeepImages(selected.images || [])
