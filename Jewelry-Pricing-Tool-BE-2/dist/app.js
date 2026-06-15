@@ -9,10 +9,26 @@ const path_1 = require("path");
 const routes_1 = __importDefault(require("./routes"));
 const app = (0, express_1.default)();
 // CORS configuration
+const allowedOrigins = [
+    process.env.FE_URL,
+    'http://localhost:3001',
+    'http://localhost:3000'
+].filter(Boolean).map(url => url.trim().replace(/\/$/, ''));
 app.use((0, cors_1.default)({
-    origin: process.env.FE_URL || 'http://localhost:3001',
+    origin: (origin, callback) => {
+        if (!origin) {
+            return callback(null, true);
+        }
+        const cleanOrigin = origin.trim().replace(/\/$/, '');
+        if (allowedOrigins.includes(cleanOrigin) || cleanOrigin.includes('vercel.app')) {
+            callback(null, true);
+        }
+        else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
     credentials: true,
 }));
 // Body parsers

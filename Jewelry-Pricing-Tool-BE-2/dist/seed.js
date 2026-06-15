@@ -38,6 +38,8 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importDefault(require("mongoose"));
 const dotenv = __importStar(require("dotenv"));
+const dns_1 = __importDefault(require("dns"));
+dns_1.default.setServers(['8.8.8.8']);
 dotenv.config();
 const GoldPrice_1 = require("./models/GoldPrice");
 const MaterialRatio_1 = require("./models/MaterialRatio");

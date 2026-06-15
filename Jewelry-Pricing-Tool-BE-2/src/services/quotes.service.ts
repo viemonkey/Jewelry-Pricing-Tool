@@ -1,5 +1,83 @@
 import { Quote, QuoteStatus } from '../models/Quote'
+import { PricingConfig } from '../models/PricingConfig'
 import { notificationsService } from './notifications.service'
+
+function getProfitDivisor(
+  costWithVAT: number,
+  profitMargins: Array<{ maxCost: number; divisor: number; margin: string }>
+): { divisor: number; margin: string } {
+  for (const tier of profitMargins) {
+    if (costWithVAT < tier.maxCost) {
+      return { divisor: tier.divisor, margin: tier.margin }
+    }
+  }
+  const last = profitMargins[profitMargins.length - 1]
+  return { divisor: last?.divisor ?? 0.75, margin: last?.margin ?? '25%' }
+}
+
+async function calculateQuoteOption(option: any, config: any, isMulti: boolean, sharedLaborCost: number, sharedStoneCost: number) {
+  const isSilver = option.materialType === 'SILVER'
+  const isPlatinum = option.materialType === 'PLATINUM'
+  
+  // 1. Calculate materialCost
+  let materialCost = 0
+  if (isSilver) {
+    materialCost = parseFloat(option.materialCost) || 0
+  } else if (isPlatinum) {
+    materialCost = parseFloat(option.materialCost) || 0
+  } else {
+    // Gold
+    const goldPrice24K = parseFloat(option.goldPrice24K) || config.goldPrice24K || 9000000
+    const ratioObj = config.goldRatios.find((r: any) => r.key === option.materialType)
+    const ratio = ratioObj ? ratioObj.applied : 0
+    const weight = parseFloat(option.weightChi || option.weightGram || '0') || 0
+    materialCost = Math.round(ratio * goldPrice24K * weight)
+  }
+
+  // 2. Calculate stoneCost
+  const stoneCostVal = isMulti
+    ? (parseFloat(option.stoneCost) || 0)
+    : (isSilver ? 0 : sharedStoneCost)
+
+  // 3. Calculate laborCost
+  const laborCostVal = isSilver || isPlatinum ? 0 : sharedLaborCost
+
+  // 4. Calculate costBeforeVAT
+  const costBeforeVAT = isSilver
+    ? materialCost + stoneCostVal
+    : isPlatinum
+      ? materialCost + stoneCostVal
+      : (materialCost + stoneCostVal + laborCostVal)
+
+  // 5. Calculate costWithVAT
+  const costWithVAT = isSilver || isPlatinum ? costBeforeVAT : Math.round(costBeforeVAT * 1.1)
+
+  // 6. Calculate sellingPrice
+  let sellingPrice = 0
+  if (isSilver) {
+    sellingPrice = materialCost * (config.silverMultiplier ?? 3) + stoneCostVal
+  } else if (isPlatinum) {
+    sellingPrice = costWithVAT
+  } else if (config.profitMargins) {
+    const { divisor } = getProfitDivisor(costWithVAT, config.profitMargins)
+    sellingPrice = costBeforeVAT > 0 ? Math.round(costWithVAT / divisor / 1000) * 1000 : 0
+  }
+
+  return {
+    materialType: option.materialType,
+    weightChi: option.weightChi,
+    weightGram: option.weightGram,
+    laborCost: laborCostVal,
+    goldPrice24K: isPlatinum ? undefined : (option.goldPrice24K || config.goldPrice24K),
+    platinumPrice: option.platinumPrice,
+    materialCost,
+    stoneCost: stoneCostVal,
+    costBeforeVAT,
+    costWithVAT,
+    costPrice: costWithVAT,
+    sellingPrice,
+  }
+}
 
 export class QuotesService {
   async findAll(status?: QuoteStatus) {
@@ -80,11 +158,38 @@ export class QuotesService {
   }
 
   async updatePrice(id: string, dto: any) {
+    const config = await PricingConfig.findOne()
+    if (!config) {
+      const err = new Error('Pricing configuration not found')
+      ;(err as any).statusCode = 500
+      throw err
+    }
+
     const updateData = { ...dto }
-    
-    // Backwards compatibility: populate top-level fields from the first option
+
     if (dto.options && Array.isArray(dto.options) && dto.options.length > 0) {
-      const firstOpt = dto.options[0]
+      const isMulti = dto.options.length > 1
+      const sharedLaborCost = parseFloat(dto.laborCost) || 0
+      const sharedStoneCost = parseFloat(dto.stoneCost) || 0
+      
+      const calculatedOptions = []
+      for (const opt of dto.options) {
+        const calculatedOpt = await calculateQuoteOption(
+          opt,
+          config,
+          isMulti,
+          sharedLaborCost,
+          sharedStoneCost
+        )
+        calculatedOptions.push({
+          ...opt,
+          ...calculatedOpt
+        })
+      }
+      updateData.options = calculatedOptions
+
+      // Backwards compatibility: populate top-level fields from the first option
+      const firstOpt = calculatedOptions[0]
       updateData.materialType = firstOpt.materialType
       updateData.weightChi = firstOpt.weightChi
       updateData.weightGram = firstOpt.weightGram
@@ -97,6 +202,36 @@ export class QuotesService {
       updateData.costWithVAT = firstOpt.costWithVAT
       updateData.costPrice = firstOpt.costPrice
       updateData.sellingPrice = firstOpt.sellingPrice
+    } else {
+      // Single-option fallback
+      const singleOpt = {
+        materialType: dto.materialType,
+        weightChi: dto.weightChi,
+        weightGram: dto.weightGram,
+        laborCost: parseFloat(dto.laborCost) || 0,
+        goldPrice24K: parseFloat(dto.goldPrice24K),
+        platinumPrice: parseFloat(dto.platinumPrice),
+        materialCost: parseFloat(dto.materialCost),
+        stoneCost: parseFloat(dto.stoneCost) || 0,
+      }
+      const calculatedOpt = await calculateQuoteOption(
+        singleOpt,
+        config,
+        false,
+        singleOpt.laborCost,
+        singleOpt.stoneCost
+      )
+      
+      updateData.materialCost = calculatedOpt.materialCost
+      updateData.stoneCost = calculatedOpt.stoneCost
+      updateData.costBeforeVAT = calculatedOpt.costBeforeVAT
+      updateData.costWithVAT = calculatedOpt.costWithVAT
+      updateData.costPrice = calculatedOpt.costPrice
+      updateData.sellingPrice = calculatedOpt.sellingPrice
+      updateData.options = [{
+        ...singleOpt,
+        ...calculatedOpt
+      }]
     }
 
     const quote = await Quote.findByIdAndUpdate(
