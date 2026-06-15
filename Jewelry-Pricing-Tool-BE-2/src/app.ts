@@ -6,11 +6,27 @@ import routes from './routes'
 const app = express()
 
 // CORS configuration
+const allowedOrigins = [
+  process.env.FE_URL,
+  'http://localhost:3001',
+  'http://localhost:3000'
+].filter(Boolean).map(url => url!.trim().replace(/\/$/, ''))
+
 app.use(
   cors({
-    origin: process.env.FE_URL || 'http://localhost:3001',
+    origin: (origin, callback) => {
+      if (!origin) {
+        return callback(null, true)
+      }
+      const cleanOrigin = origin.trim().replace(/\/$/, '')
+      if (allowedOrigins.includes(cleanOrigin) || cleanOrigin.includes('vercel.app')) {
+        callback(null, true)
+      } else {
+        callback(new Error('Not allowed by CORS'))
+      }
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
     credentials: true,
   })
 )
