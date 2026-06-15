@@ -272,7 +272,13 @@ export class QuotesService {
   }
 
   async updateInfo(id: string, data: any) {
-    const quote = await Quote.findByIdAndUpdate(id, { ...data }, { new: true }).lean()
+    const updateData = { ...data }
+    if (updateData.options) {
+      try {
+        updateData.options = typeof updateData.options === 'string' ? JSON.parse(updateData.options) : updateData.options
+      } catch (err) {}
+    }
+    const quote = await Quote.findByIdAndUpdate(id, updateData, { new: true }).lean()
     if (!quote) {
       const err = new Error('Quote not found')
       ;(err as any).statusCode = 404
