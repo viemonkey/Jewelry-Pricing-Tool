@@ -26,8 +26,22 @@ import type { UserRole } from './header'
 import {
   Calculator, Info, Sparkles, Eye, EyeOff,
   Save, FileDown, CheckCircle2, Loader2, ImagePlus,
+  Gem, Watch,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+
+const CATEGORIES = [
+  { value: 'NHAN', label: 'Nhẫn', icon: Gem },
+  { value: 'DAY_CHUYEN', label: 'Dây chuyền', icon: Sparkles },
+  { value: 'VONG_LAC_TAY', label: 'Vòng / Lắc tay', icon: Watch },
+  { value: 'LAC_CHAN', label: 'Lắc chân', icon: Sparkles },
+]
+
+const GENDER_OPTIONS = [
+  { value: 'men', label: 'Nam' },
+  { value: 'women', label: 'Nữ' },
+  { value: 'unisex', label: 'Unisex' },
+]
 
 interface GoldCalculatorProps {
   currentRole: UserRole
@@ -79,6 +93,12 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
   const [showStoneCalculator, setShowStoneCalculator] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [hasCalculated, setHasCalculated] = useState(false)
+  const [productName, setProductName] = useState<string>('')
+  const [productCategory, setProductCategory] = useState<string>('NHAN')
+  const [gender, setGender] = useState<string>('unisex')
+
+  const currentCategoryLabel = CATEGORIES.find(c => c.value === productCategory)?.label ?? 'Sản phẩm'
+  const currentGenderLabel = GENDER_OPTIONS.find(g => g.value === gender)?.label ?? 'Unisex'
 
   // FIX: currency-formatted inputs for gold price and labor cost
   const goldPriceInput = useCurrencyInput()
@@ -119,7 +139,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
 
     if (weightNum > 0 && goldPriceNum > 0) {
       return calculateGoldProductPrice({
-        name: '',
+        name: productName,
         karatType,
         weight: weightNum,
         goldPrice24K: goldPriceNum,
@@ -130,7 +150,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
       })
     }
     return null
-  }, [material, karatType, weight, goldPriceInput.rawValue, laborCostInput.rawValue, stoneCost, config, goldRatiosMap])
+  }, [productName, material, karatType, weight, goldPriceInput.rawValue, laborCostInput.rawValue, stoneCost, config, goldRatiosMap])
 
   const result: PricingResult | null = hasCalculated ? calculatedResult : null
   const canCalculate = material === 'gold' && Boolean(calculatedResult)
@@ -145,7 +165,9 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
       const entry = {
         id: Date.now(),
         date: new Date().toLocaleString('vi-VN'),
-        productName: materialLabel,
+        productName: productName.trim()
+          ? `${productName.trim()} (${currentCategoryLabel} - ${currentGenderLabel})`
+          : `${currentCategoryLabel} (${currentGenderLabel})`,
         karatType,
         weight,
         goldPrice24K: goldPriceInput.rawValue,
@@ -238,6 +260,69 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                   setProductImage(URL.createObjectURL(file))
                 }}
               />
+            </div>
+
+            {/* Tên sản phẩm */}
+            <div className="space-y-2">
+              <Label htmlFor="productName">Tên sản phẩm</Label>
+              <Input
+                id="productName"
+                placeholder="Nhập tên sản phẩm (VD: Nhẫn cưới hoa mai)"
+                value={productName}
+                onChange={(e) => setProductName(e.target.value)}
+              />
+            </div>
+
+            {/* Phân loại sản phẩm */}
+            <div className="space-y-2">
+              <Label>Phân loại sản phẩm</Label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {CATEGORIES.map((cat) => {
+                  const Icon = cat.icon
+                  const isSelected = productCategory === cat.value
+                  return (
+                    <button
+                      key={cat.value}
+                      type="button"
+                      onClick={() => setProductCategory(cat.value)}
+                      className={cn(
+                        "flex flex-col items-center justify-center gap-2 rounded-lg border p-3 text-center transition-all duration-200",
+                        isSelected
+                          ? "border-primary bg-primary/10 text-primary shadow-sm ring-1 ring-primary"
+                          : "border-muted bg-muted/20 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+                      )}
+                    >
+                      <Icon className={cn("h-5 w-5", isSelected ? "text-primary animate-pulse" : "text-muted-foreground")} />
+                      <span className="text-xs font-medium">{cat.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Đối tượng sử dụng */}
+            <div className="space-y-2">
+              <Label>Đối tượng sử dụng</Label>
+              <div className="flex rounded-lg bg-muted/50 p-1">
+                {GENDER_OPTIONS.map((opt) => {
+                  const isSelected = gender === opt.value
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setGender(opt.value)}
+                      className={cn(
+                        "flex-1 rounded-md py-1.5 text-center text-xs font-medium transition-all duration-200",
+                        isSelected
+                          ? "bg-background text-primary shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -434,10 +519,10 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Info className="h-5 w-5 text-primary" />
-              Kết quả tính giá
+              {productName.trim() || 'Kết quả tính giá'}
             </CardTitle>
             <CardDescription>
-              {materialLabel} - {currentKaratLabel}
+              Phân loại: {currentCategoryLabel} ({currentGenderLabel}) · Vàng {currentKaratLabel}
             </CardDescription>
           </CardHeader>
           <CardContent>
