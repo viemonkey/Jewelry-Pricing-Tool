@@ -17,13 +17,14 @@ import { authApi, pricingConfigApi, type GoldRatioConfig } from '@/lib/api'
 import type { AuthUser } from '@/lib/types'
 import { useSseNotifications } from '@/lib/use-sse-notifications'
 import { useNotifications } from '@/lib/notifications'
-import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, Save, Loader2, BarChart3, CheckSquare } from 'lucide-react'
+import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, Save, Loader2, BarChart3, CheckSquare, FileText } from 'lucide-react'
 import { QuoteRequestModal } from '@/components/quote-request-modal'
 import { QuoteListPricer } from '@/components/quote-list-pricer'
 import { SaleDashboard } from '@/components/sale-dashboard'
 import { BusinessAnalytics } from '@/components/business-analytics'
 import { PricingSettings } from '@/components/pricing-settings'
 import { QuickQuoteApprovals } from '@/components/quick-approvals'
+import { QuickQuoteHistoryList } from '@/components/quick-quote-history'
 
 const tabContentVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -60,6 +61,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [search, setSearch] = useState('')
   const [latestQuote, setLatestQuote] = useState<any>(null)
+  const [loadedQuote, setLoadedQuote] = useState<any>(null)
   const [goldRatios, setGoldRatios] = useState<GoldRatioConfig[]>([])
   const [pricingConfig, setPricingConfig] = useState<any>(null)
   const [isUpdatingGoldPrice, setIsUpdatingGoldPrice] = useState(false)
@@ -184,6 +186,7 @@ export default function Home() {
               { value: 'quick-approvals', icon: CheckSquare, label: 'Duyệt giá nhanh', show: currentRole === 'order' },
               { value: 'analytics', icon: BarChart3, label: 'Báo cáo', show: currentRole === 'order' },
               { value: 'calculator', icon: Calculator, label: 'Máy tính giá', show: canViewCalculator },
+              { value: 'quick-quote-history', icon: FileText, label: 'Lịch sử giá nhanh', show: currentRole === 'sale' },
               { value: 'settings', icon: Settings, label: 'Cấu hình', show: currentRole === 'order' },
             ].filter(item => item.show).map((item) => {
               const isActive = activeTab === item.value
@@ -409,8 +412,37 @@ export default function Home() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.4 }}
                   >
-                    <GoldCalculator currentRole={currentRole} currentUserName={currentUserName} />
+                    <GoldCalculator
+                      currentRole={currentRole}
+                      currentUserName={currentUserName}
+                      loadedQuote={loadedQuote}
+                      onClearLoadedQuote={() => setLoadedQuote(null)}
+                    />
                   </motion.div>
+                </motion.div>
+              </TabsContent>
+            )}
+
+            {/* Quick Quote History Tab */}
+            {currentRole === 'sale' && (
+              <TabsContent value="quick-quote-history" className="space-y-6 mt-0">
+                <motion.div
+                  key="quick-quote-history"
+                  variants={tabContentVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  className="space-y-6"
+                >
+                  <QuickQuoteHistoryList
+                    currentRole={currentRole}
+                    currentUserName={currentUserName}
+                    refreshTrigger={0}
+                    onLoadQuote={(quote) => {
+                      setLoadedQuote(quote)
+                      setActiveTab('calculator')
+                    }}
+                  />
                 </motion.div>
               </TabsContent>
             )}

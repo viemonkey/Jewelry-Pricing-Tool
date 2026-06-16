@@ -25,7 +25,6 @@ import { StoneCalculator } from './stone-calculator'
 import type { UserRole } from './header'
 import type { Quote } from '@/lib/types'
 import { useNotifications } from '@/lib/notifications'
-import { QuickQuoteHistoryList } from './quick-quote-history'
 import {
   Calculator, Info, Sparkles, Eye, EyeOff,
   Save, FileDown, CheckCircle2, Loader2, ImagePlus,
@@ -49,6 +48,8 @@ const GENDER_OPTIONS = [
 interface GoldCalculatorProps {
   currentRole: UserRole
   currentUserName?: string
+  loadedQuote?: Quote | null
+  onClearLoadedQuote?: () => void
 }
 
 type QuickMaterial = 'gold' | 'silver'
@@ -85,7 +86,7 @@ function useCurrencyInput(initial = '') {
 
 const roundToThousand = (value: number) => Math.round(value / 1000) * 1000
 
-export function GoldCalculator({ currentRole, currentUserName }: GoldCalculatorProps) {
+export function GoldCalculator({ currentRole, currentUserName, loadedQuote, onClearLoadedQuote }: GoldCalculatorProps) {
   const [config, setConfig] = useState<PricingConfig | null>(null)
   const [configLoading, setConfigLoading] = useState(true)
 
@@ -304,6 +305,13 @@ export function GoldCalculator({ currentRole, currentUserName }: GoldCalculatorP
     })
   }
 
+  useEffect(() => {
+    if (loadedQuote) {
+      onLoadQuote(loadedQuote)
+      onClearLoadedQuote?.()
+    }
+  }, [loadedQuote, onClearLoadedQuote])
+
   if (configLoading) {
     return (
       <div className="flex h-48 items-center justify-center text-muted-foreground">
@@ -325,8 +333,7 @@ export function GoldCalculator({ currentRole, currentUserName }: GoldCalculatorP
   const materialLabel = material === 'gold' ? 'Sản phẩm vàng' : 'Sản phẩm bạc'
 
   return (
-    <div className="space-y-8">
-      <div className="grid gap-6 lg:grid-cols-2">
+    <div className="grid gap-6 lg:grid-cols-2">
       {/* ── Input Form ─────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
@@ -812,20 +819,5 @@ export function GoldCalculator({ currentRole, currentUserName }: GoldCalculatorP
         </Card>
       </motion.div>
     </div>
-
-    {/* Lịch sử yêu cầu duyệt giá nhanh */}
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: 0.2 }}
-    >
-      <QuickQuoteHistoryList
-        currentRole={currentRole}
-        currentUserName={currentUserName}
-        refreshTrigger={refreshTrigger}
-        onLoadQuote={onLoadQuote}
-      />
-    </motion.div>
-  </div>
   )
 }

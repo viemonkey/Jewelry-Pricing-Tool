@@ -123,7 +123,7 @@ const itemVariants = {
     opacity: 1,
     y: 0,
     transition: {
-      type: 'spring',
+      type: 'spring' as const,
       bounce: 0.08,
       duration: 0.45,
     },
@@ -755,9 +755,11 @@ export function BusinessAnalytics() {
                       'flex items-center gap-4 rounded-2xl border p-4 transition-all duration-300 relative overflow-hidden shadow-sm hover:shadow-md',
                       isTop1
                         ? 'border-[#D4AF37]/45 bg-gradient-to-r from-[#D4AF37]/10 via-[#D4AF37]/5 to-transparent dark:from-[#D4AF37]/15 dark:to-transparent'
-                        : 'border-[#CBD5E1]/60 bg-gradient-to-r from-slate-100/60 to-transparent dark:from-slate-800/25 dark:to-transparent'
-                          ? 'border-amber-600/25 bg-gradient-to-r from-amber-600/[0.04] to-transparent dark:from-amber-600/[0.08] dark:to-transparent'
-                          : 'border-[#EBE6DA]/85 dark:border-[#383126]/60 bg-white/40 dark:bg-[#151310]/40'
+                        : isTop2
+                          ? 'border-[#CBD5E1]/60 bg-gradient-to-r from-slate-100/60 to-transparent dark:from-slate-800/25 dark:to-transparent'
+                          : isTop3
+                            ? 'border-amber-600/25 bg-gradient-to-r from-amber-600/[0.04] to-transparent dark:from-amber-600/[0.08] dark:to-transparent'
+                            : 'border-[#EBE6DA]/85 dark:border-[#383126]/60 bg-white/40 dark:bg-[#151310]/40'
                     )}
                   >
                     {isTop1 && (
