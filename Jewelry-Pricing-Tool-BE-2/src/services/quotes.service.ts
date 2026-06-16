@@ -82,8 +82,14 @@ async function calculateQuoteOption(option: any, config: any, isMulti: boolean, 
 }
 
 export class QuotesService {
-  async findAll(status?: QuoteStatus) {
-    const filter = status ? { status } : {}
+  async findAll(status?: QuoteStatus, isQuickQuote?: boolean) {
+    const filter: any = {}
+    if (status) filter.status = status
+    if (isQuickQuote !== undefined) {
+      filter.isQuickQuote = isQuickQuote
+    } else {
+      filter.isQuickQuote = { $ne: true }
+    }
     const quotes = await Quote.find(filter).sort({ createdAt: -1 })
     
     let changed = false
@@ -140,7 +146,9 @@ export class QuotesService {
   async create(dto: any, imageUrls: string[]) {
     const year = new Date().getFullYear()
     const count = await Quote.countDocuments()
-    const quoteCode = `QT-${year}-${String(count + 1).padStart(4, '0')}`
+    const isQuick = dto.isQuickQuote === 'true' || dto.isQuickQuote === true
+    const prefix = isQuick ? 'QQ' : 'QT'
+    const quoteCode = `${prefix}-${year}-${String(count + 1).padStart(4, '0')}`
 
     let options = []
     if (dto.options) {
@@ -154,6 +162,7 @@ export class QuotesService {
       options,
       quoteCode,
       images: imageUrls,
+      isQuickQuote: isQuick,
       status: QuoteStatus.PENDING,
     })
     return quote.save()

@@ -6,7 +6,8 @@ export class QuotesController {
   async findAll(req: Request, res: Response, next: NextFunction) {
     try {
       const status = req.query.status as QuoteStatus | undefined
-      const quotes = await quotesService.findAll(status)
+      const isQuickQuote = req.query.isQuickQuote === 'true' ? true : req.query.isQuickQuote === 'false' ? false : undefined
+      const quotes = await quotesService.findAll(status, isQuickQuote)
       res.json(quotes)
     } catch (error) {
       next(error)

@@ -76,8 +76,16 @@ async function calculateQuoteOption(option, config, isMulti, sharedLaborCost, sh
     };
 }
 class QuotesService {
-    async findAll(status) {
-        const filter = status ? { status } : {};
+    async findAll(status, isQuickQuote) {
+        const filter = {};
+        if (status)
+            filter.status = status;
+        if (isQuickQuote !== undefined) {
+            filter.isQuickQuote = isQuickQuote;
+        }
+        else {
+            filter.isQuickQuote = { $ne: true };
+        }
         const quotes = await Quote_1.Quote.find(filter).sort({ createdAt: -1 });
         let changed = false;
         for (const quote of quotes) {
@@ -127,7 +135,9 @@ class QuotesService {
     async create(dto, imageUrls) {
         const year = new Date().getFullYear();
         const count = await Quote_1.Quote.countDocuments();
-        const quoteCode = `QT-${year}-${String(count + 1).padStart(4, '0')}`;
+        const isQuick = dto.isQuickQuote === 'true' || dto.isQuickQuote === true;
+        const prefix = isQuick ? 'QQ' : 'QT';
+        const quoteCode = `${prefix}-${year}-${String(count + 1).padStart(4, '0')}`;
         let options = [];
         if (dto.options) {
             try {
@@ -140,6 +150,7 @@ class QuotesService {
             options,
             quoteCode,
             images: imageUrls,
+            isQuickQuote: isQuick,
             status: Quote_1.QuoteStatus.PENDING,
         });
         return quote.save();

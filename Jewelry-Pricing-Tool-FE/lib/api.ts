@@ -53,9 +53,12 @@ export const authApi = {
 // ─── QUOTES ────────────────────────────────────────────────
 
 export const quotesApi = {
-  /** Lấy tất cả quotes, có thể lọc theo status */
-  list: (status?: string) => {
-    const qs = status ? `?status=${status}` : ''
+  /** Lấy tất cả quotes, có thể lọc theo status và isQuickQuote */
+  list: (status?: string, isQuickQuote?: boolean) => {
+    const params = new URLSearchParams()
+    if (status) params.append('status', status)
+    if (isQuickQuote !== undefined) params.append('isQuickQuote', String(isQuickQuote))
+    const qs = params.toString() ? `?${params.toString()}` : ''
     return request<Quote[]>(`/quotes${qs}`)
   },
 
@@ -75,6 +78,8 @@ export const quotesApi = {
     if (data.deadline) form.append('deadline', data.deadline)
     if (data.notes) form.append('notes', data.notes)
     if (data.options) form.append('options', JSON.stringify(data.options))
+    if (data.isQuickQuote !== undefined) form.append('isQuickQuote', String(data.isQuickQuote))
+    if (data.gender) form.append('gender', data.gender)
     data.images.forEach((file) => form.append('images', file))
 
     const res = await fetch(`${BASE_URL}/quotes`, {

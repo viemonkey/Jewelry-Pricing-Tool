@@ -17,12 +17,13 @@ import { authApi, pricingConfigApi, type GoldRatioConfig } from '@/lib/api'
 import type { AuthUser } from '@/lib/types'
 import { useSseNotifications } from '@/lib/use-sse-notifications'
 import { useNotifications } from '@/lib/notifications'
-import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, Save, Loader2, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, Calculator, Settings, Sparkles, TrendingUp, ClipboardList, Save, Loader2, BarChart3, CheckSquare } from 'lucide-react'
 import { QuoteRequestModal } from '@/components/quote-request-modal'
 import { QuoteListPricer } from '@/components/quote-list-pricer'
 import { SaleDashboard } from '@/components/sale-dashboard'
 import { BusinessAnalytics } from '@/components/business-analytics'
 import { PricingSettings } from '@/components/pricing-settings'
+import { QuickQuoteApprovals } from '@/components/quick-approvals'
 
 const tabContentVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -180,6 +181,7 @@ export default function Home() {
             {[
               { value: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan', show: true },
               { value: 'quotes', icon: ClipboardList, label: 'Xử lý báo giá', show: true },
+              { value: 'quick-approvals', icon: CheckSquare, label: 'Duyệt giá nhanh', show: currentRole === 'order' },
               { value: 'analytics', icon: BarChart3, label: 'Báo cáo', show: currentRole === 'order' },
               { value: 'calculator', icon: Calculator, label: 'Máy tính giá', show: canViewCalculator },
               { value: 'settings', icon: Settings, label: 'Cấu hình', show: currentRole === 'order' },
@@ -302,6 +304,22 @@ export default function Home() {
               </TabsContent>
             )}
 
+            {/* Quick Approvals Tab */}
+            {currentRole === 'order' && (
+              <TabsContent value="quick-approvals" className="space-y-6 mt-0">
+                <motion.div
+                  key="quick-approvals"
+                  variants={tabContentVariants}
+                  initial="hidden"
+                  animate="visible"
+                  exit="exit"
+                  className="space-y-6"
+                >
+                  <QuickQuoteApprovals currentUserName={currentUserName} />
+                </motion.div>
+              </TabsContent>
+            )}
+
             {/* Settings Tab */}
             {currentRole === 'order' && (
               <TabsContent value="settings" className="space-y-6 mt-0">
@@ -391,7 +409,7 @@ export default function Home() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ duration: 0.4 }}
                   >
-                    <GoldCalculator currentRole={currentRole} />
+                    <GoldCalculator currentRole={currentRole} currentUserName={currentUserName} />
                   </motion.div>
                 </motion.div>
               </TabsContent>

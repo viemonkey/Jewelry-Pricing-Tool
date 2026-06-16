@@ -20,13 +20,14 @@ import {
   formatCurrency,
   type PricingResult,
 } from '@/lib/pricing'
-import { pricingConfigApi, type PricingConfig } from '@/lib/api'
+import { pricingConfigApi, quotesApi, type PricingConfig } from '@/lib/api'
 import { StoneCalculator } from './stone-calculator'
 import type { UserRole } from './header'
+import { useNotifications } from '@/lib/notifications'
 import {
   Calculator, Info, Sparkles, Eye, EyeOff,
   Save, FileDown, CheckCircle2, Loader2, ImagePlus,
-  Gem, Watch,
+  Gem, Watch, Send, Check
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -45,6 +46,7 @@ const GENDER_OPTIONS = [
 
 interface GoldCalculatorProps {
   currentRole: UserRole
+  currentUserName?: string
 }
 
 type QuickMaterial = 'gold' | 'silver'
@@ -81,17 +83,20 @@ function useCurrencyInput(initial = '') {
 
 const roundToThousand = (value: number) => Math.round(value / 1000) * 1000
 
-export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
+export function GoldCalculator({ currentRole, currentUserName }: GoldCalculatorProps) {
   const [config, setConfig] = useState<PricingConfig | null>(null)
   const [configLoading, setConfigLoading] = useState(true)
 
   const [productImage, setProductImage] = useState<string>('')
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const [material, setMaterial] = useState<QuickMaterial>('gold')
   const [karatType, setKaratType] = useState<string>('GOLD_18K')
   const [weight, setWeight] = useState<string>('')
   const [stoneCost, setStoneCost] = useState<number>(0)
   const [showStoneCalculator, setShowStoneCalculator] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isSendingRequest, setIsSendingRequest] = useState(false)
+  const [requestSent, setRequestSent] = useState(false)
   const [hasCalculated, setHasCalculated] = useState(false)
   const [productName, setProductName] = useState<string>('')
   const [productCategory, setProductCategory] = useState<string>('NHAN')
@@ -184,6 +189,64 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
     setTimeout(() => setIsSaving(false), 1500)
   }
 
+  const { addNotification } = useNotifications()
+
+  const handleSendApproval = async () => {
+    if (!result) return
+    if (!productName.trim()) {
+      addNotification({
+        type: 'error',
+        title: 'Thiếu tên sản phẩm',
+        message: 'Vui lòng nhập tên sản phẩm trước khi gửi yêu cầu duyệt.',
+      })
+      return
+    }
+
+    setIsSendingRequest(true)
+    try {
+      const weightNum = parseFloat(weight) || 0
+      const goldPriceNum = goldPriceInput.rawValue || config?.goldPrice24K || 0
+      const laborNum = laborCostInput.rawValue || 0
+
+      await quotesApi.create({
+        productName: productName.trim(),
+        materialType: karatType as any,
+        productDescription: `Phân loại: ${currentCategoryLabel} (${currentGenderLabel}) · Vàng ${currentKaratLabel}`,
+        notes: `Yêu cầu tính giá nhanh. Trọng lượng: ${weight} chỉ.`,
+        images: imageFile ? [imageFile] : [],
+        requestedBy: currentUserName || 'Sale',
+        isQuickQuote: true,
+        gender: gender,
+        options: [
+          {
+            materialType: karatType as any,
+            weightChi: weightNum,
+            laborCost: laborNum,
+            goldPrice24K: goldPriceNum,
+            stoneCost: stoneCost,
+            sellingPrice: result.suggestedPrice,
+            costPrice: result.costWithVAT,
+          }
+        ]
+      })
+
+      addNotification({
+        type: 'success',
+        title: 'Gửi yêu cầu thành công',
+        message: `Yêu cầu duyệt giá nhanh cho "${productName.trim()}" đã được gửi tới Admin.`,
+      })
+      setRequestSent(true)
+    } catch (err: any) {
+      addNotification({
+        type: 'error',
+        title: 'Gửi yêu cầu thất bại',
+        message: err.message || 'Có lỗi xảy ra khi gửi yêu cầu.',
+      })
+    } finally {
+      setIsSendingRequest(false)
+    }
+  }
+
   if (configLoading) {
     return (
       <div className="flex h-48 items-center justify-center text-muted-foreground">
@@ -256,6 +319,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                 onChange={(e) => {
                   const file = e.target.files?.[0]
                   if (!file) return
+                  setImageFile(file)
                   if (productImage) URL.revokeObjectURL(productImage)
                   setProductImage(URL.createObjectURL(file))
                 }}
@@ -623,7 +687,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                   </div>
 
                   {/* Actions */}
-                  {canViewCost && (
+                  {canViewCost ? (
                     <div className="flex gap-2">
                       <Button
                         className="flex-1 gap-2 bg-gold-gradient hover:opacity-95 shadow-md active:scale-98 transition-all hover-gold-glow"
@@ -638,6 +702,31 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
                       <Button className="flex-1 gap-2" variant="outline">
                         <FileDown className="h-4 w-4" />
                         Xuất PDF
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        className="w-full gap-2 bg-gold-gradient hover:opacity-95 shadow-md active:scale-98 transition-all hover-gold-glow"
+                        onClick={handleSendApproval}
+                        disabled={isSendingRequest || requestSent}
+                      >
+                        {isSendingRequest ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Đang gửi yêu cầu...
+                          </>
+                        ) : requestSent ? (
+                          <>
+                            <Check className="h-4 w-4" />
+                            Đã gửi duyệt thành công!
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4" />
+                            Gửi yêu cầu duyệt
+                          </>
+                        )}
                       </Button>
                     </div>
                   )}

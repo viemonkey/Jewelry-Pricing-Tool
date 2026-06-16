@@ -110,6 +110,8 @@ const QuoteSchema = new mongoose_1.Schema({
     requestedBy: { type: String, required: true },
     quotedBy: { type: String },
     options: { type: [QuoteOptionSchema], default: [] },
+    isQuickQuote: { type: Boolean, default: false },
+    gender: { type: String, default: 'unisex' },
 }, { timestamps: true });
 QuoteSchema.index({ status: 1, createdAt: -1 });
 QuoteSchema.index({ requestedBy: 1, status: 1 });

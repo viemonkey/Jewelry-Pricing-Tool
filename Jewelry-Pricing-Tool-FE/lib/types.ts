@@ -71,6 +71,8 @@ export interface Quote {
   options?: QuoteOption[]
   dimensions?: string
   stoneRequirements?: string
+  isQuickQuote?: boolean
+  gender?: string
   createdAt: string
   updatedAt: string
 }
@@ -88,6 +90,8 @@ export interface CreateQuoteRequest {
   images: File[]
   requestedBy: string
   options?: any[]
+  isQuickQuote?: boolean
+  gender?: string
 }
 
 // DTO for pricer to update quote
