@@ -20,10 +20,12 @@ import {
   formatCurrency,
   type PricingResult,
 } from '@/lib/pricing'
-import { pricingConfigApi, quotesApi, type PricingConfig } from '@/lib/api'
+import { pricingConfigApi, quotesApi, BASE_URL, type PricingConfig } from '@/lib/api'
 import { StoneCalculator } from './stone-calculator'
 import type { UserRole } from './header'
+import type { Quote } from '@/lib/types'
 import { useNotifications } from '@/lib/notifications'
+import { QuickQuoteHistoryList } from './quick-quote-history'
 import {
   Calculator, Info, Sparkles, Eye, EyeOff,
   Save, FileDown, CheckCircle2, Loader2, ImagePlus,
@@ -101,6 +103,7 @@ export function GoldCalculator({ currentRole, currentUserName }: GoldCalculatorP
   const [productName, setProductName] = useState<string>('')
   const [productCategory, setProductCategory] = useState<string>('NHAN')
   const [gender, setGender] = useState<string>('unisex')
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   const currentCategoryLabel = CATEGORIES.find(c => c.value === productCategory)?.label ?? 'Sản phẩm'
   const currentGenderLabel = GENDER_OPTIONS.find(g => g.value === gender)?.label ?? 'Unisex'
@@ -208,8 +211,16 @@ export function GoldCalculator({ currentRole, currentUserName }: GoldCalculatorP
       const goldPriceNum = goldPriceInput.rawValue || config?.goldPrice24K || 0
       const laborNum = laborCostInput.rawValue || 0
 
+      const categoryMap: Record<string, string> = {
+        'NHAN': 'RING',
+        'DAY_CHUYEN': 'NECKLACE',
+        'VONG_LAC_TAY': 'BRACELET',
+        'LAC_CHAN': 'ANKLET'
+      }
+
       await quotesApi.create({
         productName: productName.trim(),
+        productType: categoryMap[productCategory] as any,
         materialType: karatType as any,
         productDescription: `Phân loại: ${currentCategoryLabel} (${currentGenderLabel}) · Vàng ${currentKaratLabel}`,
         notes: `Yêu cầu tính giá nhanh. Trọng lượng: ${weight} chỉ.`,
@@ -236,6 +247,7 @@ export function GoldCalculator({ currentRole, currentUserName }: GoldCalculatorP
         message: `Yêu cầu duyệt giá nhanh cho "${productName.trim()}" đã được gửi tới Admin.`,
       })
       setRequestSent(true)
+      setRefreshTrigger(prev => prev + 1)
     } catch (err: any) {
       addNotification({
         type: 'error',
@@ -245,6 +257,51 @@ export function GoldCalculator({ currentRole, currentUserName }: GoldCalculatorP
     } finally {
       setIsSendingRequest(false)
     }
+  }
+
+  const onLoadQuote = (quote: Quote) => {
+    setProductName(quote.productName)
+    setWeight(String(quote.weightChi || ''))
+    setKaratType(quote.materialType)
+    setGender(quote.gender || 'unisex')
+    
+    const reverseCategoryMap: Record<string, string> = {
+      'RING': 'NHAN',
+      'NECKLACE': 'DAY_CHUYEN',
+      'BRACELET': 'VONG_LAC_TAY',
+      'ANKLET': 'LAC_CHAN'
+    }
+    if (quote.productType && reverseCategoryMap[quote.productType]) {
+      setProductCategory(reverseCategoryMap[quote.productType])
+    }
+    
+    const option = quote.options?.[0]
+    if (option) {
+      setStoneCost(option.stoneCost || 0)
+      if (option.goldPrice24K) {
+        goldPriceInput.setDisplay(new Intl.NumberFormat('vi-VN').format(option.goldPrice24K))
+      }
+      if (option.laborCost) {
+        laborCostInput.setDisplay(new Intl.NumberFormat('vi-VN').format(option.laborCost))
+      }
+    }
+
+    if (quote.images && quote.images.length > 0) {
+      setProductImage(`${BASE_URL}${quote.images[0]}`)
+      setImageFile(null)
+    } else {
+      setProductImage('')
+      setImageFile(null)
+    }
+    
+    setHasCalculated(false)
+    setRequestSent(false)
+    
+    addNotification({
+      type: 'info',
+      title: 'Đã nạp dữ liệu',
+      message: `Đã nạp yêu cầu "${quote.productName}" vào máy tính. Bạn có thể sửa và gửi duyệt lại.`,
+    })
   }
 
   if (configLoading) {
@@ -268,7 +325,8 @@ export function GoldCalculator({ currentRole, currentUserName }: GoldCalculatorP
   const materialLabel = material === 'gold' ? 'Sản phẩm vàng' : 'Sản phẩm bạc'
 
   return (
-    <div className="grid gap-6 lg:grid-cols-2">
+    <div className="space-y-8">
+      <div className="grid gap-6 lg:grid-cols-2">
       {/* ── Input Form ─────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
@@ -754,5 +812,20 @@ export function GoldCalculator({ currentRole, currentUserName }: GoldCalculatorP
         </Card>
       </motion.div>
     </div>
+
+    {/* Lịch sử yêu cầu duyệt giá nhanh */}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, delay: 0.2 }}
+    >
+      <QuickQuoteHistoryList
+        currentRole={currentRole}
+        currentUserName={currentUserName}
+        refreshTrigger={refreshTrigger}
+        onLoadQuote={onLoadQuote}
+      />
+    </motion.div>
+  </div>
   )
 }

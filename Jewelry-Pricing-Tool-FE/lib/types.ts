@@ -73,6 +73,7 @@ export interface Quote {
   stoneRequirements?: string
   isQuickQuote?: boolean
   gender?: string
+  productType?: 'RING' | 'NECKLACE' | 'BRACELET' | 'ANKLET' | null
   createdAt: string
   updatedAt: string
 }
@@ -81,6 +82,7 @@ export interface Quote {
 export interface CreateQuoteRequest {
   productName: string
   materialType: Quote['materialType']
+  productType?: 'RING' | 'NECKLACE' | 'BRACELET' | 'ANKLET' | null
   productDescription?: string
   dimensions?: string
   stoneRequirements?: string
