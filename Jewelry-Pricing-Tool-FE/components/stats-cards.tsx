@@ -145,20 +145,20 @@ export function StatsCards() {
 
     const confirmedCount = quotes.flatMap((q) => {
       if (q.options && q.options.length > 0) {
-        return q.options.filter((opt) => opt.isConfirmed)
+        return q.options.filter((opt) => opt.isConfirmed) as any[]
       } else if (q.status === 'CONFIRMED') {
-        return [q]
+        return [q] as any[]
       }
-      return []
+      return [] as any[]
     }).length
 
     const cancelledCount = quotes.flatMap((q) => {
       if (q.options && q.options.length > 0) {
-        return q.options.filter((opt) => opt.isCancelled)
+        return q.options.filter((opt) => opt.isCancelled) as any[]
       } else if (q.status === 'CANCELLED') {
-        return [q]
+        return [q] as any[]
       }
-      return []
+      return [] as any[]
     }).length
 
     const confirmedRevenue = quotes.reduce((sum, q) => {

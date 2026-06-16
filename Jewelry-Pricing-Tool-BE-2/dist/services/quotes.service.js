@@ -22,7 +22,9 @@ async function calculateQuoteOption(option, config, isMulti, sharedLaborCost, sh
         materialCost = parseFloat(option.materialCost) || 0;
     }
     else if (isPlatinum) {
-        materialCost = parseFloat(option.materialCost) || 0;
+        const platinumPrice = parseFloat(option.platinumPrice) || config.platinumPrice || 0;
+        const weight = parseFloat(option.weightChi || option.weightGram || '0') || 0;
+        materialCost = parseFloat(option.materialCost) || Math.round(platinumPrice * weight);
     }
     else {
         // Gold
@@ -224,7 +226,14 @@ class QuotesService {
         return quote;
     }
     async updateInfo(id, data) {
-        const quote = await Quote_1.Quote.findByIdAndUpdate(id, { ...data }, { new: true }).lean();
+        const updateData = { ...data };
+        if (updateData.options) {
+            try {
+                updateData.options = typeof updateData.options === 'string' ? JSON.parse(updateData.options) : updateData.options;
+            }
+            catch (err) { }
+        }
+        const quote = await Quote_1.Quote.findByIdAndUpdate(id, updateData, { new: true }).lean();
         if (!quote) {
             const err = new Error('Quote not found');
             err.statusCode = 404;
@@ -289,25 +298,22 @@ class QuotesService {
             quote.costPrice = selectedOption.costPrice;
             quote.sellingPrice = selectedOption.sellingPrice;
             if (quote.options && quote.options.length > 0) {
-                const option = quote.options.find(o => o.materialType === selectedOption.materialType);
-                if (option) {
-                    option.isConfirmed = true;
-                    option.isCancelled = false;
-                }
-                ;
+                quote.options.forEach(o => {
+                    if (o.materialType === selectedOption.materialType) {
+                        o.isConfirmed = true;
+                        o.isCancelled = false;
+                    }
+                    else {
+                        o.isConfirmed = false;
+                        o.isCancelled = true;
+                    }
+                });
                 quote.markModified('options');
                 const confirmedOptionsTotal = quote.options
                     .filter(o => o.isConfirmed)
                     .reduce((sum, o) => sum + (Number(o.sellingPrice) || 0), 0);
                 quote.confirmedPrice = confirmedOptionsTotal || selectedOption.sellingPrice || quote.sellingPrice || 0;
-                const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled);
-                const hasConfirmed = quote.options.some(o => o.isConfirmed);
-                if (allResolved && hasConfirmed) {
-                    quote.status = Quote_1.QuoteStatus.CONFIRMED;
-                }
-                else {
-                    quote.status = Quote_1.QuoteStatus.SENT_TO_CUSTOMER;
-                }
+                quote.status = Quote_1.QuoteStatus.CONFIRMED;
             }
             else {
                 quote.confirmedPrice = selectedOption.sellingPrice || quote.sellingPrice || 0;

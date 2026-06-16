@@ -28,6 +28,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import {
   ResponsiveContainer,
   AreaChart,
   Area,
@@ -103,6 +111,10 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
   const [activeActionTab, setActiveActionTab] = useState<'urgent' | 'progress'>('urgent')
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
+  const [selectedQuoteForConfirm, setSelectedQuoteForConfirm] = useState<Quote | null>(null)
+  const [selectedOptionToConfirm, setSelectedOptionToConfirm] = useState<any | null>(null)
+  const [confirmingQuote, setConfirmingQuote] = useState(false)
 
   const { addNotification } = useNotifications()
 
@@ -129,14 +141,14 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
     const confirmedQuotes = quotes.filter((q) => q.status === 'CONFIRMED')
     
     const totalSalesVal = confirmedQuotes.reduce((sum, q) => {
-      const quantity = Number(q.quantity) || 1
+      const quantity = Number((q as any).quantity) || 1
       if (q.options && q.options.length > 0) {
         const confirmedOptionsTotal = q.options
           .filter((opt) => opt.isConfirmed)
           .reduce((s, opt) => s + (Number(opt.sellingPrice) || 0), 0)
         return sum + confirmedOptionsTotal * quantity
       }
-      return sum + (q.confirmedPrice || q.sellingPrice || 0) * quantity
+      return sum + ((q as any).confirmedPrice || q.sellingPrice || 0) * quantity
     }, 0)
     
     const urgentCount = quotes.filter((q) => q.status === 'NEED_MORE_INFO').length
@@ -237,12 +249,48 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
   }
 
   const handleConfirm = async (id: string, name: string) => {
+    const q = quotes.find((x) => x._id === id)
+    if (!q) return
+
+    const options = q.options || []
+    if (options.length > 1) {
+      setSelectedQuoteForConfirm(q)
+      setSelectedOptionToConfirm(options[0])
+      setConfirmModalOpen(true)
+    } else {
+      const singleOption = options.length === 1 ? options[0] : null
+      const priceVal = singleOption?.sellingPrice || q.sellingPrice || 0
+      const matLabel = singleOption ? ` (${formatMaterialType(singleOption.materialType)})` : ''
+      if (confirm(`Bạn có chắc chắn muốn chốt báo giá cho "${name}"${matLabel} với giá ${formatCurrency(priceVal)} không?`)) {
+        try {
+          await quotesApi.confirm(id, singleOption || undefined)
+          addNotification({ type: 'success', title: '🎉 Khách chốt đơn!', message: `"${name}"${matLabel} đã được đặt hàng thành công.` })
+          fetchData()
+        } catch {
+          addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể xác nhận đơn.' })
+        }
+      }
+    }
+  }
+
+  const doConfirmMultiOption = async () => {
+    if (!selectedQuoteForConfirm || !selectedOptionToConfirm) return
+    setConfirmingQuote(true)
+    const id = selectedQuoteForConfirm._id
+    const name = selectedQuoteForConfirm.productName
+    const opt = selectedOptionToConfirm
+    const matLabel = ` (${formatMaterialType(opt.materialType)})`
     try {
-      await quotesApi.confirm(id)
-      addNotification({ type: 'success', title: '🎉 Khách chốt đơn!', message: `"${name}" đã được đặt hàng thành công.` })
+      await quotesApi.confirm(id, opt)
+      addNotification({ type: 'success', title: '🎉 Khách chốt đơn!', message: `"${name}"${matLabel} đã được đặt hàng thành công.` })
+      setConfirmModalOpen(false)
+      setSelectedQuoteForConfirm(null)
+      setSelectedOptionToConfirm(null)
       fetchData()
     } catch {
       addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể xác nhận đơn.' })
+    } finally {
+      setConfirmingQuote(false)
     }
   }
 
@@ -640,6 +688,86 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
           )}
         </Card>
       </section>
+      {/* Modal xác nhận chốt đơn cho nhiều phân loại */}
+      <Dialog open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
+        <DialogContent className="sm:max-w-[480px] border-[#D4AF37]/35 bg-white shadow-lg rounded-2xl">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="font-serif text-xl font-bold text-[#8C6D1F]">
+              Xác nhận khách chốt đơn
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Yêu cầu <span className="font-mono font-bold text-foreground">{selectedQuoteForConfirm?.quoteCode}</span> có nhiều tùy chọn chất liệu. Vui lòng chọn đúng chất liệu khách đã chốt:
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedQuoteForConfirm && (
+            <div className="py-4 space-y-3">
+              {(selectedQuoteForConfirm.options || []).map((opt) => {
+                const isSelected = selectedOptionToConfirm?.materialType === opt.materialType
+                return (
+                  <div
+                    key={opt.materialType}
+                    onClick={() => setSelectedOptionToConfirm(opt)}
+                    className={cn(
+                      "flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all duration-200 select-none",
+                      isSelected
+                        ? "border-[#B4904C] bg-[#FBF6E9]/60 shadow-sm"
+                        : "border-border/60 hover:border-[#B4904C]/50 hover:bg-muted/30"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={cn(
+                        "w-4 h-4 rounded-full border flex items-center justify-center transition-all",
+                        isSelected
+                          ? "border-[#B4904C]"
+                          : "border-muted-foreground/40"
+                      )}>
+                        {isSelected && (
+                          <span className="w-2 h-2 rounded-full bg-[#B4904C]" />
+                        )}
+                      </span>
+                      <div>
+                        <p className={cn("font-bold text-sm", isSelected ? "text-[#8C6D1F]" : "text-[#3A352E]")}>
+                          {formatMaterialType(opt.materialType)}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {opt.weightChi ? `${opt.weightChi} chi` : opt.weightGram ? `${opt.weightGram} gram` : '—'}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="font-extrabold text-sm text-[#A97800]">
+                      {opt.sellingPrice ? formatCurrency(opt.sellingPrice) : '—'}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <DialogFooter className="flex flex-row gap-2 justify-end sm:space-x-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setConfirmModalOpen(false)
+                setSelectedQuoteForConfirm(null)
+                setSelectedOptionToConfirm(null)
+              }}
+              className="flex-1 sm:flex-none h-9 text-xs font-semibold rounded-lg border-border/60"
+            >
+              Hủy bỏ
+            </Button>
+            <Button
+              type="button"
+              onClick={doConfirmMultiOption}
+              disabled={confirmingQuote || !selectedOptionToConfirm}
+              className="flex-1 sm:flex-none h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 shadow-sm"
+            >
+              {confirmingQuote ? 'Đang xử lý...' : 'Xác nhận chốt đơn'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

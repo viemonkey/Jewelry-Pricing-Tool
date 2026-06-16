@@ -1,24 +1,44 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.pricingConfigService = exports.PricingConfigService = void 0;
+const mongoose_1 = __importDefault(require("mongoose"));
 const PricingConfig_1 = require("../models/PricingConfig");
 const Quote_1 = require("../models/Quote");
+const GoldPrice_1 = require("../models/GoldPrice");
 class PricingConfigService {
     async get() {
         return PricingConfig_1.PricingConfig.findOne().lean();
     }
-    async update(data) {
+    async update(data, userId) {
         const config = await PricingConfig_1.PricingConfig.findOneAndUpdate({}, data, { new: true, upsert: true }).lean();
-        // If goldPrice24K is updated, recalculate all quotes in the database
-        if (data.goldPrice24K !== undefined) {
-            const newGoldPrice = Number(data.goldPrice24K);
-            await this.recalculateQuotes(newGoldPrice, config);
+        // If goldPrice24K or platinumPrice is updated, recalculate all quotes in the database
+        if (data.goldPrice24K !== undefined || data.platinumPrice !== undefined) {
+            const newGoldPrice = data.goldPrice24K !== undefined ? Number(data.goldPrice24K) : config.goldPrice24K;
+            const newPlatinumPrice = data.platinumPrice !== undefined ? Number(data.platinumPrice) : config.platinumPrice;
+            await this.recalculateQuotes(newGoldPrice, newPlatinumPrice, config);
+            // Record to GoldPrice history
+            if (data.goldPrice24K !== undefined) {
+                const newGoldPriceNum = Number(data.goldPrice24K);
+                await GoldPrice_1.GoldPrice.create({
+                    pricePerChi: newGoldPriceNum,
+                    pricePerGram: Math.round(newGoldPriceNum / 3.75),
+                    effectiveDate: new Date(),
+                    source: 'manual',
+                    updatedBy: userId ? new mongoose_1.default.Types.ObjectId(userId) : null,
+                });
+            }
         }
         return config;
     }
-    async recalculateQuotes(newGoldPrice, config) {
-        // Get all quotes
-        const quotes = await Quote_1.Quote.find({});
+    async recalculateQuotes(newGoldPrice, newPlatinumPrice, config) {
+        // Chỉ tính toán lại các báo giá đang xử lý (chờ báo giá, cần bổ sung, đang báo giá)
+        // Các đơn đã báo giá (QUOTED, SENT_TO_CUSTOMER) sẽ được khóa giá tương tự đơn CONFIRMED/CANCELLED
+        const quotes = await Quote_1.Quote.find({
+            status: { $in: ['PENDING', 'NEED_MORE_INFO', 'QUOTING'] }
+        });
         // Load gold ratios and profit margins
         const ratiosMap = {};
         if (config.goldRatios) {
@@ -71,6 +91,21 @@ class PricingConfigService {
                         opt.sellingPrice = sellingPrice;
                         isModified = true;
                     }
+                    else if (opt.materialType === 'PLATINUM') {
+                        const weightChi = getWeightChi(opt);
+                        const stoneCost = opt.stoneCost || 0;
+                        const materialCost = newPlatinumPrice * weightChi;
+                        const costBeforeVAT = materialCost + stoneCost;
+                        const costWithVAT = costBeforeVAT;
+                        const sellingPrice = costWithVAT;
+                        opt.platinumPrice = newPlatinumPrice;
+                        opt.materialCost = materialCost;
+                        opt.costBeforeVAT = costBeforeVAT;
+                        opt.costWithVAT = costWithVAT;
+                        opt.costPrice = costWithVAT;
+                        opt.sellingPrice = sellingPrice;
+                        isModified = true;
+                    }
                     return opt;
                 });
                 // 2. Populate top-level fields from the first option
@@ -92,7 +127,7 @@ class PricingConfigService {
                 }
             }
             else {
-                // Fallback: If quote has no options but is a gold product, recalculate top-level directly
+                // Fallback: If quote has no options but is a gold/platinum product, recalculate top-level directly
                 if (quote.materialType && quote.materialType.startsWith('GOLD_')) {
                     const ratio = getRatio(quote.materialType);
                     const weightChi = getWeightChi(quote);
@@ -114,6 +149,21 @@ class PricingConfigService {
                     const sellingPrice = costBeforeVAT > 0 ? Math.round(costWithVAT / divisor / 1000) * 1000 : 0;
                     quote.goldPrice24K = newGoldPrice;
                     quote.materialCost = goldCost;
+                    quote.costBeforeVAT = costBeforeVAT;
+                    quote.costWithVAT = costWithVAT;
+                    quote.costPrice = costWithVAT;
+                    quote.sellingPrice = sellingPrice;
+                    isModified = true;
+                }
+                else if (quote.materialType === 'PLATINUM') {
+                    const weightChi = getWeightChi(quote);
+                    const stoneCost = quote.stoneCost || 0;
+                    const materialCost = newPlatinumPrice * weightChi;
+                    const costBeforeVAT = materialCost + stoneCost;
+                    const costWithVAT = costBeforeVAT;
+                    const sellingPrice = costWithVAT;
+                    quote.platinumPrice = newPlatinumPrice;
+                    quote.materialCost = materialCost;
                     quote.costBeforeVAT = costBeforeVAT;
                     quote.costWithVAT = costWithVAT;
                     quote.costPrice = costWithVAT;

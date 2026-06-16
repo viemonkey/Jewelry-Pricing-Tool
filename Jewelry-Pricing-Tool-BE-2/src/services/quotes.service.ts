@@ -360,25 +360,22 @@ export class QuotesService {
       quote.sellingPrice = selectedOption.sellingPrice
 
       if (quote.options && quote.options.length > 0) {
-        const option = quote.options.find(o => o.materialType === selectedOption.materialType)
-        if (option) {
-          option.isConfirmed = true
-          option.isCancelled = false
-        }
+        quote.options.forEach(o => {
+          if (o.materialType === selectedOption.materialType) {
+            o.isConfirmed = true
+            o.isCancelled = false
+          } else {
+            o.isConfirmed = false
+            o.isCancelled = true
+          }
+        })
         ;(quote as any).markModified('options')
 
         const confirmedOptionsTotal = quote.options
           .filter(o => o.isConfirmed)
           .reduce((sum, o) => sum + (Number(o.sellingPrice) || 0), 0)
         quote.confirmedPrice = confirmedOptionsTotal || selectedOption.sellingPrice || quote.sellingPrice || 0
-
-        const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled)
-        const hasConfirmed = quote.options.some(o => o.isConfirmed)
-        if (allResolved && hasConfirmed) {
-          quote.status = QuoteStatus.CONFIRMED
-        } else {
-          quote.status = QuoteStatus.SENT_TO_CUSTOMER
-        }
+        quote.status = QuoteStatus.CONFIRMED
       } else {
         quote.confirmedPrice = selectedOption.sellingPrice || quote.sellingPrice || 0
         quote.status = QuoteStatus.CONFIRMED
