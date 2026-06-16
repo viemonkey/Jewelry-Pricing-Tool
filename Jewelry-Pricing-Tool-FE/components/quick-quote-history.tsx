@@ -142,7 +142,7 @@ export function QuickQuoteHistoryList({
                     <TableCell className="text-xs py-2">{getMaterialLabel(quote.materialType)}</TableCell>
                     <TableCell className="text-xs py-2 tabular-nums">{quote.weightChi || '—'}</TableCell>
                     <TableCell className="text-xs py-2 font-semibold text-primary tabular-nums">
-                      {sellingPriceVal ? formatCurrency(sellingPriceVal) : '—'}
+                      {sellingPriceVal ? `${formatCurrency(sellingPriceVal)} - ${formatCurrency(sellingPriceVal + 5000000)}` : '—'}
                     </TableCell>
                     <TableCell className="text-[11px] text-muted-foreground py-2">
                       {new Date(quote.createdAt).toLocaleDateString('vi-VN')}
@@ -266,12 +266,12 @@ export function QuickQuoteHistoryList({
                   <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-0.5">
                     {selectedQuote.status === 'QUOTED' ? 'GIÁ BÁN ĐÃ DUYỆT' : 'GIÁ BÁN ĐỀ XUẤT'}
                   </p>
-                  <p className="text-2xl font-serif font-bold text-primary tabular-nums">
-                    {selectedQuote.options?.[0]?.sellingPrice
-                      ? formatCurrency(selectedQuote.options[0].sellingPrice)
-                      : selectedQuote.sellingPrice
-                        ? formatCurrency(selectedQuote.sellingPrice)
-                        : '—'}
+                  <p className="text-xl font-serif font-bold text-primary tabular-nums">
+                    {(() => {
+                      const pOption = selectedQuote.options?.[0]
+                      const sPriceVal = pOption?.sellingPrice || selectedQuote.sellingPrice || 0
+                      return sPriceVal ? `${formatCurrency(sPriceVal)} - ${formatCurrency(sPriceVal + 5000000)}` : '—'
+                    })()}
                   </p>
                 </div>
 

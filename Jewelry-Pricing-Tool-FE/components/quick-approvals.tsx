@@ -237,7 +237,7 @@ export function QuickQuoteApprovals({ currentUserName }: QuickQuoteApprovalsProp
                       <TableCell className="text-sm">{getMaterialLabel(quote.materialType)}</TableCell>
                       <TableCell className="text-sm tabular-nums">{quote.weightChi || '—'}</TableCell>
                       <TableCell className="text-sm font-semibold text-primary tabular-nums">
-                        {sellingPriceVal ? formatCurrency(sellingPriceVal) : '—'}
+                        {sellingPriceVal ? `${formatCurrency(sellingPriceVal)} - ${formatCurrency(sellingPriceVal + 5000000)}` : '—'}
                       </TableCell>
                       <TableCell className="text-sm">{quote.requestedBy}</TableCell>
                       <TableCell>{getStatusBadge(quote.status)}</TableCell>
@@ -379,12 +379,12 @@ export function QuickQuoteApprovals({ currentUserName }: QuickQuoteApprovalsProp
                 {/* Cost / Suggested Price summary */}
                 <div className="rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-amber-500/5 p-4 text-center">
                   <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">GIÁ BÁN ĐỀ XUẤT</p>
-                  <p className="text-3xl font-serif font-bold text-primary tabular-nums">
-                    {selectedQuote.options?.[0]?.sellingPrice
-                      ? formatCurrency(selectedQuote.options[0].sellingPrice)
-                      : selectedQuote.sellingPrice
-                        ? formatCurrency(selectedQuote.sellingPrice)
-                        : '—'}
+                  <p className="text-2xl font-serif font-bold text-primary tabular-nums">
+                    {(() => {
+                      const pOption = selectedQuote.options?.[0]
+                      const sPriceVal = pOption?.sellingPrice || selectedQuote.sellingPrice || 0
+                      return sPriceVal ? `${formatCurrency(sPriceVal)} - ${formatCurrency(sPriceVal + 5000000)}` : '—'
+                    })()}
                   </p>
                   <p className="text-[10px] text-muted-foreground mt-2">
                     Giá vốn gồm VAT: {selectedQuote.options?.[0]?.costPrice ? formatCurrency(selectedQuote.options[0].costPrice) : '—'}
