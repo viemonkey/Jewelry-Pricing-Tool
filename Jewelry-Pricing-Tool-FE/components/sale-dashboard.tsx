@@ -103,26 +103,6 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('vi-VN')
 }
 
-function getQuoteMaterialsText(q: Quote) {
-  if (q.options && q.options.length > 0) {
-    return q.options.map(opt => formatMaterialType(opt.materialType)).join(', ')
-  }
-  return formatMaterialType(q.materialType)
-}
-
-function getQuotePriceRangeText(q: Quote) {
-  if (q.options && q.options.length > 0) {
-    const prices = q.options.map(opt => opt.sellingPrice || 0).filter(p => p > 0)
-    if (prices.length > 0) {
-      const min = Math.min(...prices)
-      const max = Math.max(...prices)
-      if (min === max) return formatCurrency(min)
-      return `${formatCurrency(min)} - ${formatCurrency(max)}`
-    }
-  }
-  return q.sellingPrice ? formatCurrency(q.sellingPrice) : 'Chờ tính giá'
-}
-
 const MATERIAL_COLORS = ['#d4af37', '#b4904c', '#9ca3af', '#78350f', '#f59e0b', '#4b5563']
 
 export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, onViewAll }: SaleDashboardProps) {
@@ -604,25 +584,47 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
                         whileHover={{ backgroundColor: 'rgba(212, 175, 55, 0.02)' }}
                         className="border-b border-border/40 hover:bg-muted/10 transition-all duration-200 group cursor-pointer"
                       >
-                        <td className="px-5 py-3.5 text-xs font-bold text-[#b4904c] tracking-wider font-mono">{q.quoteCode}</td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-5 py-3.5 text-xs font-bold text-[#b4904c] tracking-wider font-mono align-top">{q.quoteCode}</td>
+                        <td className="px-5 py-3.5 align-top">
                           <span className="text-xs font-semibold text-foreground group-hover:text-[#b4904c] transition-colors">
                             {q.productName}
                           </span>
                         </td>
-                        <td className="px-5 py-3.5 text-xs text-[#526071] font-medium">
-                          {getQuoteMaterialsText(q)}
+                        <td className="px-5 py-3.5 text-xs text-[#526071] font-medium align-top">
+                          <div className="space-y-1">
+                            {q.options && q.options.length > 0 ? (
+                              q.options.map((opt) => (
+                                <div key={opt.materialType} className="h-5 flex items-center">
+                                  {formatMaterialType(opt.materialType)}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="h-5 flex items-center">{formatMaterialType(q.materialType)}</div>
+                            )}
+                          </div>
                         </td>
-                        <td className="px-5 py-3.5 text-xs text-muted-foreground">{formatDate(q.createdAt)}</td>
-                        <td className="px-5 py-3.5 text-xs font-bold text-[#b4904c] tracking-wide">
-                          {getQuotePriceRangeText(q)}
+                        <td className="px-5 py-3.5 text-xs text-muted-foreground align-top pt-[17px]">{formatDate(q.createdAt)}</td>
+                        <td className="px-5 py-3.5 text-xs font-bold text-[#b4904c] tracking-wide align-top">
+                          <div className="space-y-1">
+                            {q.options && q.options.length > 0 ? (
+                              q.options.map((opt, idx) => (
+                                <div key={idx} className="h-5 flex items-center justify-start tabular-nums">
+                                  {opt.sellingPrice ? formatCurrency(opt.sellingPrice) : '—'}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="h-5 flex items-center">
+                                {q.sellingPrice ? formatCurrency(q.sellingPrice) : 'Chờ tính giá'}
+                              </div>
+                            )}
+                          </div>
                         </td>
-                        <td className="px-5 py-3.5">
+                        <td className="px-5 py-3.5 align-top pt-[14px]">
                           <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border', st.badgeClass)}>
                             {st.label}
                           </span>
                         </td>
-                        <td className="px-5 py-3.5 text-right">
+                        <td className="px-5 py-3.5 text-right align-top pt-[11px]">
                           <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                             {/* NEED_MORE_INFO: Bổ sung */}
                             {q.status === 'NEED_MORE_INFO' && (
