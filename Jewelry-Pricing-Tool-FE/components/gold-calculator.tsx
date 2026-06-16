@@ -223,6 +223,7 @@ export function GoldCalculator({ currentRole, currentUserName, loadedQuote, onCl
         productName: productName.trim(),
         productType: categoryMap[productCategory] as any,
         materialType: karatType as any,
+        weightChi: weightNum,
         productDescription: `Phân loại: ${currentCategoryLabel} (${currentGenderLabel}) · Vàng ${currentKaratLabel}`,
         notes: `Yêu cầu tính giá nhanh. Trọng lượng: ${weight} chỉ.`,
         images: imageFile ? [imageFile] : [],

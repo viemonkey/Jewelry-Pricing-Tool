@@ -151,6 +151,25 @@ export function QuickQuoteApprovals({ currentUserName }: QuickQuoteApprovalsProp
     return map[type] || type
   }
 
+  const getCategoryLabel = (type?: string | null) => {
+    const map: Record<string, string> = {
+      'RING': 'Nhẫn',
+      'NECKLACE': 'Dây chuyền',
+      'BRACELET': 'Vòng / Lắc tay',
+      'ANKLET': 'Lắc chân',
+    }
+    return map[type || ''] || '—'
+  }
+
+  const getGenderLabel = (g?: string) => {
+    const map: Record<string, string> = {
+      'men': 'Nam',
+      'women': 'Nữ',
+      'unisex': 'Unisex',
+    }
+    return map[g || ''] || '—'
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -235,7 +254,7 @@ export function QuickQuoteApprovals({ currentUserName }: QuickQuoteApprovalsProp
                       <TableCell className="font-mono text-xs font-semibold">{quote.quoteCode}</TableCell>
                       <TableCell className="font-medium max-w-[200px] truncate">{quote.productName}</TableCell>
                       <TableCell className="text-sm">{getMaterialLabel(quote.materialType)}</TableCell>
-                      <TableCell className="text-sm tabular-nums">{quote.weightChi || '—'}</TableCell>
+                      <TableCell className="text-sm tabular-nums">{quote.weightChi || quote.options?.[0]?.weightChi || '—'}</TableCell>
                       <TableCell className="text-sm font-semibold text-primary tabular-nums">
                         {sellingPriceVal ? `${formatCurrency(sellingPriceVal)} - ${formatCurrency(sellingPriceVal + 5000000)}` : '—'}
                       </TableCell>
@@ -298,157 +317,192 @@ export function QuickQuoteApprovals({ currentUserName }: QuickQuoteApprovalsProp
       {/* MODAL CHI TIẾT YÊU CẦU */}
       <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
-          {selectedQuote && (
-            <>
-              <DialogHeader>
-                <div className="flex items-center justify-between border-b pb-3">
-                  <div>
-                    <DialogTitle className="text-xl font-serif text-primary font-bold">
-                      {selectedQuote.productName}
-                    </DialogTitle>
-                    <DialogDescription className="font-mono text-xs mt-1">
-                      Mã yêu cầu: {selectedQuote.quoteCode}
-                    </DialogDescription>
-                  </div>
-                  <div className="text-right">
-                    {getStatusBadge(selectedQuote.status)}
-                  </div>
-                </div>
-              </DialogHeader>
+          {selectedQuote && (() => {
+            const primaryOption = selectedQuote.options?.[0]
+            const weight = selectedQuote.weightChi || primaryOption?.weightChi || 0
+            const laborCost = primaryOption?.laborCost || 0
+            const goldPrice24K = primaryOption?.goldPrice24K || 0
+            const stoneCost = primaryOption?.stoneCost || 0
+            const sellingPrice = primaryOption?.sellingPrice || selectedQuote.sellingPrice || 0
+            const costPrice = primaryOption?.costPrice || selectedQuote.costPrice || 0
 
-              <div className="py-4 space-y-4">
-                {/* Meta details */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-lg bg-muted/40 border p-3 flex items-center gap-3">
-                    <User className="h-4 w-4 text-muted-foreground shrink-0" />
+            return (
+              <>
+                <DialogHeader>
+                  <div className="flex items-center justify-between border-b pb-3">
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">Người yêu cầu</p>
-                      <p className="text-sm font-semibold">{selectedQuote.requestedBy}</p>
+                      <DialogTitle className="text-xl font-serif text-primary font-bold">
+                        {selectedQuote.productName}
+                      </DialogTitle>
+                      <DialogDescription className="font-mono text-xs mt-1">
+                        Mã yêu cầu: {selectedQuote.quoteCode}
+                      </DialogDescription>
+                    </div>
+                    <div className="text-right">
+                      {getStatusBadge(selectedQuote.status)}
                     </div>
                   </div>
-                  <div className="rounded-lg bg-muted/40 border p-3 flex items-center gap-3">
-                    <Calendar className="h-4 w-4 text-muted-foreground shrink-0" />
+                </DialogHeader>
+
+                <div className="py-4 space-y-4 text-xs">
+                  {/* Meta details */}
+                  <div className="grid grid-cols-2 gap-3 bg-muted/20 border rounded-xl p-3">
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">Ngày tạo</p>
-                      <p className="text-sm font-semibold">
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Người yêu cầu</p>
+                      <p className="font-semibold text-sm mt-0.5">{selectedQuote.requestedBy}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Ngày tạo</p>
+                      <p className="font-semibold text-sm mt-0.5">
                         {new Date(selectedQuote.createdAt).toLocaleString('vi-VN')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-[140px_1fr]">
+                    {/* Left Column: Image placeholder or image */}
+                    <div className="flex flex-col items-center justify-center border rounded-xl p-3 bg-muted/10 h-[140px] w-[140px] mx-auto shrink-0 relative overflow-hidden">
+                      {(() => {
+                        const hasImage = selectedQuote.images?.length > 0 && 
+                          (selectedQuote.images[0].startsWith('/uploads/') || selectedQuote.images[0].startsWith('http'));
+                        if (hasImage) {
+                          return (
+                            <a
+                              href={`${BASE_URL}${selectedQuote.images[0]}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="w-full h-full block"
+                            >
+                              <img 
+                                src={`${BASE_URL}${selectedQuote.images[0]}`} 
+                                alt={selectedQuote.productName} 
+                                className="w-full h-full object-cover rounded-lg" 
+                              />
+                            </a>
+                          )
+                        }
+                        return (
+                          <div className="flex flex-col items-center justify-center text-muted-foreground/60 gap-1 text-center">
+                            <Gem className="h-8 w-8 text-muted-foreground/45" />
+                            <span className="text-[9px] font-medium leading-tight">Không có ảnh mẫu</span>
+                          </div>
+                        )
+                      })()}
+                    </div>
+
+                    {/* Right Column: Detail Grid */}
+                    <div className="space-y-2.5">
+                      <div className="grid grid-cols-2 gap-x-3 gap-y-2 bg-card border rounded-xl p-3">
+                        <div>
+                          <span className="text-muted-foreground block text-[10px]">Phân loại:</span>
+                          <span className="font-semibold">{getCategoryLabel(selectedQuote.productType)}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[10px]">Giới tính:</span>
+                          <span className="font-semibold">{getGenderLabel(selectedQuote.gender)}</span>
+                        </div>
+                        <div className="border-t pt-1.5 mt-0.5">
+                          <span className="text-muted-foreground block text-[10px]">Tuổi vàng:</span>
+                          <span className="font-semibold">{getMaterialLabel(selectedQuote.materialType)}</span>
+                        </div>
+                        <div className="border-t pt-1.5 mt-0.5">
+                          <span className="text-muted-foreground block text-[10px]">Trọng lượng:</span>
+                          <span className="font-semibold text-primary">{weight ? `${weight} chỉ` : '—'}</span>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 bg-card border rounded-xl p-3">
+                        <div>
+                          <span className="text-muted-foreground block text-[10px] truncate">Vàng 24K:</span>
+                          <span className="font-medium">{goldPrice24K ? `${formatCurrency(goldPrice24K)}` : '—'}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[10px]">Tiền công:</span>
+                          <span className="font-medium">{laborCost ? formatCurrency(laborCost) : '—'}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground block text-[10px]">Tiền đá:</span>
+                          <span className="font-medium">{stoneCost !== undefined ? formatCurrency(stoneCost) : '0 đ'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Notes and reject reason */}
+                  {(selectedQuote.notes || selectedQuote.rejectReason) && (
+                    <div className="space-y-2">
+                      {selectedQuote.notes && (
+                        <div className="bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200/40 rounded-xl p-3 text-amber-800 dark:text-amber-300">
+                          <strong className="text-[10px] block uppercase tracking-wider mb-0.5">Ghi chú từ Sale:</strong>
+                          <p className="text-xs leading-relaxed">{selectedQuote.notes}</p>
+                        </div>
+                      )}
+                      {selectedQuote.rejectReason && (
+                        <div className="bg-red-50/50 dark:bg-red-950/10 border border-red-200/40 rounded-xl p-3 text-red-800 dark:text-red-300">
+                          <strong className="text-[10px] block uppercase tracking-wider mb-0.5">Lý do yêu cầu sửa trước đó:</strong>
+                          <p className="text-xs leading-relaxed">{selectedQuote.rejectReason}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Costs & Price Display for Admin */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-border bg-muted/40 p-4 text-center flex flex-col justify-center shadow-sm">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">GIÁ VỐN (CÓ VAT)</p>
+                      <p className="text-lg font-bold text-foreground tabular-nums">
+                        {costPrice ? formatCurrency(costPrice) : '—'}
+                      </p>
+                    </div>
+                    
+                    <div className="rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/10 via-amber-500/5 to-transparent p-4 text-center shadow-md relative overflow-hidden">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-20%,rgba(212,175,55,0.1),transparent_70%)] pointer-events-none" />
+                      <p className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">KHOẢNG GIÁ ĐỀ XUẤT</p>
+                      <p className="text-lg font-serif font-bold text-primary tabular-nums tracking-wide">
+                        {sellingPrice ? `${formatCurrency(sellingPrice)} - ${formatCurrency(sellingPrice + 5000000)}` : '—'}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Product details */}
-                <div className="rounded-xl border p-4 space-y-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                    ⚙️ Thông số sản phẩm
-                  </h4>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                    <div className="flex justify-between border-b pb-1">
-                      <span className="text-muted-foreground">Phân loại / Giới tính:</span>
-                      <span className="font-medium">{selectedQuote.productDescription?.split(' · ')[0] || '—'}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-1">
-                      <span className="text-muted-foreground">Tuổi vàng:</span>
-                      <span className="font-medium">{getMaterialLabel(selectedQuote.materialType)}</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-1">
-                      <span className="text-muted-foreground">Trọng lượng:</span>
-                      <span className="font-medium tabular-nums">{selectedQuote.weightChi} chỉ</span>
-                    </div>
-                    <div className="flex justify-between border-b pb-1">
-                      <span className="text-muted-foreground">Tiền đá quý:</span>
-                      <span className="font-medium tabular-nums">
-                        {selectedQuote.options?.[0]?.stoneCost ? formatCurrency(selectedQuote.options[0].stoneCost) : '—'}
-                      </span>
-                    </div>
-                  </div>
+                <DialogFooter className="border-t pt-3 flex gap-2">
+                  <Button variant="ghost" onClick={() => setIsDetailOpen(false)}>
+                    Đóng
+                  </Button>
                   
-                  {selectedQuote.notes && (
-                    <div className="mt-2 text-xs bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 rounded-lg p-2.5 text-amber-800 dark:text-amber-300">
-                      <strong>Ghi chú từ Sale:</strong> {selectedQuote.notes}
-                    </div>
+                  {selectedQuote.status === 'PENDING' && (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="border-red-200 bg-red-50/50 text-red-700 hover:bg-red-50"
+                        onClick={() => {
+                          setRejectReason('')
+                          setIsRejectOpen(true)
+                        }}
+                        disabled={actionLoading}
+                      >
+                        <X className="h-4 w-4 mr-1" />
+                        Yêu cầu sửa
+                      </Button>
+                      
+                      <Button
+                        className="bg-gold-gradient text-white hover:opacity-95"
+                        onClick={() => handleApprove(selectedQuote)}
+                        disabled={actionLoading}
+                      >
+                        {actionLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                        ) : (
+                          <Check className="h-4 w-4 mr-1" />
+                        )}
+                        Phê duyệt giá bán
+                      </Button>
+                    </>
                   )}
-
-                  {selectedQuote.rejectReason && selectedQuote.status === 'NEED_MORE_INFO' && (
-                    <div className="mt-2 text-xs bg-red-50/60 dark:bg-red-950/20 border border-red-200/50 rounded-lg p-2.5 text-red-800 dark:text-red-300">
-                      <strong>Lý do yêu cầu sửa:</strong> {selectedQuote.rejectReason}
-                    </div>
-                  )}
-                </div>
-
-                {/* Cost / Suggested Price summary */}
-                <div className="rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-amber-500/5 p-4 text-center">
-                  <p className="text-xs font-bold text-primary uppercase tracking-widest mb-1">GIÁ BÁN ĐỀ XUẤT</p>
-                  <p className="text-2xl font-serif font-bold text-primary tabular-nums">
-                    {(() => {
-                      const pOption = selectedQuote.options?.[0]
-                      const sPriceVal = pOption?.sellingPrice || selectedQuote.sellingPrice || 0
-                      return sPriceVal ? `${formatCurrency(sPriceVal)} - ${formatCurrency(sPriceVal + 5000000)}` : '—'
-                    })()}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-2">
-                    Giá vốn gồm VAT: {selectedQuote.options?.[0]?.costPrice ? formatCurrency(selectedQuote.options[0].costPrice) : '—'}
-                  </p>
-                </div>
-
-                {/* Images */}
-                {selectedQuote.images?.length > 0 && (
-                  <div>
-                    <p className="text-xs font-semibold text-muted-foreground mb-2">🖼 Hình ảnh sản phẩm</p>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedQuote.images.map((img, i) => (
-                        <a
-                          key={i}
-                          href={`${BASE_URL}${img}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block rounded-lg border overflow-hidden hover:opacity-80 transition-opacity"
-                        >
-                          <img src={`${BASE_URL}${img}`} alt={`Ảnh ${i + 1}`} className="h-24 w-24 object-cover" />
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <DialogFooter className="border-t pt-3 flex gap-2">
-                <Button variant="ghost" onClick={() => setIsDetailOpen(false)}>
-                  Đóng
-                </Button>
-                
-                {selectedQuote.status === 'PENDING' && (
-                  <>
-                    <Button
-                      variant="outline"
-                      className="border-red-200 bg-red-50/50 text-red-700 hover:bg-red-50"
-                      onClick={() => {
-                        setRejectReason('')
-                        setIsRejectOpen(true)
-                      }}
-                      disabled={actionLoading}
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Yêu cầu sửa
-                    </Button>
-                    
-                    <Button
-                      className="bg-gold-gradient text-white hover:opacity-95"
-                      onClick={() => handleApprove(selectedQuote)}
-                      disabled={actionLoading}
-                    >
-                      {actionLoading ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                      ) : (
-                        <Check className="h-4 w-4 mr-1" />
-                      )}
-                      Phê duyệt giá bán
-                    </Button>
-                  </>
-                )}
-              </DialogFooter>
-            </>
-          )}
+                </DialogFooter>
+              </>
+            )
+          })()}
         </DialogContent>
       </Dialog>
 

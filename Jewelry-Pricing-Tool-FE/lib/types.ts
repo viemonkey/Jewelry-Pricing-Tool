@@ -94,6 +94,7 @@ export interface CreateQuoteRequest {
   options?: any[]
   isQuickQuote?: boolean
   gender?: string
+  weightChi?: number
 }
 
 // DTO for pricer to update quote
