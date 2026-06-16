@@ -87,7 +87,7 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
 
   const [productImage, setProductImage] = useState<string>('')
   const [material, setMaterial] = useState<QuickMaterial>('gold')
-  const [karatType, setKaratType] = useState<string>('18K')
+  const [karatType, setKaratType] = useState<string>('GOLD_18K')
   const [weight, setWeight] = useState<string>('')
   const [stoneCost, setStoneCost] = useState<number>(0)
   const [showStoneCalculator, setShowStoneCalculator] = useState(false)
@@ -134,8 +134,8 @@ export function GoldCalculator({ currentRole }: GoldCalculatorProps) {
   const calculatedResult: PricingResult | null = useMemo(() => {
     if (!config || material !== 'gold') return null
     const weightNum = parseFloat(weight) || 0
-    const goldPriceNum = goldPriceInput.rawValue
-    const laborNum = laborCostInput.rawValue
+    const goldPriceNum = goldPriceInput.rawValue || config.goldPrice24K
+    const laborNum = laborCostInput.rawValue || 0
 
     if (weightNum > 0 && goldPriceNum > 0) {
       return calculateGoldProductPrice({
