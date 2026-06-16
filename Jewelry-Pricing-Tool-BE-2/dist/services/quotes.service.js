@@ -277,14 +277,52 @@ class QuotesService {
         });
         return quote;
     }
-    async confirm(id, selectedOption) {
+    async confirm(id, selectedOption, selectedOptions) {
         const quote = await Quote_1.Quote.findById(id);
         if (!quote) {
             const err = new Error('Quote not found');
             err.statusCode = 404;
             throw err;
         }
-        if (selectedOption) {
+        if (selectedOptions && Array.isArray(selectedOptions) && selectedOptions.length > 0) {
+            const targetTypes = selectedOptions.map(o => o.materialType);
+            if (quote.options && quote.options.length > 0) {
+                quote.options.forEach(o => {
+                    if (targetTypes.includes(o.materialType)) {
+                        o.isConfirmed = true;
+                        o.isCancelled = false;
+                    }
+                    else {
+                        o.isConfirmed = false;
+                        o.isCancelled = true;
+                    }
+                });
+                quote.markModified('options');
+                const confirmedOptionsTotal = quote.options
+                    .filter(o => o.isConfirmed)
+                    .reduce((sum, o) => sum + (Number(o.sellingPrice) || 0), 0);
+                quote.confirmedPrice = confirmedOptionsTotal || quote.sellingPrice || 0;
+            }
+            else {
+                quote.confirmedPrice = quote.sellingPrice || 0;
+            }
+            // Update top-level fields from the first selected option for compatibility
+            const primaryOption = selectedOptions[0];
+            quote.materialType = primaryOption.materialType;
+            quote.weightChi = primaryOption.weightChi;
+            quote.weightGram = primaryOption.weightGram;
+            quote.laborCost = primaryOption.laborCost;
+            quote.goldPrice24K = primaryOption.goldPrice24K;
+            quote.platinumPrice = primaryOption.platinumPrice;
+            quote.materialCost = primaryOption.materialCost;
+            quote.stoneCost = primaryOption.stoneCost;
+            quote.costBeforeVAT = primaryOption.costBeforeVAT;
+            quote.costWithVAT = primaryOption.costWithVAT;
+            quote.costPrice = primaryOption.costPrice;
+            quote.sellingPrice = primaryOption.sellingPrice;
+            quote.status = Quote_1.QuoteStatus.CONFIRMED;
+        }
+        else if (selectedOption) {
             quote.materialType = selectedOption.materialType;
             quote.weightChi = selectedOption.weightChi;
             quote.weightGram = selectedOption.weightGram;
@@ -298,22 +336,25 @@ class QuotesService {
             quote.costPrice = selectedOption.costPrice;
             quote.sellingPrice = selectedOption.sellingPrice;
             if (quote.options && quote.options.length > 0) {
-                quote.options.forEach(o => {
-                    if (o.materialType === selectedOption.materialType) {
-                        o.isConfirmed = true;
-                        o.isCancelled = false;
-                    }
-                    else {
-                        o.isConfirmed = false;
-                        o.isCancelled = true;
-                    }
-                });
+                const option = quote.options.find(o => o.materialType === selectedOption.materialType);
+                if (option) {
+                    option.isConfirmed = true;
+                    option.isCancelled = false;
+                }
+                ;
                 quote.markModified('options');
                 const confirmedOptionsTotal = quote.options
                     .filter(o => o.isConfirmed)
                     .reduce((sum, o) => sum + (Number(o.sellingPrice) || 0), 0);
                 quote.confirmedPrice = confirmedOptionsTotal || selectedOption.sellingPrice || quote.sellingPrice || 0;
-                quote.status = Quote_1.QuoteStatus.CONFIRMED;
+                const allResolved = quote.options.every(o => o.isConfirmed || o.isCancelled);
+                const hasConfirmed = quote.options.some(o => o.isConfirmed);
+                if (allResolved && hasConfirmed) {
+                    quote.status = Quote_1.QuoteStatus.CONFIRMED;
+                }
+                else {
+                    quote.status = Quote_1.QuoteStatus.SENT_TO_CUSTOMER;
+                }
             }
             else {
                 quote.confirmedPrice = selectedOption.sellingPrice || quote.sellingPrice || 0;

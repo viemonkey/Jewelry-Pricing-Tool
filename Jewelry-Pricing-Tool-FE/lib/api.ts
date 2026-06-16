@@ -158,10 +158,10 @@ export const quotesApi = {
     request<Quote>(`/quotes/${id}/sent-to-customer`, { method: 'PATCH' }),
 
   /** Sale: Khách chốt → CONFIRMED */
-  confirm: (id: string, selectedOption?: any) =>
+  confirm: (id: string, selectedOption?: any, selectedOptions?: any[]) =>
     request<Quote>(`/quotes/${id}/confirm`, { 
       method: 'PATCH',
-      body: JSON.stringify({ selectedOption })
+      body: JSON.stringify({ selectedOption, selectedOptions })
     }),
 
   /** Sale: Khách huỷ → CANCELLED */

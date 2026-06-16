@@ -103,6 +103,26 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('vi-VN')
 }
 
+function getQuoteMaterialsText(q: Quote) {
+  if (q.options && q.options.length > 0) {
+    return q.options.map(opt => formatMaterialType(opt.materialType)).join(', ')
+  }
+  return formatMaterialType(q.materialType)
+}
+
+function getQuotePriceRangeText(q: Quote) {
+  if (q.options && q.options.length > 0) {
+    const prices = q.options.map(opt => opt.sellingPrice || 0).filter(p => p > 0)
+    if (prices.length > 0) {
+      const min = Math.min(...prices)
+      const max = Math.max(...prices)
+      if (min === max) return formatCurrency(min)
+      return `${formatCurrency(min)} - ${formatCurrency(max)}`
+    }
+  }
+  return q.sellingPrice ? formatCurrency(q.sellingPrice) : 'Chờ tính giá'
+}
+
 const MATERIAL_COLORS = ['#d4af37', '#b4904c', '#9ca3af', '#78350f', '#f59e0b', '#4b5563']
 
 export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, onViewAll }: SaleDashboardProps) {
@@ -113,7 +133,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
   const [activeActionTab, setActiveActionTab] = useState<'urgent' | 'progress'>('urgent')
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
   const [selectedQuoteForConfirm, setSelectedQuoteForConfirm] = useState<Quote | null>(null)
-  const [selectedOptionToConfirm, setSelectedOptionToConfirm] = useState<any | null>(null)
+  const [selectedOptionsToConfirm, setSelectedOptionsToConfirm] = useState<any[]>([])
   const [confirmingQuote, setConfirmingQuote] = useState(false)
 
   const { addNotification } = useNotifications()
@@ -255,7 +275,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
     const options = q.options || []
     if (options.length > 1) {
       setSelectedQuoteForConfirm(q)
-      setSelectedOptionToConfirm(options[0])
+      setSelectedOptionsToConfirm([options[0]])
       setConfirmModalOpen(true)
     } else {
       const singleOption = options.length === 1 ? options[0] : null
@@ -274,18 +294,18 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
   }
 
   const doConfirmMultiOption = async () => {
-    if (!selectedQuoteForConfirm || !selectedOptionToConfirm) return
+    if (!selectedQuoteForConfirm || selectedOptionsToConfirm.length === 0) return
     setConfirmingQuote(true)
     const id = selectedQuoteForConfirm._id
     const name = selectedQuoteForConfirm.productName
-    const opt = selectedOptionToConfirm
-    const matLabel = ` (${formatMaterialType(opt.materialType)})`
+    const opts = selectedOptionsToConfirm
+    const matLabels = opts.map(o => formatMaterialType(o.materialType)).join(', ')
     try {
-      await quotesApi.confirm(id, opt)
-      addNotification({ type: 'success', title: '🎉 Khách chốt đơn!', message: `"${name}"${matLabel} đã được đặt hàng thành công.` })
+      await quotesApi.confirm(id, undefined, opts)
+      addNotification({ type: 'success', title: '🎉 Khách chốt đơn!', message: `"${name}" (${matLabels}) đã được đặt hàng thành công.` })
       setConfirmModalOpen(false)
       setSelectedQuoteForConfirm(null)
-      setSelectedOptionToConfirm(null)
+      setSelectedOptionsToConfirm([])
       fetchData()
     } catch {
       addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể xác nhận đơn.' })
@@ -591,15 +611,11 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
                           </span>
                         </td>
                         <td className="px-5 py-3.5 text-xs text-[#526071] font-medium">
-                          {formatMaterialType(q.materialType)}
+                          {getQuoteMaterialsText(q)}
                         </td>
                         <td className="px-5 py-3.5 text-xs text-muted-foreground">{formatDate(q.createdAt)}</td>
                         <td className="px-5 py-3.5 text-xs font-bold text-[#b4904c] tracking-wide">
-                          {q.sellingPrice ? (
-                            <span>{formatCurrency(q.sellingPrice)}</span>
-                          ) : (
-                            <span className="text-muted-foreground/60 font-normal italic text-[11px]">Chờ tính giá</span>
-                          )}
+                          {getQuotePriceRangeText(q)}
                         </td>
                         <td className="px-5 py-3.5">
                           <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border', st.badgeClass)}>
@@ -703,11 +719,17 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
           {selectedQuoteForConfirm && (
             <div className="py-4 space-y-3">
               {(selectedQuoteForConfirm.options || []).map((opt) => {
-                const isSelected = selectedOptionToConfirm?.materialType === opt.materialType
+                const isSelected = selectedOptionsToConfirm.some(o => o.materialType === opt.materialType)
                 return (
                   <div
                     key={opt.materialType}
-                    onClick={() => setSelectedOptionToConfirm(opt)}
+                    onClick={() => {
+                      if (isSelected) {
+                        setSelectedOptionsToConfirm(selectedOptionsToConfirm.filter(o => o.materialType !== opt.materialType))
+                      } else {
+                        setSelectedOptionsToConfirm([...selectedOptionsToConfirm, opt])
+                      }
+                    }}
                     className={cn(
                       "flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all duration-200 select-none",
                       isSelected
@@ -717,13 +739,15 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
                   >
                     <div className="flex items-center gap-3">
                       <span className={cn(
-                        "w-4 h-4 rounded-full border flex items-center justify-center transition-all",
+                        "w-4 h-4 rounded border flex items-center justify-center transition-all",
                         isSelected
-                          ? "border-[#B4904C]"
-                          : "border-muted-foreground/40"
+                          ? "border-[#B4904C] bg-[#B4904C] text-white"
+                          : "border-muted-foreground/40 bg-white"
                       )}>
                         {isSelected && (
-                          <span className="w-2 h-2 rounded-full bg-[#B4904C]" />
+                          <svg className="w-3 h-3 stroke-current" viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
                         )}
                       </span>
                       <div>
@@ -751,7 +775,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
               onClick={() => {
                 setConfirmModalOpen(false)
                 setSelectedQuoteForConfirm(null)
-                setSelectedOptionToConfirm(null)
+                setSelectedOptionsToConfirm([])
               }}
               className="flex-1 sm:flex-none h-9 text-xs font-semibold rounded-lg border-border/60"
             >
@@ -760,7 +784,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
             <Button
               type="button"
               onClick={doConfirmMultiOption}
-              disabled={confirmingQuote || !selectedOptionToConfirm}
+              disabled={confirmingQuote || selectedOptionsToConfirm.length === 0}
               className="flex-1 sm:flex-none h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 shadow-sm"
             >
               {confirmingQuote ? 'Đang xử lý...' : 'Xác nhận chốt đơn'}

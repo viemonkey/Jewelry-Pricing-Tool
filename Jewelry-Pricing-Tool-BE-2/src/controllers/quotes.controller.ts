@@ -126,8 +126,8 @@ export class QuotesController {
 
   async confirm(req: Request, res: Response, next: NextFunction) {
     try {
-      const { selectedOption } = req.body
-      const quote = await quotesService.confirm(req.params.id, selectedOption)
+      const { selectedOption, selectedOptions } = req.body
+      const quote = await quotesService.confirm(req.params.id, selectedOption, selectedOptions)
       res.json(quote)
     } catch (error) {
       next(error)
