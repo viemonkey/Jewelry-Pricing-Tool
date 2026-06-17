@@ -175,7 +175,7 @@ export function PricingSettings() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <Card className="luxury-card border-luxury relative overflow-hidden shimmer-gold shadow-md h-full flex flex-col">
+          <Card className="luxury-card border-luxury relative overflow-hidden shimmer-gold shadow-md h-full flex flex-col flex-1">
             <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
               <Coins className="h-16 w-16 text-primary" />
             </div>
@@ -256,7 +256,7 @@ export function PricingSettings() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
         >
-          <Card className="luxury-card border-luxury relative overflow-hidden bg-slate-50/50 dark:bg-slate-950/20 shadow-md h-full flex flex-col">
+          <Card className="luxury-card border-luxury relative overflow-hidden bg-slate-50/50 dark:bg-slate-950/20 shadow-md h-full flex flex-col flex-1">
             <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
               <Layers className="h-16 w-16 text-slate-500" />
             </div>
