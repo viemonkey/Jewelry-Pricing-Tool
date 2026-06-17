@@ -330,6 +330,63 @@ export function PricingSettings() {
           </Card>
         </motion.div>
       </div>
+
+      {/* Quy tắc và Công thức định giá tự động */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.2 }}
+      >
+        <Card className="border-luxury shadow-md relative overflow-hidden bg-gradient-to-br from-white to-amber-50/10 dark:from-zinc-900 dark:to-amber-950/5">
+          <CardHeader>
+            <CardTitle className="text-base font-serif font-bold text-foreground flex items-center gap-2">
+              <Info className="h-4.5 w-4.5 text-primary" />
+              Quy tắc và Công thức định giá tự động
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Hướng dẫn chi tiết cách hệ thống tự động đề xuất giá bán dựa trên giá nguyên liệu cấu hình phía trên
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs text-muted-foreground leading-relaxed">
+            {/* Vàng */}
+            <div className="space-y-2 border-r border-border/40 pr-4 last:border-0">
+              <h4 className="font-bold text-sm text-foreground flex items-center gap-1.5 text-amber-600">
+                🔸 Định giá sản phẩm Vàng
+              </h4>
+              <ul className="list-disc pl-4 space-y-1.5">
+                <li><strong>Giá vàng nguyên liệu</strong>: Tính dựa trên tỷ lệ vàng của từng tuổi (ví dụ: 18K = 75%, 14K = 58.5%,...) nhân với giá vàng 24K cấu hình.</li>
+                <li><strong>Giá vốn trước thuế</strong>: Bằng giá vàng nguyên liệu + tiền đá + tiền công chế tác.</li>
+                <li><strong>Giá vốn có thuế</strong>: Cộng thêm 10% VAT của giá vốn trước thuế.</li>
+                <li><strong>Giá bán đề xuất</strong>: Bằng giá vốn có thuế chia cho hệ số lợi nhuận tương ứng theo phân khúc giá.</li>
+              </ul>
+            </div>
+
+            {/* Bạch kim */}
+            <div className="space-y-2 border-r border-border/40 pr-4 last:border-0">
+              <h4 className="font-bold text-sm text-foreground flex items-center gap-1.5 text-slate-600">
+                🔹 Định giá sản phẩm Bạch kim
+              </h4>
+              <ul className="list-disc pl-4 space-y-1.5">
+                <li><strong>Giá bạch kim nguyên liệu</strong>: Được tính trực tiếp từ giá bạch kim nguyên liệu cấu hình nhân với trọng lượng sản phẩm.</li>
+                <li><strong>Giá vốn chế tác</strong>: Bằng giá bạch kim nguyên liệu + tiền đá (không bao gồm thêm tiền công vì giá bạch kim cấu hình đã bao gồm tiền công chế tác).</li>
+                <li><strong>Giá bán đề xuất</strong>: Được đề xuất bằng chính giá vốn chế tác (hệ số lợi nhuận 1:1).</li>
+              </ul>
+            </div>
+
+            {/* Bạc */}
+            <div className="space-y-2">
+              <h4 className="font-bold text-sm text-foreground flex items-center gap-1.5 text-blue-600">
+                🔹 Định giá sản phẩm Bạc 925
+              </h4>
+              <ul className="list-disc pl-4 space-y-1.5">
+                <li><strong>Giá vốn nguyên liệu</strong>: Nhập trực tiếp giá nguyên liệu bạc vào phiếu yêu cầu báo giá.</li>
+                <li><strong>Giá bán đề xuất</strong>: Bằng giá nguyên liệu bạc nhân với hệ số nhân cấu hình (mặc định là x3) cộng với chi phí đá.</li>
+                <li><strong>Hệ số nhân bạc</strong>: Được lưu trong cấu hình cấu trúc giá chung của hệ thống.</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   )
 }
