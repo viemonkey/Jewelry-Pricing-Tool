@@ -147,6 +147,9 @@ export function QuickQuoteHistoryList({
                 <TableHead className="font-semibold text-foreground text-xs py-2">Trọng lượng (chỉ)</TableHead>
                 <TableHead className="font-semibold text-foreground text-xs py-2 font-mono">Giá đề xuất</TableHead>
                 <TableHead className="font-semibold text-foreground text-xs py-2">Ngày gửi</TableHead>
+                {currentRole === 'order' && (
+                  <TableHead className="font-semibold text-foreground text-xs py-2">Người yêu cầu</TableHead>
+                )}
                 <TableHead className="font-semibold text-foreground text-xs py-2">Trạng thái</TableHead>
                 <TableHead className="text-right font-semibold text-foreground text-xs py-2">Thao tác</TableHead>
               </TableRow>
@@ -168,6 +171,9 @@ export function QuickQuoteHistoryList({
                     <TableCell className="text-[11px] text-muted-foreground py-2">
                       {new Date(quote.createdAt).toLocaleDateString('vi-VN')}
                     </TableCell>
+                    {currentRole === 'order' && (
+                      <TableCell className="text-xs py-2 font-medium">{quote.requestedBy || '—'}</TableCell>
+                    )}
                     <TableCell className="py-2">{getStatusBadge(quote.status)}</TableCell>
                     <TableCell className="text-right py-2">
                       <div className="flex justify-end gap-1">
