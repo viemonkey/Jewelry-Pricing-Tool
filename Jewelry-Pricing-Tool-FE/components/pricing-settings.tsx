@@ -170,65 +170,68 @@ export function PricingSettings() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Card giá vàng */}
         <motion.div
+          className="h-full flex flex-col"
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <Card className="luxury-card border-luxury relative overflow-hidden shimmer-gold shadow-md">
+          <Card className="luxury-card border-luxury relative overflow-hidden shimmer-gold shadow-md h-full flex flex-col">
             <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
               <Coins className="h-16 w-16 text-primary" />
             </div>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 shrink-0">
               <CardTitle className="flex items-center gap-2 text-base font-serif font-bold text-foreground">
                 <Sparkles className="h-4.5 w-4.5 text-primary animate-pulse" />
                 Giá Vàng 24K Hôm Nay
               </CardTitle>
               <CardDescription className="text-xs">Giá vàng nguyên liệu dùng làm gốc định giá</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="goldPrice24K" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Giá vàng nguyên liệu (VND / Chỉ)
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="goldPrice24K"
-                    value={goldPriceDisplay}
-                    inputMode="numeric"
-                    onChange={(e) => handleGoldPriceChange(e.target.value)}
-                    placeholder="9,000,000"
-                    className="pr-16 text-xl font-semibold tabular-nums text-primary border-primary/20 focus-visible:ring-primary h-12"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
-                    VND / chỉ
+            <CardContent className="flex-1 flex flex-col justify-between space-y-5">
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="goldPrice24K" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Giá vàng nguyên liệu (VND / Chỉ)
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="goldPrice24K"
+                      value={goldPriceDisplay}
+                      inputMode="numeric"
+                      onChange={(e) => handleGoldPriceChange(e.target.value)}
+                      placeholder="9,000,000"
+                      className="pr-16 text-xl font-semibold tabular-nums text-primary border-primary/20 focus-visible:ring-primary h-12"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
+                      VND / chỉ
+                    </span>
+                  </div>
+                </div>
+
+                {goldPriceRaw > 0 && (
+                  <div className="rounded-lg bg-primary/5 border border-primary/10 p-3 text-xs space-y-1 text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Đơn giá theo chỉ:</span>
+                      <span className="font-semibold text-primary">{formatCurrency(goldPriceRaw)} / chỉ</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Đơn giá theo gram (chia 3.75):</span>
+                      <span className="font-medium">{formatCurrency(Math.round(goldPriceRaw / 3.75))} / gram</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start gap-2 text-[11px] text-muted-foreground leading-relaxed bg-amber-500/5 p-3 rounded-lg border border-amber-500/10">
+                  <Info className="h-3.5 w-3.5 shrink-0 text-amber-500 mt-0.5" />
+                  <span>
+                    <b>Lưu ý:</b> Khi thay đổi giá vàng 24K nguyên liệu, toàn bộ các yêu cầu báo giá vàng hiện có trong cơ sở dữ liệu sẽ tự động được hệ thống tính toán lại giá vốn và giá bán đề xuất.
                   </span>
                 </div>
-              </div>
-
-              {goldPriceRaw > 0 && (
-                <div className="rounded-lg bg-primary/5 border border-primary/10 p-3 text-xs space-y-1 text-muted-foreground">
-                  <div className="flex justify-between">
-                    <span>Đơn giá theo chỉ:</span>
-                    <span className="font-semibold text-primary">{formatCurrency(goldPriceRaw)} / chỉ</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Đơn giá theo gram (chia 3.75):</span>
-                    <span className="font-medium">{formatCurrency(Math.round(goldPriceRaw / 3.75))} / gram</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex items-start gap-2 text-[11px] text-muted-foreground leading-relaxed bg-amber-500/5 p-3 rounded-lg border border-amber-500/10">
-                <Info className="h-3.5 w-3.5 shrink-0 text-amber-500 mt-0.5" />
-                <span>
-                  <b>Lưu ý:</b> Khi thay đổi giá vàng 24K nguyên liệu, toàn bộ các yêu cầu báo giá vàng hiện có trong cơ sở dữ liệu sẽ tự động được hệ thống tính toán lại giá vốn và giá bán đề xuất.
-                </span>
               </div>
 
               <Button
                 onClick={handleSaveGold}
                 disabled={savingGold}
-                className="w-full gap-2 bg-gold-gradient hover:opacity-95 shadow-md active:scale-98 transition-all hover-gold-glow h-11 text-primary-foreground font-semibold"
+                className="w-full gap-2 bg-gold-gradient hover:opacity-95 shadow-md active:scale-98 transition-all hover-gold-glow h-11 text-primary-foreground font-semibold shrink-0"
               >
                 {savingGold ? (
                   <>
@@ -248,61 +251,68 @@ export function PricingSettings() {
 
         {/* Card giá bạch kim */}
         <motion.div
+          className="h-full flex flex-col"
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
         >
-          <Card className="luxury-card border-luxury relative overflow-hidden bg-slate-50/50 dark:bg-slate-950/20 shadow-md">
+          <Card className="luxury-card border-luxury relative overflow-hidden bg-slate-50/50 dark:bg-slate-950/20 shadow-md h-full flex flex-col">
             <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
               <Layers className="h-16 w-16 text-slate-500" />
             </div>
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-3 shrink-0">
               <CardTitle className="flex items-center gap-2 text-base font-serif font-bold text-foreground">
                 <Layers className="h-4.5 w-4.5 text-slate-500 animate-pulse" />
                 Giá Bạch Kim Hôm Nay
               </CardTitle>
               <CardDescription className="text-xs">Giá bạch kim nguyên liệu dùng làm gốc định giá (gồm công)</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="platinumPrice" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Giá bạch kim nguyên liệu (VND / Chỉ)
-                </Label>
-                <div className="relative">
-                  <Input
-                    id="platinumPrice"
-                    value={platinumPriceDisplay}
-                    inputMode="numeric"
-                    onChange={(e) => handlePlatinumPriceChange(e.target.value)}
-                    placeholder="7,500,000"
-                    className="pr-16 text-xl font-semibold tabular-nums text-slate-700 dark:text-slate-300 border-slate-200 focus-visible:ring-slate-400 h-12"
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
-                    VND / chỉ
-                  </span>
-                </div>
-              </div>
-
-              {platinumPriceRaw > 0 && (
-                <div className="rounded-lg bg-slate-500/5 border border-slate-500/10 p-3 text-xs space-y-1 text-muted-foreground">
-                  <div className="flex justify-between">
-                    <span>Đơn giá theo chỉ:</span>
-                    <span className="font-semibold text-slate-700 dark:text-slate-300">{formatCurrency(platinumPriceRaw)} / chỉ</span>
+            <CardContent className="flex-1 flex flex-col justify-between space-y-5">
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="platinumPrice" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    Giá bạch kim nguyên liệu (VND / Chỉ)
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="platinumPrice"
+                      value={platinumPriceDisplay}
+                      inputMode="numeric"
+                      onChange={(e) => handlePlatinumPriceChange(e.target.value)}
+                      placeholder="7,500,000"
+                      className="pr-16 text-xl font-semibold tabular-nums text-slate-700 dark:text-slate-300 border-slate-200 focus-visible:ring-slate-400 h-12"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
+                      VND / chỉ
+                    </span>
                   </div>
                 </div>
-              )}
 
-              <div className="flex items-start gap-2 text-[11px] text-muted-foreground leading-relaxed bg-slate-500/5 p-3 rounded-lg border border-slate-500/10">
-                <Info className="h-3.5 w-3.5 shrink-0 text-slate-500 mt-0.5" />
-                <span>
-                  <b>Lưu ý:</b> Khi thay đổi giá bạch kim, toàn bộ các yêu cầu báo giá bạch kim đang xử lý trong hệ thống sẽ tự động được tính toán lại giá vốn và giá bán đề xuất.
-                </span>
+                {platinumPriceRaw > 0 && (
+                  <div className="rounded-lg bg-slate-500/5 border border-slate-500/10 p-3 text-xs space-y-1 text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Đơn giá theo chỉ:</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">{formatCurrency(platinumPriceRaw)} / chỉ</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Đơn giá theo gram (chia 3.75):</span>
+                      <span className="font-medium text-slate-600 dark:text-slate-400">{formatCurrency(Math.round(platinumPriceRaw / 3.75))} / gram</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start gap-2 text-[11px] text-muted-foreground leading-relaxed bg-slate-500/5 p-3 rounded-lg border border-slate-500/10">
+                  <Info className="h-3.5 w-3.5 shrink-0 text-slate-500 mt-0.5" />
+                  <span>
+                    <b>Lưu ý:</b> Khi thay đổi giá bạch kim, toàn bộ các yêu cầu báo giá bạch kim đang xử lý trong hệ thống sẽ tự động được tính toán lại giá vốn và giá bán đề xuất.
+                  </span>
+                </div>
               </div>
 
               <Button
                 onClick={handleSavePlatinum}
                 disabled={savingPlatinum}
-                className="w-full gap-2 bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-700 shadow-md active:scale-98 transition-all h-11 text-white font-semibold"
+                className="w-full gap-2 bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-700 shadow-md active:scale-98 transition-all h-11 text-white font-semibold shrink-0"
               >
                 {savingPlatinum ? (
                   <>
