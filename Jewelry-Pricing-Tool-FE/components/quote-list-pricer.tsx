@@ -1712,18 +1712,24 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
   useEffect(() => {
     if (newQuote && !autoOpenedRefs.current.has(newQuote._id)) {
       autoOpenedRefs.current.add(newQuote._id)
+      if (currentRole === 'sale' && newQuote.requestedBy !== currentUserName) {
+        return // Skip if not this sale's quote
+      }
       setQuotes((prev) => {
         if (prev.some((q) => q._id === newQuote._id)) return prev
         return [newQuote, ...prev]
       })
     }
-  }, [newQuote])
+  }, [newQuote, currentRole, currentUserName])
 
   const fetchQuotes = async () => {
     setLoading(true)
     try {
       const data = await quotesApi.list(filterStatus === 'ALL' ? undefined : filterStatus)
-      setQuotes(data)
+      const filtered = currentRole === 'sale'
+        ? data.filter(q => q.requestedBy === currentUserName)
+        : data
+      setQuotes(filtered)
     } catch {
       setQuotes([])
     } finally {
