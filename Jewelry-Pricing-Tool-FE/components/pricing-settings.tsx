@@ -175,7 +175,7 @@ export function PricingSettings() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <Card className="luxury-card border-luxury relative overflow-hidden shimmer-gold shadow-md min-h-[600px] flex flex-col flex-1 p-4">
+          <Card className="luxury-card border-luxury relative overflow-hidden shimmer-gold shadow-md min-h-[520px] flex flex-col flex-1 p-4">
             <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
               <Coins className="h-16 w-16 text-primary" />
             </div>
@@ -186,7 +186,7 @@ export function PricingSettings() {
               </CardTitle>
               <CardDescription className="text-xs">Giá vàng nguyên liệu dùng làm gốc định giá</CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col justify-between space-y-8">
+            <CardContent className="flex-1 flex flex-col justify-between space-y-6">
               <div className="space-y-6">
                 <div className="space-y-3">
                   <Label htmlFor="goldPrice24K" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -258,7 +258,7 @@ export function PricingSettings() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
         >
-          <Card className="luxury-card border-luxury relative overflow-hidden bg-slate-50/50 dark:bg-slate-950/20 shadow-md min-h-[600px] flex flex-col flex-1 p-4">
+          <Card className="luxury-card border-luxury relative overflow-hidden bg-slate-50/50 dark:bg-slate-950/20 shadow-md min-h-[520px] flex flex-col flex-1 p-4">
             <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
               <Layers className="h-16 w-16 text-slate-500" />
             </div>
@@ -269,7 +269,7 @@ export function PricingSettings() {
               </CardTitle>
               <CardDescription className="text-xs">Giá bạch kim nguyên liệu dùng làm gốc định giá (gồm công)</CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col justify-between space-y-8">
+            <CardContent className="flex-1 flex flex-col justify-between space-y-6">
               <div className="space-y-5">
                 <div className="space-y-3">
                   <Label htmlFor="platinumPrice" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
