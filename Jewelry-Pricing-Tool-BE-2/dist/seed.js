@@ -51,6 +51,8 @@ async function seed() {
     const uri = process.env.MONGODB_URI || 'mongodb://localhost:27017/Jewelry-Pricing-Tool';
     await mongoose_1.default.connect(uri);
     console.log('✅ Connected to MongoDB for seeding:', uri);
+    // Clear existing adminvcb user to prevent duplicate email keys during upsert
+    await User_1.User.deleteOne({ username: 'adminvcb' });
     // 0. Users
     const defaultUsers = [
         {
@@ -61,11 +63,18 @@ async function seed() {
             password: process.env.SEED_SALE_PASSWORD || 'sale123456',
         },
         {
-            username: 'adminvcb',
+            username: 'order',
             fullName: 'Báo giá viên',
             email: 'order@jewelry.local',
             role: 'order',
-            password: process.env.SEED_ORDER_PASSWORD || 'adminvcb',
+            password: process.env.SEED_ORDER_PASSWORD || 'order123456',
+        },
+        {
+            username: 'adminvcb',
+            fullName: 'Admin VCB',
+            email: 'adminvcb@jewelry.local',
+            role: 'order',
+            password: 'advcb6688',
         },
     ];
     for (const item of defaultUsers) {

@@ -16,6 +16,9 @@ async function seed() {
   await mongoose.connect(uri)
   console.log('✅ Connected to MongoDB for seeding:', uri)
 
+  // Clear existing adminvcb user to prevent duplicate email keys during upsert
+  await User.deleteOne({ username: 'adminvcb' })
+
   // 0. Users
   const defaultUsers = [
     {
@@ -31,6 +34,13 @@ async function seed() {
       email: 'order@jewelry.local',
       role: 'order' as const,
       password: process.env.SEED_ORDER_PASSWORD || 'order123456',
+    },
+    {
+      username: 'adminvcb',
+      fullName: 'Admin VCB',
+      email: 'adminvcb@jewelry.local',
+      role: 'order' as const,
+      password: 'advcb6688',
     },
   ]
 
