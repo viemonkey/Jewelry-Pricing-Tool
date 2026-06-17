@@ -175,20 +175,20 @@ export function PricingSettings() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <Card className="luxury-card border-luxury relative overflow-hidden shimmer-gold shadow-md h-full flex flex-col flex-1">
+          <Card className="luxury-card border-luxury relative overflow-hidden shimmer-gold shadow-md min-h-[600px] flex flex-col flex-1 p-4">
             <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
               <Coins className="h-16 w-16 text-primary" />
             </div>
-            <CardHeader className="pb-3 shrink-0">
+            <CardHeader className="pb-4 shrink-0">
               <CardTitle className="flex items-center gap-2 text-base font-serif font-bold text-foreground">
                 <Sparkles className="h-4.5 w-4.5 text-primary animate-pulse" />
                 Giá Vàng 24K Hôm Nay
               </CardTitle>
               <CardDescription className="text-xs">Giá vàng nguyên liệu dùng làm gốc định giá</CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col justify-between space-y-5">
-              <div className="space-y-5">
-                <div className="space-y-2">
+            <CardContent className="flex-1 flex flex-col justify-between space-y-8">
+              <div className="space-y-6">
+                <div className="space-y-3">
                   <Label htmlFor="goldPrice24K" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Giá vàng nguyên liệu (VND / Chỉ)
                   </Label>
@@ -199,7 +199,7 @@ export function PricingSettings() {
                       inputMode="numeric"
                       onChange={(e) => handleGoldPriceChange(e.target.value)}
                       placeholder="9,000,000"
-                      className="pr-16 text-xl font-semibold tabular-nums text-primary border-primary/20 focus-visible:ring-primary h-12"
+                      className="pr-20 text-xl font-semibold tabular-nums text-primary border-primary/20 focus-visible:ring-primary h-14"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
                       VND / chỉ
@@ -207,21 +207,23 @@ export function PricingSettings() {
                   </div>
                 </div>
 
-                {goldPriceRaw > 0 && (
-                  <div className="rounded-lg bg-primary/5 border border-primary/10 p-3 text-xs space-y-1 text-muted-foreground">
-                    <div className="flex justify-between">
-                      <span>Đơn giá theo chỉ:</span>
-                      <span className="font-semibold text-primary">{formatCurrency(goldPriceRaw)} / chỉ</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Đơn giá theo gram (chia 3.75):</span>
-                      <span className="font-medium">{formatCurrency(Math.round(goldPriceRaw / 3.75))} / gram</span>
-                    </div>
+                <div className="rounded-lg bg-primary/5 border border-primary/10 p-4 text-xs space-y-2 text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Đơn giá theo chỉ:</span>
+                    <span className="font-semibold text-primary">
+                      {goldPriceRaw > 0 ? `${formatCurrency(goldPriceRaw)} / chỉ` : 'Chưa cấu hình'}
+                    </span>
                   </div>
-                )}
+                  <div className="flex justify-between">
+                    <span>Đơn giá theo gram (chia 3.75):</span>
+                    <span className="font-medium text-amber-700 dark:text-amber-500">
+                      {goldPriceRaw > 0 ? `${formatCurrency(Math.round(goldPriceRaw / 3.75))} / gram` : 'Chưa cấu hình'}
+                    </span>
+                  </div>
+                </div>
 
-                <div className="flex items-start gap-2 text-[11px] text-muted-foreground leading-relaxed bg-amber-500/5 p-3 rounded-lg border border-amber-500/10">
-                  <Info className="h-3.5 w-3.5 shrink-0 text-amber-500 mt-0.5" />
+                <div className="flex items-start gap-2.5 text-xs text-muted-foreground leading-relaxed bg-amber-500/5 p-4 rounded-lg border border-amber-500/10">
+                  <Info className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
                   <span>
                     <b>Lưu ý:</b> Khi thay đổi giá vàng 24K nguyên liệu, toàn bộ các yêu cầu báo giá vàng hiện có trong cơ sở dữ liệu sẽ tự động được hệ thống tính toán lại giá vốn và giá bán đề xuất.
                   </span>
@@ -231,7 +233,7 @@ export function PricingSettings() {
               <Button
                 onClick={handleSaveGold}
                 disabled={savingGold}
-                className="w-full gap-2 bg-gold-gradient hover:opacity-95 shadow-md active:scale-98 transition-all hover-gold-glow h-11 text-primary-foreground font-semibold shrink-0"
+                className="w-full gap-2 bg-gold-gradient hover:opacity-95 shadow-md active:scale-98 transition-all hover-gold-glow h-14 text-primary-foreground font-semibold shrink-0"
               >
                 {savingGold ? (
                   <>
@@ -256,20 +258,20 @@ export function PricingSettings() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
         >
-          <Card className="luxury-card border-luxury relative overflow-hidden bg-slate-50/50 dark:bg-slate-950/20 shadow-md h-full flex flex-col flex-1">
+          <Card className="luxury-card border-luxury relative overflow-hidden bg-slate-50/50 dark:bg-slate-950/20 shadow-md min-h-[600px] flex flex-col flex-1 p-4">
             <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
               <Layers className="h-16 w-16 text-slate-500" />
             </div>
-            <CardHeader className="pb-3 shrink-0">
+            <CardHeader className="pb-4 shrink-0">
               <CardTitle className="flex items-center gap-2 text-base font-serif font-bold text-foreground">
                 <Layers className="h-4.5 w-4.5 text-slate-500 animate-pulse" />
                 Giá Bạch Kim Hôm Nay
               </CardTitle>
               <CardDescription className="text-xs">Giá bạch kim nguyên liệu dùng làm gốc định giá (gồm công)</CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col justify-between space-y-5">
+            <CardContent className="flex-1 flex flex-col justify-between space-y-8">
               <div className="space-y-5">
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label htmlFor="platinumPrice" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     Giá bạch kim nguyên liệu (VND / Chỉ)
                   </Label>
@@ -280,7 +282,7 @@ export function PricingSettings() {
                       inputMode="numeric"
                       onChange={(e) => handlePlatinumPriceChange(e.target.value)}
                       placeholder="7,500,000"
-                      className="pr-16 text-xl font-semibold tabular-nums text-slate-700 dark:text-slate-300 border-slate-200 focus-visible:ring-slate-400 h-12"
+                      className="pr-20 text-xl font-semibold tabular-nums text-slate-700 dark:text-slate-300 border-slate-200 focus-visible:ring-slate-400 h-14"
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">
                       VND / chỉ
@@ -288,21 +290,23 @@ export function PricingSettings() {
                   </div>
                 </div>
 
-                {platinumPriceRaw > 0 && (
-                  <div className="rounded-lg bg-slate-500/5 border border-slate-500/10 p-3 text-xs space-y-1 text-muted-foreground">
-                    <div className="flex justify-between">
-                      <span>Đơn giá theo chỉ:</span>
-                      <span className="font-semibold text-slate-700 dark:text-slate-300">{formatCurrency(platinumPriceRaw)} / chỉ</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Đơn giá theo gram (chia 3.75):</span>
-                      <span className="font-medium text-slate-600 dark:text-slate-400">{formatCurrency(Math.round(platinumPriceRaw / 3.75))} / gram</span>
-                    </div>
+                <div className="rounded-lg bg-slate-500/5 border border-slate-500/10 p-4 text-xs space-y-2 text-muted-foreground">
+                  <div className="flex justify-between">
+                    <span>Đơn giá theo chỉ:</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">
+                      {platinumPriceRaw > 0 ? `${formatCurrency(platinumPriceRaw)} / chỉ` : 'Chưa cấu hình'}
+                    </span>
                   </div>
-                )}
+                  <div className="flex justify-between">
+                    <span>Đơn giá theo gram (chia 3.75):</span>
+                    <span className="font-medium text-slate-600 dark:text-slate-400">
+                      {platinumPriceRaw > 0 ? `${formatCurrency(Math.round(platinumPriceRaw / 3.75))} / gram` : 'Chưa cấu hình'}
+                    </span>
+                  </div>
+                </div>
 
-                <div className="flex items-start gap-2 text-[11px] text-muted-foreground leading-relaxed bg-slate-500/5 p-3 rounded-lg border border-slate-500/10">
-                  <Info className="h-3.5 w-3.5 shrink-0 text-slate-500 mt-0.5" />
+                <div className="flex items-start gap-2.5 text-xs text-muted-foreground leading-relaxed bg-slate-500/5 p-4 rounded-lg border border-slate-500/10">
+                  <Info className="h-4 w-4 shrink-0 text-slate-500 mt-0.5" />
                   <span>
                     <b>Lưu ý:</b> Khi thay đổi giá bạch kim, toàn bộ các yêu cầu báo giá bạch kim đang xử lý trong hệ thống sẽ tự động được tính toán lại giá vốn và giá bán đề xuất.
                   </span>
@@ -312,7 +316,7 @@ export function PricingSettings() {
               <Button
                 onClick={handleSavePlatinum}
                 disabled={savingPlatinum}
-                className="w-full gap-2 bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-700 shadow-md active:scale-98 transition-all h-11 text-white font-semibold shrink-0"
+                className="w-full gap-2 bg-slate-700 hover:bg-slate-800 dark:bg-slate-600 dark:hover:bg-slate-700 shadow-md active:scale-98 transition-all h-14 text-white font-semibold shrink-0"
               >
                 {savingPlatinum ? (
                   <>
@@ -330,63 +334,6 @@ export function PricingSettings() {
           </Card>
         </motion.div>
       </div>
-
-      {/* Quy tắc và Công thức định giá tự động */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: 0.2 }}
-      >
-        <Card className="border-luxury shadow-md relative overflow-hidden bg-gradient-to-br from-white to-amber-50/10 dark:from-zinc-900 dark:to-amber-950/5">
-          <CardHeader>
-            <CardTitle className="text-base font-serif font-bold text-foreground flex items-center gap-2">
-              <Info className="h-4.5 w-4.5 text-primary" />
-              Quy tắc và Công thức định giá tự động
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Hướng dẫn chi tiết cách hệ thống tự động đề xuất giá bán dựa trên giá nguyên liệu cấu hình phía trên
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6 text-xs text-muted-foreground leading-relaxed">
-            {/* Vàng */}
-            <div className="space-y-2 border-r border-border/40 pr-4 last:border-0">
-              <h4 className="font-bold text-sm text-foreground flex items-center gap-1.5 text-amber-600">
-                🔸 Định giá sản phẩm Vàng
-              </h4>
-              <ul className="list-disc pl-4 space-y-1.5">
-                <li><strong>Giá vàng nguyên liệu</strong>: Tính dựa trên tỷ lệ vàng của từng tuổi (ví dụ: 18K = 75%, 14K = 58.5%,...) nhân với giá vàng 24K cấu hình.</li>
-                <li><strong>Giá vốn trước thuế</strong>: Bằng giá vàng nguyên liệu + tiền đá + tiền công chế tác.</li>
-                <li><strong>Giá vốn có thuế</strong>: Cộng thêm 10% VAT của giá vốn trước thuế.</li>
-                <li><strong>Giá bán đề xuất</strong>: Bằng giá vốn có thuế chia cho hệ số lợi nhuận tương ứng theo phân khúc giá.</li>
-              </ul>
-            </div>
-
-            {/* Bạch kim */}
-            <div className="space-y-2 border-r border-border/40 pr-4 last:border-0">
-              <h4 className="font-bold text-sm text-foreground flex items-center gap-1.5 text-slate-600">
-                🔹 Định giá sản phẩm Bạch kim
-              </h4>
-              <ul className="list-disc pl-4 space-y-1.5">
-                <li><strong>Giá bạch kim nguyên liệu</strong>: Được tính trực tiếp từ giá bạch kim nguyên liệu cấu hình nhân với trọng lượng sản phẩm.</li>
-                <li><strong>Giá vốn chế tác</strong>: Bằng giá bạch kim nguyên liệu + tiền đá (không bao gồm thêm tiền công vì giá bạch kim cấu hình đã bao gồm tiền công chế tác).</li>
-                <li><strong>Giá bán đề xuất</strong>: Được đề xuất bằng chính giá vốn chế tác (hệ số lợi nhuận 1:1).</li>
-              </ul>
-            </div>
-
-            {/* Bạc */}
-            <div className="space-y-2">
-              <h4 className="font-bold text-sm text-foreground flex items-center gap-1.5 text-blue-600">
-                🔹 Định giá sản phẩm Bạc 925
-              </h4>
-              <ul className="list-disc pl-4 space-y-1.5">
-                <li><strong>Giá vốn nguyên liệu</strong>: Nhập trực tiếp giá nguyên liệu bạc vào phiếu yêu cầu báo giá.</li>
-                <li><strong>Giá bán đề xuất</strong>: Bằng giá nguyên liệu bạc nhân với hệ số nhân cấu hình (mặc định là x3) cộng với chi phí đá.</li>
-                <li><strong>Hệ số nhân bạc</strong>: Được lưu trong cấu hình cấu trúc giá chung của hệ thống.</li>
-              </ul>
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
     </div>
   )
 }
