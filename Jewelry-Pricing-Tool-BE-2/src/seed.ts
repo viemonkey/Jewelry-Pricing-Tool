@@ -26,11 +26,11 @@ async function seed() {
       password: process.env.SEED_SALE_PASSWORD || 'sale123456',
     },
     {
-      username: 'order',
+      username: 'adminvcb',
       fullName: 'Báo giá viên',
       email: 'order@jewelry.local',
       role: 'order' as const,
-      password: process.env.SEED_ORDER_PASSWORD || 'order123456',
+      password: process.env.SEED_ORDER_PASSWORD || 'adminvcb',
     },
   ]
 
