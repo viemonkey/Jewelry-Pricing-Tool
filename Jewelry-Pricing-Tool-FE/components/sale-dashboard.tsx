@@ -1,40 +1,23 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { quotesApi, statsApi, type QuoteStats } from '@/lib/api'
 import type { Quote, QuoteStatus } from '@/lib/types'
 import { QuoteRequestModal } from '@/components/quote-request-modal'
 import { formatCurrency } from '@/lib/pricing'
 import { useNotifications } from '@/lib/notifications'
 import {
-  LayoutDashboard,
-  Hourglass,
   CheckCircle2,
-  Eye,
-  ChevronLeft,
-  ChevronRight,
   RefreshCw,
   Sparkles,
   TrendingUp,
   AlertCircle,
   Activity,
   Layers,
-  Calendar,
-  ArrowUpRight,
-  ClipboardList
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog'
 import {
   ResponsiveContainer,
   AreaChart,
@@ -110,11 +93,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
-  const [activeActionTab, setActiveActionTab] = useState<'urgent' | 'progress'>('urgent')
-  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
-  const [selectedQuoteForConfirm, setSelectedQuoteForConfirm] = useState<Quote | null>(null)
-  const [selectedOptionsToConfirm, setSelectedOptionsToConfirm] = useState<any[]>([])
-  const [confirmingQuote, setConfirmingQuote] = useState(false)
+
 
   const { addNotification } = useNotifications()
 
@@ -213,98 +192,6 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
     }))
   }, [quotes])
 
-  // 4. Action Center lists (filtered by Search if user searches)
-  const actionQuotes = useMemo(() => {
-    const filteredQuotes = quotes.filter((q) => {
-      return (
-        search === '' ||
-        q.productName.toLowerCase().includes(search.toLowerCase()) ||
-        q.quoteCode.toLowerCase().includes(search.toLowerCase())
-      )
-    })
-
-    const urgent = filteredQuotes.filter((q) =>
-      ['NEED_MORE_INFO', 'QUOTED', 'SENT_TO_CUSTOMER'].includes(q.status)
-    )
-
-    const progress = filteredQuotes.filter((q) =>
-      ['PENDING', 'QUOTING'].includes(q.status)
-    )
-
-    return {
-      urgent,
-      progress
-    }
-  }, [quotes, search])
-
-  // ─── Actions Handlers ───
-  const handleSentToCustomer = async (id: string, name: string) => {
-    try {
-      await quotesApi.sentToCustomer(id)
-      addNotification({ type: 'success', title: '📤 Đã gửi giá cho khách', message: `"${name}" đang chờ khách phản hồi.` })
-      fetchData()
-    } catch {
-      addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể cập nhật trạng thái.' })
-    }
-  }
-
-  const handleConfirm = async (id: string, name: string) => {
-    const q = quotes.find((x) => x._id === id)
-    if (!q) return
-
-    const options = q.options || []
-    if (options.length > 1) {
-      setSelectedQuoteForConfirm(q)
-      setSelectedOptionsToConfirm([options[0]])
-      setConfirmModalOpen(true)
-    } else {
-      const singleOption = options.length === 1 ? options[0] : null
-      const priceVal = singleOption?.sellingPrice || q.sellingPrice || 0
-      const matLabel = singleOption ? ` (${formatMaterialType(singleOption.materialType)})` : ''
-      if (confirm(`Bạn có chắc chắn muốn chốt báo giá cho "${name}"${matLabel} với giá ${formatCurrency(priceVal)} không?`)) {
-        try {
-          await quotesApi.confirm(id, singleOption || undefined)
-          addNotification({ type: 'success', title: '🎉 Khách chốt đơn!', message: `"${name}"${matLabel} đã được đặt hàng thành công.` })
-          fetchData()
-        } catch {
-          addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể xác nhận đơn.' })
-        }
-      }
-    }
-  }
-
-  const doConfirmMultiOption = async () => {
-    if (!selectedQuoteForConfirm || selectedOptionsToConfirm.length === 0) return
-    setConfirmingQuote(true)
-    const id = selectedQuoteForConfirm._id
-    const name = selectedQuoteForConfirm.productName
-    const opts = selectedOptionsToConfirm
-    const matLabels = opts.map(o => formatMaterialType(o.materialType)).join(', ')
-    try {
-      await quotesApi.confirm(id, undefined, opts)
-      addNotification({ type: 'success', title: '🎉 Khách chốt đơn!', message: `"${name}" (${matLabels}) đã được đặt hàng thành công.` })
-      setConfirmModalOpen(false)
-      setSelectedQuoteForConfirm(null)
-      setSelectedOptionsToConfirm([])
-      fetchData()
-    } catch {
-      addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể xác nhận đơn.' })
-    } finally {
-      setConfirmingQuote(false)
-    }
-  }
-
-  const handleCancel = async (id: string, name: string) => {
-    if (confirm(`Bạn có chắc chắn muốn huỷ báo giá "${name}"?`)) {
-      try {
-        await quotesApi.cancel(id)
-        addNotification({ type: 'warning', title: 'Báo giá đã huỷ', message: `Yêu cầu "${name}" đã bị huỷ.` })
-        fetchData()
-      } catch {
-        addNotification({ type: 'error', title: 'Thao tác thất bại', message: 'Không thể huỷ báo giá.' })
-      }
-    }
-  }
 
   return (
     <div className="space-y-6">
@@ -492,308 +379,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
         </section>
       )}
 
-      {/* ── Action Center Section ── */}
-      <section>
-        <Card className="border-luxury shadow-sm overflow-hidden">
-          
-          {/* Card Header with tabs */}
-          <div className="px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b bg-card">
-            <div>
-              <h2 className="text-lg font-serif font-semibold text-foreground tracking-wide flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-primary" />
-                Trung tâm tác vụ yêu cầu
-              </h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Xử lý nhanh các yêu cầu theo trạng thái công việc</p>
-            </div>
 
-            {/* Tab switchers */}
-            <div className="flex bg-[#e2e8f0]/40 p-0.5 rounded-lg border border-border/40 text-xs font-semibold">
-              <button
-                onClick={() => setActiveActionTab('urgent')}
-                className={cn(
-                  'px-4 py-1.5 rounded-md transition-all duration-200 tracking-wider text-[10px] font-bold flex items-center gap-1.5',
-                  activeActionTab === 'urgent'
-                    ? 'bg-[#6e5812] text-white shadow-sm'
-                    : 'text-[#64748b] hover:text-[#b4904c] hover:bg-white/40'
-                )}
-              >
-                CẦN XỬ LÝ NGAY
-                {actionQuotes.urgent.length > 0 && (
-                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[8px] font-extrabold rounded-full bg-rose-500 text-white leading-none">
-                    {actionQuotes.urgent.length}
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => setActiveActionTab('progress')}
-                className={cn(
-                  'px-4 py-1.5 rounded-md transition-all duration-200 tracking-wider text-[10px] font-bold',
-                  activeActionTab === 'progress'
-                    ? 'bg-[#6e5812] text-white shadow-sm'
-                    : 'text-[#64748b] hover:text-[#b4904c] hover:bg-white/40'
-                )}
-              >
-                ĐANG CHỜ BÁO GIÁ
-              </button>
-            </div>
-          </div>
-
-          {/* List display */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#FBF6E9] border-b border-[#EDE8DE]">
-                  {['Mã yêu cầu', 'Sản phẩm', 'Chất liệu', 'Ngày tạo', 'Giá bán', 'Trạng thái', 'Thao tác'].map((h) => (
-                    <th key={h} className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-[#6B5E4C] h-10">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <tr key={i} className="border-b border-slate-100/60">
-                      {Array.from({ length: 7 }).map((__, j) => (
-                        <td key={j} className="px-5 py-3.5">
-                          <div className="h-3 rounded bg-muted animate-pulse" style={{ width: `${60 + (j * 15) % 40}%` }} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : (activeActionTab === 'urgent' ? actionQuotes.urgent : actionQuotes.progress).length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-12 text-center text-xs text-muted-foreground font-medium bg-muted/5">
-                      <div className="max-w-sm mx-auto space-y-2">
-                        <CheckCircle2 className="mx-auto h-8 w-8 text-emerald-500 opacity-60" />
-                        <p className="font-semibold text-zinc-700">Tuyệt vời! Không có yêu cầu nào cần xử lý</p>
-                        <p className="text-[11px] text-muted-foreground">Tất cả các báo giá của bạn đã được cập nhật ổn định.</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : (
-                  (activeActionTab === 'urgent' ? actionQuotes.urgent : actionQuotes.progress).map((q, i) => {
-                    const st = STATUS_MAP[q.status] ?? { label: q.status, badgeClass: 'border-slate-200 bg-slate-50 text-slate-500' }
-                    return (
-                      <motion.tr
-                        key={q._id}
-                        onClick={() => onCreateSuccess?.(q)}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: i * 0.02, duration: 0.15 }}
-                        whileHover={{ backgroundColor: 'rgba(212, 175, 55, 0.02)' }}
-                        className="border-b border-border/40 hover:bg-muted/10 transition-all duration-200 group cursor-pointer"
-                      >
-                        <td className="px-5 py-3.5 text-xs font-bold text-[#b4904c] tracking-wider font-mono align-top">{q.quoteCode}</td>
-                        <td className="px-5 py-3.5 align-top">
-                          <span className="text-xs font-semibold text-foreground group-hover:text-[#b4904c] transition-colors">
-                            {q.productName}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-xs text-[#526071] font-medium align-top">
-                          <div className="space-y-1">
-                            {q.options && q.options.length > 0 ? (
-                              q.options.map((opt) => (
-                                <div key={opt.materialType} className="h-5 flex items-center">
-                                  {formatMaterialType(opt.materialType)}
-                                </div>
-                              ))
-                            ) : (
-                              <div className="h-5 flex items-center">{formatMaterialType(q.materialType)}</div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 text-xs text-muted-foreground align-top pt-[17px]">{formatDate(q.createdAt)}</td>
-                        <td className="px-5 py-3.5 text-xs font-bold text-[#b4904c] tracking-wide align-top">
-                          <div className="space-y-1">
-                            {q.options && q.options.length > 0 ? (
-                              q.options.map((opt, idx) => (
-                                <div key={idx} className="h-5 flex items-center justify-start tabular-nums">
-                                  {opt.sellingPrice ? formatCurrency(opt.sellingPrice) : '—'}
-                                </div>
-                              ))
-                            ) : (
-                              <div className="h-5 flex items-center">
-                                {q.sellingPrice ? formatCurrency(q.sellingPrice) : 'Chờ tính giá'}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 align-top pt-[14px]">
-                          <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider border', st.badgeClass)}>
-                            {st.label}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-right align-top pt-[11px]">
-                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                            {/* NEED_MORE_INFO: Bổ sung */}
-                            {q.status === 'NEED_MORE_INFO' && (
-                              <button
-                                onClick={() => onCreateSuccess?.(q)}
-                                className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-orange-500 hover:bg-orange-600 rounded-md transition-colors shadow-sm"
-                              >
-                                Bổ sung
-                              </button>
-                            )}
-
-                            {/* QUOTED: Xem giá + Gửi khách */}
-                            {q.status === 'QUOTED' && (
-                              <div className="flex gap-1.5">
-                                <button
-                                  onClick={() => onCreateSuccess?.(q)}
-                                  className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-[#64748b] bg-white border border-[#e2e8f0] hover:bg-[#e2e8f0]/30 rounded-md transition-colors shadow-sm h-7"
-                                >
-                                  XEM GIÁ
-                                </button>
-                                <button
-                                  onClick={() => handleSentToCustomer(q._id, q.productName)}
-                                  className="px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-white bg-[#4a5568] hover:bg-[#3d4656] rounded-md transition-colors shadow-sm h-7"
-                                >
-                                  GỬI KHÁCH
-                                </button>
-                              </div>
-                            )}
-
-                            {/* SENT_TO_CUSTOMER: Khách chốt + Huỷ */}
-                            {q.status === 'SENT_TO_CUSTOMER' && (
-                              <div className="flex gap-1.5">
-                                <button
-                                  onClick={() => handleConfirm(q._id, q.productName)}
-                                  className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors shadow-sm"
-                                >
-                                  Khách chốt
-                                </button>
-                                <button
-                                  onClick={() => handleCancel(q._id, q.productName)}
-                                  className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white bg-rose-600 hover:bg-rose-700 rounded-md transition-colors shadow-sm"
-                                >
-                                  Huỷ
-                                </button>
-                              </div>
-                            )}
-
-                            {/* Other statuses: Xem */}
-                            {!['NEED_MORE_INFO', 'QUOTED', 'SENT_TO_CUSTOMER'].includes(q.status) && (
-                              <button
-                                onClick={() => onCreateSuccess?.(q)}
-                                className="p-1 rounded-md text-muted-foreground hover:text-[#b4904c] hover:bg-muted transition-colors"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </motion.tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Card footer redirecting to quotes tab */}
-          {onViewAll && (
-            <div className="px-6 py-4 border-t bg-muted/5 flex items-center justify-center">
-              <Button
-                variant="ghost"
-                onClick={onViewAll}
-                className="text-xs font-semibold text-primary hover:text-primary/80 flex items-center gap-1.5"
-              >
-                Xem toàn bộ lịch sử yêu cầu báo giá
-                <ArrowUpRight className="h-4 w-4" />
-              </Button>
-            </div>
-          )}
-        </Card>
-      </section>
-      {/* Modal xác nhận chốt đơn cho nhiều phân loại */}
-      <Dialog open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
-        <DialogContent className="sm:max-w-[480px] border-[#D4AF37]/35 bg-white shadow-lg rounded-2xl">
-          <DialogHeader className="space-y-2">
-            <DialogTitle className="font-serif text-xl font-bold text-[#8C6D1F]">
-              Xác nhận khách chốt đơn
-            </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              Yêu cầu <span className="font-mono font-bold text-foreground">{selectedQuoteForConfirm?.quoteCode}</span> có nhiều tùy chọn chất liệu. Vui lòng chọn đúng chất liệu khách đã chốt:
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedQuoteForConfirm && (
-            <div className="py-4 space-y-3">
-              {(selectedQuoteForConfirm.options || []).map((opt) => {
-                const isSelected = selectedOptionsToConfirm.some(o => o.materialType === opt.materialType)
-                return (
-                  <div
-                    key={opt.materialType}
-                    onClick={() => {
-                      if (isSelected) {
-                        setSelectedOptionsToConfirm(selectedOptionsToConfirm.filter(o => o.materialType !== opt.materialType))
-                      } else {
-                        setSelectedOptionsToConfirm([...selectedOptionsToConfirm, opt])
-                      }
-                    }}
-                    className={cn(
-                      "flex items-center justify-between p-4 rounded-xl border cursor-pointer transition-all duration-200 select-none",
-                      isSelected
-                        ? "border-[#B4904C] bg-[#FBF6E9]/60 shadow-sm"
-                        : "border-border/60 hover:border-[#B4904C]/50 hover:bg-muted/30"
-                    )}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className={cn(
-                        "w-4 h-4 rounded border flex items-center justify-center transition-all",
-                        isSelected
-                          ? "border-[#B4904C] bg-[#B4904C] text-white"
-                          : "border-muted-foreground/40 bg-white"
-                      )}>
-                        {isSelected && (
-                          <svg className="w-3 h-3 stroke-current" viewBox="0 0 24 24" fill="none" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </span>
-                      <div>
-                        <p className={cn("font-bold text-sm", isSelected ? "text-[#8C6D1F]" : "text-[#3A352E]")}>
-                          {formatMaterialType(opt.materialType)}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">
-                          {opt.weightChi ? `${opt.weightChi} chi` : opt.weightGram ? `${opt.weightGram} gram` : '—'}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="font-extrabold text-sm text-[#A97800]">
-                      {opt.sellingPrice ? formatCurrency(opt.sellingPrice) : '—'}
-                    </p>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          <DialogFooter className="flex flex-row gap-2 justify-end sm:space-x-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setConfirmModalOpen(false)
-                setSelectedQuoteForConfirm(null)
-                setSelectedOptionsToConfirm([])
-              }}
-              className="flex-1 sm:flex-none h-9 text-xs font-semibold rounded-lg border-border/60"
-            >
-              Hủy bỏ
-            </Button>
-            <Button
-              type="button"
-              onClick={doConfirmMultiOption}
-              disabled={confirmingQuote || selectedOptionsToConfirm.length === 0}
-              className="flex-1 sm:flex-none h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-4 shadow-sm"
-            >
-              {confirmingQuote ? 'Đang xử lý...' : 'Xác nhận chốt đơn'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
