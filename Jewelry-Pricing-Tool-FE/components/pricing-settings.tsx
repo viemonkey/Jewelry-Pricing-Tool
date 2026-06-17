@@ -157,7 +157,7 @@ export function PricingSettings() {
   }
 
   return (
-    <div className="space-y-6 max-w-xl">
+    <div className="space-y-6 max-w-5xl">
       <div>
         <h1 className="text-2xl sm:text-3xl font-serif font-semibold bg-gradient-to-r from-primary via-amber-600 to-primary bg-clip-text text-transparent tracking-wide">
           Cấu hình giá nguyên liệu hàng ngày
@@ -167,7 +167,7 @@ export function PricingSettings() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Card giá vàng */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
