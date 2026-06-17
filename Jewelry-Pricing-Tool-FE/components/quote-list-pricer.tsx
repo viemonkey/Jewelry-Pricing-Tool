@@ -24,7 +24,7 @@ import { Calendar } from '@/components/ui/calendar'
 import { format, addYears } from 'date-fns'
 import { vi } from 'date-fns/locale'
 import {
-  Calculator, CheckCircle, Eye, Loader2, RefreshCw,
+  Calculator, CheckCircle, Eye, Loader2, RefreshCw, Clock,
   ThumbsUp, Ban, Gem, Hammer, Sparkles, TrendingUp, AlertCircle,
   Package, Zap, Send, ShoppingCart, ImageIcon, X, Layers, FileText,
   ChevronLeft, ChevronRight, Plus, Minus, CalendarIcon, ChevronDown, Check,
@@ -197,6 +197,34 @@ export function parseMaterialsFromQuote(quote: {
 
   // 3. Fallback: 1 dòng từ materialType
   return [makeGoldRow(quote.materialType)]
+}
+
+export function getQuoteDurationText(q: any): string | null {
+  if (!q.createdAt) return null
+  const start = new Date(q.createdAt).getTime()
+  const endVal = q.quotedAt ? q.quotedAt : (['QUOTED', 'SENT_TO_CUSTOMER', 'CONFIRMED', 'CANCELLED'].includes(q.status) ? q.updatedAt : null)
+  if (!endVal) return null
+  
+  const end = new Date(endVal).getTime()
+  const diffMs = end - start
+  if (diffMs <= 0) return '0 phút'
+  
+  const diffMins = Math.round(diffMs / (1000 * 60))
+  if (diffMins < 60) return `${diffMins} phút`
+  
+  const diffHours = Math.floor(diffMins / 60)
+  const remMins = diffMins % 60
+  if (diffHours < 24) {
+    return remMins > 0 ? `${diffHours} giờ ${remMins} phút` : `${diffHours} giờ`
+  }
+  
+  const diffDays = Math.floor(diffHours / 24)
+  const remHours = diffHours % 24
+  if (diffDays < 7) {
+    return remHours > 0 ? `${diffDays} ngày ${remHours} giờ` : `${diffDays} ngày`
+  }
+  
+  return new Date(q.createdAt).toLocaleDateString('vi-VN')
 }
 
 
@@ -466,6 +494,7 @@ function PricingDialogTabs({
                 { label: 'Người yêu cầu', value: selected.requestedBy, icon: '👤' },
                 { label: 'Số lượng', value: `${(selected as any).quantity ?? 1} cái`, icon: '📦' },
                 { label: 'Deadline', value: (selected as any).deadline, icon: '📅' },
+                ...(getQuoteDurationText(selected) ? [{ label: 'Thời gian báo giá', value: getQuoteDurationText(selected), icon: '⏱️' }] : []),
               ].map(({ label, value, icon }) => (
                 <div key={label} className="rounded-xl bg-muted/40 border border-border/50 px-4 py-3">
                   <p className="text-xs text-muted-foreground mb-1">{icon} {label}</p>
@@ -2325,6 +2354,12 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                             {quoteStatus.label}
                           </Badge>
                           <span className="text-xs font-semibold text-muted-foreground">{formatDate(q.createdAt)}</span>
+                          {getQuoteDurationText(q) && (
+                            <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200/50 px-2 py-0.5 rounded-full shrink-0">
+                              <Clock className="w-3 h-3" />
+                              Báo giá trong: {getQuoteDurationText(q)}
+                            </span>
+                          )}
                         </div>
                         <div>
                           <div className="min-w-0">
@@ -2571,6 +2606,7 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                         { label: 'Người yêu cầu', value: selected.requestedBy, icon: '👤' },
                         { label: 'Số lượng', value: `${(selected as any).quantity ?? 1} cái`, icon: '📦' },
                         { label: 'Deadline', value: (selected as any).deadline, icon: '📅' },
+                        ...(getQuoteDurationText(selected) ? [{ label: 'Thời gian báo giá', value: getQuoteDurationText(selected), icon: '⏱️' }] : []),
                       ].map(({ label, value, icon }) => (
                         <div key={label} className="rounded-xl bg-background border border-border/60 px-3 py-2.5">
                           <p className="text-xs text-muted-foreground mb-1">{icon} {label}</p>
@@ -3671,12 +3707,13 @@ export function QuoteListPricer({ currentRole, currentUserName = 'NV Báo giá',
                           </div>
                         )}
 
-                        {/* Metadata grid (3 columns) */}
-                        <div className="grid grid-cols-3 gap-2.5">
+                        {/* Metadata grid */}
+                        <div className={`grid gap-2.5 ${getQuoteDurationText(selected) ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
                           {[
                             { label: 'Người yêu cầu', value: selected.requestedBy, icon: '👤' },
                             { label: 'Số lượng', value: `${(selected as any).quantity || 1} cái`, icon: '📦' },
                             { label: 'Deadline', value: (selected as any).deadline, icon: '📅' },
+                            ...(getQuoteDurationText(selected) ? [{ label: 'Thời gian báo giá', value: getQuoteDurationText(selected), icon: '⏱️' }] : []),
                           ].map(({ label, value, icon }) => (
                             <div key={label} className="rounded-xl border border-[#EDE8DE] bg-white px-3 py-2.5 shadow-sm transition-all duration-200 hover:shadow-md">
                               <span className="text-[9px] text-[#9E8E7A] font-bold tracking-wider uppercase block">{icon} {label}</span>

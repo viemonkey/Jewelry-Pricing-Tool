@@ -20,8 +20,9 @@ import { useNotifications } from '@/lib/notifications'
 import type { Quote } from '@/lib/types'
 import {
   Check, X, Loader2, Eye, AlertCircle, FileText, CheckCircle2,
-  Calendar, User, Gem, Sparkles, Scale, Tag, Coins, Hammer
+  Calendar, User, Gem, Sparkles, Scale, Tag, Coins, Hammer, Clock
 } from 'lucide-react'
+import { getQuoteDurationText } from './quote-list-pricer'
 
 interface QuickQuoteApprovalsProps {
   currentUserName?: string
@@ -352,7 +353,7 @@ export function QuickQuoteApprovals({ currentUserName }: QuickQuoteApprovalsProp
 
                 <div className="py-5 space-y-5 text-xs">
                   {/* Timeline Meta Card */}
-                  <div className="grid grid-cols-2 gap-4 bg-muted/30 border rounded-2xl p-3">
+                  <div className={`grid gap-4 bg-muted/30 border rounded-2xl p-3 ${getQuoteDurationText(selectedQuote) ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
                     <div className="flex items-center gap-2.5">
                       <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center border shadow-sm shrink-0">
                         <User className="h-4 w-4 text-muted-foreground" />
@@ -373,6 +374,19 @@ export function QuickQuoteApprovals({ currentUserName }: QuickQuoteApprovalsProp
                         </p>
                       </div>
                     </div>
+                    {getQuoteDurationText(selectedQuote) && (
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-8 w-8 rounded-lg bg-background flex items-center justify-center border shadow-sm shrink-0">
+                          <Clock className="h-4 w-4 text-emerald-600" />
+                        </div>
+                        <div>
+                          <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider leading-none">Thời gian báo giá</p>
+                          <p className="font-semibold mt-1 text-emerald-600 leading-none">
+                            {getQuoteDurationText(selectedQuote)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid gap-5 md:grid-cols-[160px_1fr]">

@@ -429,7 +429,11 @@ class QuotesService {
         return result;
     }
     async updateStatus(id, status) {
-        const quote = await Quote_1.Quote.findByIdAndUpdate(id, { status }, { new: true }).lean();
+        const updateData = { status };
+        if (status === Quote_1.QuoteStatus.QUOTED) {
+            updateData.quotedAt = new Date();
+        }
+        const quote = await Quote_1.Quote.findByIdAndUpdate(id, updateData, { new: true }).lean();
         if (!quote) {
             const err = new Error('Quote not found');
             err.statusCode = 404;

@@ -94,6 +94,9 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
 
+  const myQuotes = useMemo(() => {
+    return quotes.filter((q) => q.requestedBy === currentUserName)
+  }, [quotes, currentUserName])
 
   const { addNotification } = useNotifications()
 
@@ -117,7 +120,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
 
   // 1. Pipeline performance metrics
   const performanceMetrics = useMemo(() => {
-    const confirmedQuotes = quotes.filter((q) => q.status === 'CONFIRMED')
+    const confirmedQuotes = myQuotes.filter((q) => q.status === 'CONFIRMED')
     
     const totalSalesVal = confirmedQuotes.reduce((sum, q) => {
       const quantity = Number((q as any).quantity) || 1
@@ -130,9 +133,9 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
       return sum + ((q as any).confirmedPrice || q.sellingPrice || 0) * quantity
     }, 0)
     
-    const urgentCount = quotes.filter((q) => q.status === 'NEED_MORE_INFO').length
+    const urgentCount = myQuotes.filter((q) => q.status === 'NEED_MORE_INFO').length
     
-    const completedCount = quotes.filter((q) => ['CONFIRMED', 'CANCELLED'].includes(q.status)).length
+    const completedCount = myQuotes.filter((q) => ['CONFIRMED', 'CANCELLED'].includes(q.status)).length
     const confirmedCount = confirmedQuotes.length
     const conversionRate = completedCount > 0 ? Math.round((confirmedCount / completedCount) * 100) : 0
 
@@ -141,7 +144,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
       urgentCount,
       conversionRate
     }
-  }, [quotes])
+  }, [myQuotes])
 
   // 2. Trend analysis chart data (Last 7 days)
   const trendChartData = useMemo(() => {
@@ -157,7 +160,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
     }
 
     // Populate from quotes
-    quotes.forEach((q) => {
+    myQuotes.forEach((q) => {
       if (!q.createdAt) return
       const key = q.createdAt.split('T')[0]
       if (datesMap[key]) {
@@ -171,12 +174,12 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
     })
 
     return Object.values(datesMap)
-  }, [quotes])
+  }, [myQuotes])
 
   // 3. Materials breakdown pie chart data
   const materialChartData = useMemo(() => {
     const counts: Record<string, number> = {}
-    quotes.forEach((q) => {
+    myQuotes.forEach((q) => {
       if (q.options && q.options.length > 0) {
         q.options.forEach((opt) => {
           counts[opt.materialType] = (counts[opt.materialType] || 0) + 1
@@ -190,7 +193,42 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
       name: formatMaterialType(type),
       value,
     }))
-  }, [quotes])
+  }, [myQuotes])
+
+  // 4. Monthly confirmed materials breakdown
+  const monthlyConfirmedMaterials = useMemo(() => {
+    const currentMonth = new Date().getMonth()
+    const currentYear = new Date().getFullYear()
+    const counts: Record<string, number> = {}
+
+    myQuotes.forEach((q) => {
+      if (q.status !== 'CONFIRMED') return
+      
+      const date = new Date(q.updatedAt)
+      if (date.getMonth() !== currentMonth || date.getFullYear() !== currentYear) return
+      
+      const qty = Number(q.quantity) || 1
+      if (q.options && q.options.length > 0) {
+        let hasConfirmedOption = false
+        q.options.forEach((opt) => {
+          if (opt.isConfirmed) {
+            counts[opt.materialType] = (counts[opt.materialType] || 0) + qty
+            hasConfirmedOption = true
+          }
+        })
+        if (!hasConfirmedOption) {
+          counts[q.materialType] = (counts[q.materialType] || 0) + qty
+        }
+      } else {
+        counts[q.materialType] = (counts[q.materialType] || 0) + qty
+      }
+    })
+
+    return Object.entries(counts).map(([type, value]) => ({
+      name: formatMaterialType(type),
+      value,
+    })).sort((a, b) => b.value - a.value)
+  }, [myQuotes])
 
 
   return (
@@ -227,8 +265,26 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
       </div>
 
       {/* ── Performance Stats row ── */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         
+        {/* Số lượng yêu cầu báo giá của bản thân */}
+        <Card className="hover:shadow-md transition-all-smooth relative overflow-hidden border-luxury shadow-sm">
+          <div className="absolute top-0 right-0 p-3 opacity-10">
+            <Layers className="w-20 h-20 text-[#b4904c]" />
+          </div>
+          <CardContent className="p-5 flex items-center gap-4 relative z-10">
+            <span className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-blue-500/10 text-blue-600 shrink-0">
+              <Layers className="w-6 h-6" />
+            </span>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Yêu cầu của tôi</p>
+              <h3 className="text-2xl font-serif font-bold text-foreground mt-0.5">
+                {myQuotes.length} <span className="text-xs font-normal text-muted-foreground">đơn</span>
+              </h3>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Doanh số đã chốt */}
         <Card className="hover:shadow-md transition-all-smooth relative overflow-hidden border-luxury shadow-sm">
           <div className="absolute top-0 right-0 p-3 opacity-10">
@@ -291,7 +347,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
 
       {/* ── Charts / Analytics Section ── */}
       {mounted && (
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* Chart 1: Request Volume Trend */}
           <Card className="border-luxury shadow-sm">
@@ -330,7 +386,7 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
                 <Layers className="h-4 w-4 text-primary" />
                 Cơ cấu chất liệu trang sức yêu cầu
               </CardTitle>
-              <CardDescription>Số lượng yêu cầu phân bổ theo phân loại chất liệu</CardDescription>
+              <CardDescription>Số lượng yêu cầu phân bổ theo chất liệu</CardDescription>
             </CardHeader>
             <CardContent className="h-64 pt-4 flex flex-col justify-between">
               {materialChartData.length === 0 ? (
@@ -376,6 +432,39 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
               )}
             </CardContent>
           </Card>
+
+          {/* Card 3: Monthly Confirmed Materials */}
+          <Card className="border-luxury shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-serif font-semibold text-foreground tracking-wide flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                Chất liệu đã chốt tháng này
+              </CardTitle>
+              <CardDescription>Số lượng chất liệu khách của bạn đã chốt trong tháng</CardDescription>
+            </CardHeader>
+            <CardContent className="h-64 pt-4 flex flex-col justify-start overflow-y-auto">
+              {monthlyConfirmedMaterials.length === 0 ? (
+                <div className="flex h-full items-center justify-center text-xs text-muted-foreground animate-pulse">
+                  Chưa có chất liệu nào được chốt trong tháng này
+                </div>
+              ) : (
+                <div className="space-y-3 pr-1 w-full">
+                  {monthlyConfirmedMaterials.map((entry, index) => (
+                    <div key={entry.name} className="flex items-center justify-between border-b border-border/40 pb-2 last:border-0 hover:bg-muted/30 transition-all p-1 rounded">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="font-medium text-xs text-zinc-700 dark:text-zinc-300">{entry.name}</span>
+                      </div>
+                      <span className="font-bold text-xs text-[#b4904c] bg-[#fbf6e9] px-2.5 py-0.5 rounded-full border border-[#d4af37]/25">
+                        {entry.value} món
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
         </section>
       )}
 

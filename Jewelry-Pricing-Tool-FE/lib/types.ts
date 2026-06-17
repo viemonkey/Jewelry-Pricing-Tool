@@ -74,6 +74,7 @@ export interface Quote {
   isQuickQuote?: boolean
   gender?: string
   productType?: 'RING' | 'NECKLACE' | 'BRACELET' | 'ANKLET' | null
+  quotedAt?: string
   createdAt: string
   updatedAt: string
 }

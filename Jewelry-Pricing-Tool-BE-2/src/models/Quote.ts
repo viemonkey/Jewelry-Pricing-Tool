@@ -78,6 +78,7 @@ export interface IQuote extends Document {
   options?: IQuoteOption[]
   isQuickQuote?: boolean
   gender?: string
+  quotedAt?: Date
   createdAt: Date
   updatedAt: Date
 }
@@ -134,6 +135,7 @@ const QuoteSchema = new Schema<IQuote>(
     options: { type: [QuoteOptionSchema], default: [] },
     isQuickQuote: { type: Boolean, default: false },
     gender: { type: String, default: 'unisex' },
+    quotedAt: { type: Date },
   },
   { timestamps: true }
 )

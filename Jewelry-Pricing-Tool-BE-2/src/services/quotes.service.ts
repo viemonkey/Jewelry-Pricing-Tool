@@ -503,7 +503,11 @@ export class QuotesService {
   }
 
   private async updateStatus(id: string, status: QuoteStatus) {
-    const quote = await Quote.findByIdAndUpdate(id, { status }, { new: true }).lean()
+    const updateData: any = { status }
+    if (status === QuoteStatus.QUOTED) {
+      updateData.quotedAt = new Date()
+    }
+    const quote = await Quote.findByIdAndUpdate(id, updateData, { new: true }).lean()
     if (!quote) {
       const err = new Error('Quote not found')
       ;(err as any).statusCode = 404
