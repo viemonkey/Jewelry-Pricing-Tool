@@ -72,6 +72,16 @@ export interface Quote {
   dimensions?: string
   stoneRequirements?: string
   isQuickQuote?: boolean
+  quantity?: number
+  deadline?: string
+  confirmedPrice?: number
+  goldPrice24K?: number | null
+  platinumPrice?: number | null
+  goldPriceEffectiveDate?: string | null
+  materialCost?: number
+  stoneCost?: number
+  costBeforeVAT?: number
+  costWithVAT?: number
   gender?: string
   productType?: 'RING' | 'NECKLACE' | 'BRACELET' | 'ANKLET' | null
   quotedAt?: string

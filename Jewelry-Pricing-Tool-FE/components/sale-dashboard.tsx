@@ -123,14 +123,14 @@ export function SaleDashboard({ currentUserName, search = '', onCreateSuccess, o
     const confirmedQuotes = myQuotes.filter((q) => q.status === 'CONFIRMED')
     
     const totalSalesVal = confirmedQuotes.reduce((sum, q) => {
-      const quantity = Number((q as any).quantity) || 1
+      const quantity = Number(q.quantity) || 1
       if (q.options && q.options.length > 0) {
         const confirmedOptionsTotal = q.options
           .filter((opt) => opt.isConfirmed)
           .reduce((s, opt) => s + (Number(opt.sellingPrice) || 0), 0)
         return sum + confirmedOptionsTotal * quantity
       }
-      return sum + ((q as any).confirmedPrice || q.sellingPrice || 0) * quantity
+      return sum + (q.confirmedPrice || q.sellingPrice || 0) * quantity
     }, 0)
     
     const urgentCount = myQuotes.filter((q) => q.status === 'NEED_MORE_INFO').length

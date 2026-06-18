@@ -81,18 +81,17 @@ function formatMaterialType(type: string) {
 }
 
 function getQuoteValue(q: Quote) {
-  const anyQuote = q as any
   const confirmedOptionsTotal = q.options
     ?.filter((opt) => opt.isConfirmed)
     .reduce((sum, opt) => sum + (Number(opt.sellingPrice) || 0), 0) ?? 0
-  const confirmedPrice = Number(anyQuote.confirmedPrice) || 0
+  const confirmedPrice = Number(q.confirmedPrice) || 0
   const optionPrice = q.options?.find((opt) => opt.isConfirmed && (opt.sellingPrice ?? 0) > 0)?.sellingPrice
   const fallbackOption = q.options?.find((opt) => (opt.sellingPrice ?? 0) > 0)?.sellingPrice
   return confirmedOptionsTotal || confirmedPrice || q.sellingPrice || optionPrice || fallbackOption || 0
 }
 
 function getQuoteQuantity(q: Quote) {
-  return Number((q as any).quantity) || 1
+  return Number(q.quantity) || 1
 }
 
 function isInSelectedMonth(iso: string | undefined, month: number, year: number) {
